@@ -41,6 +41,14 @@ void drawBoard(GameState *state)
     // Move to (0,0) and print text
     mvprintw(0, 0, "   === TETRIS ===   ");
 
+    // For ghost piece (QOL update)
+    int ghostY = state->current.y;
+    // Plunge ghost piece down as far legally
+    while (isValidPos(state, state->current.type, state->current.rot, state->current.x, ghostY + 1))
+    {
+        ghostY++;
+    }
+
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
         mvprintw(y + 2, 0, "|"); // Draw the left wall; (0, y+2) so is below the header
@@ -49,6 +57,8 @@ void drawBoard(GameState *state)
         {
             // Check if the active piece is hovering over this exact (X, Y)
             bool isActivePieceHere = false;
+            // Ghost Piece check
+            bool isGhostPieceHere = false;
 
             // Check if we are in the piece's 4x4 gridspace
             if (x >= state->current.x && x < state->current.x + 4 &&
@@ -67,6 +77,20 @@ void drawBoard(GameState *state)
                     isActivePieceHere = true; // Solid block found
                 }
             }
+            // Ghost piece logic
+            // Check if within ghost piece 4x4 gridspace
+            if (x >= state->current.x && x < state->current.x + 4 && y >= ghostY && y < ghostY + 4)
+            {
+                int px = x - state->current.x;
+                int py = y - ghostY;
+                int cellIndex = getRotationIndex(px, py, state->current.rot);
+                int shapeIndex = state->current.type - 1;
+
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    isGhostPieceHere = true;
+                }
+            }
             // Drawing with colours!
             if (isActivePieceHere)
             {
@@ -83,6 +107,11 @@ void drawBoard(GameState *state)
                 printw("  ");
                 attroff(COLOR_PAIR(lockedType));
             }
+            else if (isGhostPieceHere)
+            {
+                // Set colour pair that matches piece type and print
+                printw("[]");
+            }
             else
             {
                 printw(" ."); // Background: Empty space; No colour
@@ -91,10 +120,31 @@ void drawBoard(GameState *state)
         printw("|"); // Draw the right wall
     }
 
+    // Hold piece + grid to store it
+    mvprintw(2, 28, " HOLD ");
+    for (int hy = 0; hy < 4; hy++)
+    {
+        mvprintw(hy + 3, 28, "        ");
+        for (int hx = 0; hx < 4; hx++)
+        {
+            if (state->held_type != 0)
+            {
+                int shapeIndex = state->held_type - 1;
+                int cellIndex = getRotationIndex(hx, hy, 0);
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    attron(COLOR_PAIR(state->held_type));
+                    mvprintw(hy + 3, 28 + (hx * 2), "  ");
+                    attroff(COLOR_PAIR(state->held_type));
+                }
+            }
+        }
+    }
+
     // Draw the floor with stats
     mvprintw(BOARD_HEIGHT + 2, 0, "<!>================<!>");
     mvprintw(BOARD_HEIGHT + 3, 0, "   Score: %-6d Lines: %d", state->score, state->lines_cleared);
-    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [Q] Quit");
+    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [C] Hold  [Q] Quit");
 
     // Force push
     refresh();
@@ -158,9 +208,16 @@ int main()
                 gravityTimer = 0; // Reset Timer
                 flushinp();       // Clear kb buffer to prevent misfire
                 break;
+            case 'c':
+            case 'C':
+                holdPiece(&myGame);
+                gravityTimer = 0;
+                flushinp();
+                break;
             case 'q':
             case 'Q':
-                myGame.game_over = 1; // Trigger game over sequence
+                // Trigger game over sequence
+                myGame.game_over = 1;
                 break;
             }
         }

@@ -51,6 +51,8 @@ typedef struct
     Board board;
     Piece current;
     Piece next;
+    int held_type;
+    bool has_held;
     int score;
     int lines_cleared;
     int level;
@@ -82,5 +84,8 @@ int clearLines(GameState *state);
 
 // Repeat function to advance the game
 int tickGame(GameState *state);
+
+// Hold piece
+void holdPiece(GameState *state);
 
 #endif
