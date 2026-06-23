@@ -1,173 +1,272 @@
-#include <ncurses.h>
-#include <unistd.h>
-#include <locale.h>
-#include "tetrisbrain.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <unistd.h>  // POSIX OS API
+#include <ncurses.h> // Colours !!
+#include <time.h>    // Randomize piece spawn
+#include "tetrisu.h"
 
-// --- NCURSES SETUP ---
-void setupNcurses()
+/* ----- NCURSES ENVIRONMENT ----- */
+void setup()
 {
-    initscr();             // Initialize the ncurses window
-    cbreak();              // Disable line buffering (no waiting for Enter)
-    noecho();              // Don't print typed characters to the screen
-    keypad(stdscr, TRUE);  // Enable capture of special keys (like Arrows)
-    nodelay(stdscr, TRUE); // Make getch() non-blocking (returns ERR if no key)
-    curs_set(0);           // Hide the blinking cursor
+    initscr();             // Initialize
+    cbreak();              // Disable line buffering (ignore enter key)
+    noecho();              // Do not print typed charas to the screen
+    curs_set(0);           // Hide cursor
+    keypad(stdscr, TRUE);  // Enable capture of arrow keys
+    srand(time(NULL));     // Set new seed to ensure every initial spawn piece for each game is different
+    nodelay(stdscr, TRUE); // Make getch() non-blocking; returns ERR if no key detected
 
-    // --- COLOR SETUP ---
+    // Time for colour!
     if (has_colors())
     {
         start_color();
-        use_default_colors(); // Tells ncurses to respect your terminal's background
-
-        // Use -1 instead of COLOR_BLACK for a transparent background
-        init_pair(1, COLOR_CYAN, -1);
-        init_pair(2, COLOR_YELLOW, -1);
-        init_pair(3, COLOR_MAGENTA, -1);
-        init_pair(4, COLOR_GREEN, -1);
-        init_pair(5, COLOR_RED, -1);
-        init_pair(6, COLOR_BLUE, -1);
-        init_pair(7, COLOR_WHITE, -1);
+        // Colour pairs defined for each piece + background
+        init_pair(1, COLOR_BLACK, COLOR_CYAN);    // I piece
+        init_pair(2, COLOR_BLACK, COLOR_YELLOW);  // O piece
+        init_pair(3, COLOR_BLACK, COLOR_MAGENTA); // T piece
+        init_pair(4, COLOR_BLACK, COLOR_GREEN);   // S piece
+        init_pair(5, COLOR_BLACK, COLOR_RED);     // Z piece
+        init_pair(6, COLOR_BLACK, COLOR_BLUE);    // J piece
+        init_pair(7, COLOR_BLACK, COLOR_WHITE);   // L piece
+        // Following default tetris colours (ncurses doesn't support orange :( ))
     }
 }
 
-// --- RENDERER ---
+// Renders the board and active piece to the terminal
 void drawBoard(GameState *state)
 {
-    erase(); // Ncurses function to clear the virtual screen memory
+    erase(); // In-built NCURSES function to clear the virtual screen memory
 
-    // mvprintw(Y, X, string) moves the cursor and prints in one step
-    mvprintw(0, 0, "   === NCURSES TETRIS ===   ");
+    // Move to (0,0) and print text
+    mvprintw(0, 0, "   === TETRIS ===   ");
+
+    // For ghost piece (QOL update)
+    int ghostY = state->current.y;
+    // Plunge ghost piece down as far legally
+    while (isValidPos(state, state->current.type, state->current.rot, state->current.x, ghostY + 1))
+    {
+        ghostY++;
+    }
 
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
-        // Add +2 to Y so we draw below the title header
-        mvprintw(y + 2, 0, "<!>");
+        mvprintw(y + 2, 0, "|"); // Draw the left wall; (0, y+2) so is below the header
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
+            // Check if the active piece is hovering over this exact (X, Y)
             bool isActivePieceHere = false;
+            // Ghost Piece check
+            bool isGhostPieceHere = false;
 
+            // Check if we are in the piece's 4x4 gridspace
             if (x >= state->current.x && x < state->current.x + 4 &&
                 y >= state->current.y && y < state->current.y + 4)
             {
+                // Translate the global board coordinate back to a local coordinates
                 int px = x - state->current.x;
                 int py = y - state->current.y;
+
+                // Check our Tetris array
                 int cellIndex = getRotationIndex(px, py, state->current.rot);
                 int shapeIndex = state->current.type - 1;
 
                 if (tetrominoes[shapeIndex][cellIndex] != 0)
                 {
-                    isActivePieceHere = true;
+                    isActivePieceHere = true; // Solid block found
                 }
             }
+            // Ghost piece logic
+            // Check if within ghost piece 4x4 gridspace
+            if (x >= state->current.x && x < state->current.x + 4 && y >= ghostY && y < ghostY + 4)
+            {
+                int px = x - state->current.x;
+                int py = y - ghostY;
+                int cellIndex = getRotationIndex(px, py, state->current.rot);
+                int shapeIndex = state->current.type - 1;
 
-            // --- DRAW WITH COLORS ---
-            // --- DRAW WITH THE REVERSE SPACE TRICK ---
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    isGhostPieceHere = true;
+                }
+            }
+            // Drawing with colours!
             if (isActivePieceHere)
             {
-                // Turn on the color AND the reverse attribute
-                attron(COLOR_PAIR(state->current.type) | A_REVERSE);
-                printw("  "); // Print two blank spaces!
-                attroff(COLOR_PAIR(state->current.type) | A_REVERSE);
+                // Set colour pair that matches piece type and print
+                attron(COLOR_PAIR(state->current.type));
+                printw("  ");
+                attroff(COLOR_PAIR(state->current.type));
             }
             else if (state->board.cells[y][x] != 0)
             {
+                // Same thing here
                 int lockedType = state->board.cells[y][x];
-                attron(COLOR_PAIR(lockedType) | A_REVERSE);
-                printw("  "); // Print two blank spaces!
-                attroff(COLOR_PAIR(lockedType) | A_REVERSE);
+                attron(COLOR_PAIR(lockedType));
+                printw("  ");
+                attroff(COLOR_PAIR(lockedType));
+            }
+            else if (isGhostPieceHere)
+            {
+                // Set colour pair that matches piece type and print
+                printw("[]");
             }
             else
             {
-                printw(" ."); // Keep the empty space normal
+                printw(" ."); // Background: Empty space; No colour
             }
         }
-        printw("<!>"); // Right wall
+        printw("|"); // Draw the right wall
     }
 
-    // Floor and Stats
-    mvprintw(BOARD_HEIGHT + 2, 0, "<!>====================<!>");
-    mvprintw(BOARD_HEIGHT + 3, 0, "   Score: %-6d Lines: %d", state->score, state->lines_cleared);
-    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Arrows] Move/Drop  [Space] Rotate  [Q] Quit");
+    // Hold piece + grid to store it
+    mvprintw(2, 28, " HOLD ");
+    for (int hy = 0; hy < 4; hy++)
+    {
+        mvprintw(hy + 3, 28, "        ");
+        for (int hx = 0; hx < 4; hx++)
+        {
+            if (state->held_type != 0)
+            {
+                int shapeIndex = state->held_type - 1;
+                int cellIndex = getRotationIndex(hx, hy, 0);
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    attron(COLOR_PAIR(state->held_type));
+                    mvprintw(hy + 3, 28 + (hx * 2), "  ");
+                    attroff(COLOR_PAIR(state->held_type));
+                }
+            }
+        }
+    }
 
-    refresh(); // Ncurses pushes everything from virtual memory to the real screen instantly!
+    // Draw the floor with stats
+    mvprintw(BOARD_HEIGHT + 2, 0, "<!>================<!>");
+    mvprintw(BOARD_HEIGHT + 3, 0, "   Score: %-6d Lines: %d", state->score, state->lines_cleared);
+    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [C] Hold  [Q] Quit");
+
+    // Force push
+    refresh();
 }
 
-// --- MAIN GAME LOOP ---
+/* --- MAIN GAME LOOP --- */
 int main()
 {
+    // Spawn a game state
     GameState myGame;
 
-    // <--- ADD THIS LINE FIRST --->
-    setlocale(LC_ALL, ""); // Tells C and ncurses to support UTF-8 characters like ██
-
-    setupNcurses();
+    // Set up the terminal for the game
+    setup();
     startGame(&myGame);
 
+    // Timing set up => make the game more playable
     int gravityTimer = 0;
-    int gravityThreshold = 50;
+    int gravityThreshold = 25; // How many loop cycles before the piece drops 1 row
 
+    // --- THE GAME LOOP ---
     while (!myGame.game_over)
     {
-        // 1. Process Inputs (So much cleaner now!)
+        // Read user inputs
         int key = getch();
 
         if (key != ERR) // ERR means no key was pressed
         {
+            // keypad(stdscr, TRUE) translates raw Linux bytes into macros, so no need process directly
             switch (key)
             {
             case KEY_LEFT:
                 if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x - 1, myGame.current.y))
+                {
                     myGame.current.x--;
+                }
                 break;
             case KEY_RIGHT:
                 if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x + 1, myGame.current.y))
+                {
                     myGame.current.x++;
+                }
                 break;
-            case KEY_DOWN:
+            case KEY_DOWN: // Soft Drop
                 if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
+                {
+                    // If the piece moved successfully
                     myGame.current.y++;
-                gravityTimer = 0;
+                    gravityTimer = 0; // Prevention for double-drop stutter
+                }
                 break;
-            case KEY_UP:
-            case ' ':
+            case KEY_UP: // Rotate
                 rotateCurrentPiece(&myGame);
+                break;
+            case ' ': // Hard Drop
+                while (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
+                {
+                    myGame.current.y++;
+                }
+                // Lock immediately
+                tickGame(&myGame);
+                gravityTimer = 0; // Reset Timer
+                flushinp();       // Clear kb buffer to prevent misfire
+                break;
+            case 'c':
+            case 'C':
+                holdPiece(&myGame);
+                gravityTimer = 0;
+                flushinp();
                 break;
             case 'q':
             case 'Q':
-                myGame.game_over = 1; // Trigger game over sequence instead of immediate break
+                // Trigger game over sequence
+                myGame.game_over = 1;
                 break;
             }
         }
 
-        // 2. Gravity
+        // Gravity
         gravityTimer++;
         if (gravityTimer >= gravityThreshold)
         {
             tickGame(&myGame);
-            gravityTimer = 0;
+            gravityTimer = 0; // Reset the timer
         }
 
-        // 3. Render
+        // Render the board
         drawBoard(&myGame);
 
-        // 4. Frame Delay
+        // Delay frames to be visible to the human eye
         usleep(10000);
     }
 
-    // --- POST-GAME CLEANUP ---
-    drawBoard(&myGame); // Final draw
-    mvprintw(BOARD_HEIGHT + 6, 0, "<!> ====================== <!>");
-    mvprintw(BOARD_HEIGHT + 7, 0, "<!>       GAME OVER!       <!>");
-    mvprintw(BOARD_HEIGHT + 8, 0, "<!>    Final Score: %-4d   <!>", myGame.score);
-    mvprintw(BOARD_HEIGHT + 9, 0, "<!> ====================== <!>");
-    mvprintw(BOARD_HEIGHT + 11, 0, "Press any key to exit...");
+    // Clean up after game ends
+    drawBoard(&myGame); // Show final state
+
+    // Game Over Banner
+    int startY = BOARD_HEIGHT + 6;
+    mvprintw(startY, 0, "<!> ====================== <!>");
+    attron(COLOR_PAIR(5)); // RED RED
+    mvprintw(startY + 1, 0, "<!>       GAME OVER!       <!>");
+    attroff(COLOR_PAIR(5)); // Turn off color to show white text
+
+    mvprintw(startY + 2, 0, "<!>      Final Score: %-4d <!>", myGame.score);
+    mvprintw(startY + 3, 0, "<!>    Lines Cleared: %-4d <!>", myGame.lines_cleared);
+    mvprintw(startY + 4, 0, "<!> ====================== <!>");
+
+    // Blinks the prompt so the user knows they can exit
+    attron(A_BLINK);
+    mvprintw(startY + 6, 0, "Press any key to exit to terminal...");
+    attroff(A_BLINK);
+
+    // Push changes to the main screen
     refresh();
 
-    // Wait for player to press a key before exiting
-    nodelay(stdscr, FALSE); // Turn blocking back ON so we just pause here
+    // Turn blocking back ON
+    nodelay(stdscr, FALSE);
+
+    // Wait for input stroke
     getch();
 
-    endwin(); // CRITICAL: Restores the user's terminal back to normal
+    // Destroy and return to normal terminal
+    endwin();
+
     return 0;
 }

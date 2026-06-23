@@ -1,9 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -I./include
 
-# LDFLAGS (Linker Flags) is where we tell gcc to link external libraries
-LDFLAGS = -lncurses
-
 TARGET = tetris_test
 
 SRCS = src/libtetrisbrain/tetrisbrain.c src/tetrisu/tetrisu.c
@@ -12,7 +9,7 @@ OBJS = $(SRCS:.c=.o)
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	$(CC) $(OBJS) -o $(TARGET)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -1,49 +1,77 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <termios.h> // Linux terminal control
 #include <unistd.h>  // POSIX OS API
-#include <ncurses.h> // Colours !!
-#include <time.h>    // Randomize piece spawn
+#include <fcntl.h>   // File control (for non-blocking reads)
 #include "tetrisu.h"
 
-/* ----- NCURSES ENVIRONMENT ----- */
-void setup()
-{
-    initscr();             // Initialize
-    cbreak();              // Disable line buffering (ignore enter key)
-    noecho();              // Do not print typed charas to the screen
-    curs_set(0);           // Hide cursor
-    keypad(stdscr, TRUE);  // Enable capture of arrow keys
-    srand(time(NULL));     // Set new seed to ensure every initial spawn piece for each game is different
-    nodelay(stdscr, TRUE); // Make getch() non-blocking; returns ERR if no key detected
+// --- TERMINAL CONTROL (termios) ---
+// Linux in-built terminal flags
+struct termios orig_termios;
 
-    // Time for colour!
-    if (has_colors())
+// Reset terminal back to normal; if not will remain broken
+void disableRawMode(void)
+{
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios); // Apply stdin NOW, then reset back to handed saved state
+    printf("\e[?25h");                               // Show cursor
+    fflush(stdout);                                  // Force print
+}
+
+// Invoke terminal settings
+void enableRawMode()
+{
+    tcgetattr(STDIN_FILENO, &orig_termios); // Save current terminal settings and store as saved state
+    atexit(disableRawMode);                 // Enforces revert back to normal terminal settings when user quits / ctrl-c
+    struct termios raw = orig_termios;      // Make a copy of current state for us to work on
+
+    // ICANON => system holds input inside a buffer until enter key is pressed
+    // When disabled, sends every single keypress directly to the application instantly
+    // ECHO => shows current input on screen; when disabled, input is completely hidden from screen
+    raw.c_lflag &= ~(ECHO | ICANON); // Turn off "print keys to screen" and "wait for enter key"
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw); // Apply modifications on this saved state copy
+    printf("\e[?25l");                      // Hide blinking cursor
+    fflush(stdout);                         // Force print
+}
+
+// Checks if a key has been pressed (Non-blocking)
+int kbhit(void)
+{
+    int ch;
+
+    // In Linux, input is also treated as a file;
+    int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);      // Get current stdin
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK); // Add special flag => if no input registered, instantly return EOF and continue
+    ch = getchar();                                  // Attempt to read a chara
+    fcntl(STDIN_FILENO, F_SETFL, oldf);              // Restore normal behaviour
+
+    // If a key was pressed
+    if (ch != EOF)
     {
-        start_color();
-        // Colour pairs defined for each piece + background
-        init_pair(1, COLOR_BLACK, COLOR_CYAN);    // I piece
-        init_pair(2, COLOR_BLACK, COLOR_YELLOW);  // O piece
-        init_pair(3, COLOR_BLACK, COLOR_MAGENTA); // T piece
-        init_pair(4, COLOR_BLACK, COLOR_GREEN);   // S piece
-        init_pair(5, COLOR_BLACK, COLOR_RED);     // Z piece
-        init_pair(6, COLOR_BLACK, COLOR_BLUE);    // J piece
-        init_pair(7, COLOR_BLACK, COLOR_WHITE);   // L piece
-        // Following default tetris colours (ncurses doesn't support orange :( ))
+        ungetc(ch, stdin); // Feed obtained input into actual input
+        return 1;          // Return true
     }
+
+    return 0; // Return false
+}
+
+// Wrapper to grab the character (input) from stdin once we know it's there
+int getch(void)
+{
+    return getchar();
 }
 
 // Renders the board and active piece to the terminal
 void drawBoard(GameState *state)
 {
-    erase(); // In-built NCURSES function to clear the virtual screen memory
+    printf("\e[1;1H"); // Move cursor to top left to prevent flickering
 
-    // Move to (0,0) and print text
-    mvprintw(0, 0, "   === TETRIS ===   ");
+    printf("===      TETRIS     ===\n");
+    printf("                       \n");
 
-    // For ghost piece (QOL update)
+    // For ghost piece
     int ghostY = state->current.y;
-    // Plunge ghost piece down as far legally
     while (isValidPos(state, state->current.type, state->current.rot, state->current.x, ghostY + 1))
     {
         ghostY++;
@@ -51,13 +79,12 @@ void drawBoard(GameState *state)
 
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
-        mvprintw(y + 2, 0, "|"); // Draw the left wall; (0, y+2) so is below the header
+        printf("|"); // Draw the left wall
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
             // Check if the active piece is hovering over this exact (X, Y)
             bool isActivePieceHere = false;
-            // Ghost Piece check
             bool isGhostPieceHere = false;
 
             // Check if we are in the piece's 4x4 gridspace
@@ -77,88 +104,83 @@ void drawBoard(GameState *state)
                     isActivePieceHere = true; // Solid block found
                 }
             }
-            // Ghost piece logic
-            // Check if within ghost piece 4x4 gridspace
-            if (x >= state->current.x && x < state->current.x + 4 && y >= ghostY && y < ghostY + 4)
+
+            // Ghost piece
+            if (x >= state->current.x && x < state->current.x + 4 &&
+                y >= ghostY && y < ghostY + 4)
             {
                 int px = x - state->current.x;
                 int py = y - ghostY;
-                int cellIndex = getRotationIndex(px, py, state->current.rot);
-                int shapeIndex = state->current.type - 1;
-
-                if (tetrominoes[shapeIndex][cellIndex] != 0)
-                {
+                if (tetrominoes[state->current.type - 1][getRotationIndex(px, py, state->current.rot)] != 0)
                     isGhostPieceHere = true;
-                }
             }
-            // Drawing with colours!
+
             if (isActivePieceHere)
             {
-                // Set colour pair that matches piece type and print
-                attron(COLOR_PAIR(state->current.type));
-                printw("  ");
-                attroff(COLOR_PAIR(state->current.type));
+                printf("[]"); // Top Layer: Active falling piece
             }
             else if (state->board.cells[y][x] != 0)
             {
-                // Same thing here
-                int lockedType = state->board.cells[y][x];
-                attron(COLOR_PAIR(lockedType));
-                printw("  ");
-                attroff(COLOR_PAIR(lockedType));
+                printf("##"); // Middle Layer: Locked blocks
             }
-            else if (isGhostPieceHere)
+            else if (isGhostPieceHere) // Ghost Piece
             {
-                // Set colour pair that matches piece type and print
-                printw("[]");
+                printf("::");
             }
             else
             {
-                printw(" ."); // Background: Empty space; No colour
+                printf(" ."); // Background: Empty space
             }
         }
-        printw("|"); // Draw the right wall
-    }
+        printf("|"); // Draw the right wall
 
-    // Hold piece + grid to store it
-    mvprintw(2, 28, " HOLD ");
-    for (int hy = 0; hy < 4; hy++)
-    {
-        mvprintw(hy + 3, 28, "        ");
-        for (int hx = 0; hx < 4; hx++)
+        // For hold box to the right of the board
+        if (y == 0)
         {
-            if (state->held_type != 0)
+            printf("  HOLD BOX");
+        }
+        else if (y >= 1 && y <= 4)
+        {
+            printf("  "); // Padding
+            int hy = y - 1;
+            for (int hx = 0; hx < 4; hx++)
             {
-                int shapeIndex = state->held_type - 1;
-                int cellIndex = getRotationIndex(hx, hy, 0);
-                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                if (state->held_type != 0)
                 {
-                    attron(COLOR_PAIR(state->held_type));
-                    mvprintw(hy + 3, 28 + (hx * 2), "  ");
-                    attroff(COLOR_PAIR(state->held_type));
+                    if (tetrominoes[state->held_type - 1][getRotationIndex(hx, hy, 0)] != 0)
+                        printf("[]");
+                    else
+                        printf("  ");
                 }
+                else
+                    printf("  "); // Empty space if nothing held
             }
         }
+        printf("\n"); // Push to next row
     }
 
-    // Draw the floor with stats
-    mvprintw(BOARD_HEIGHT + 2, 0, "<!>================<!>");
-    mvprintw(BOARD_HEIGHT + 3, 0, "   Score: %-6d Lines: %d", state->score, state->lines_cleared);
-    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [C] Hold  [Q] Quit");
-
-    // Force push
-    refresh();
+    // Draw the floor
+    printf("----------------------\n");
+    printf("Score: %d  |  Lines: %d\n", state->score, state->lines_cleared);
+    printf("   [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [H] Hold  [Q] Quit");
+    fflush(stdout); // Force print
 }
 
-/* --- MAIN GAME LOOP --- */
+// --- MAIN GAME LOOP ---
 int main()
 {
     // Spawn a game state
     GameState myGame;
 
+    // Clear terminal screen
     // Set up the terminal for the game
-    setup();
+    enableRawMode();
+    printf("\e[1;1H\e[2J");
+    fflush(stdout);
+
     startGame(&myGame);
+    myGame.held_type = 0; // Initialize hold box
+    myGame.has_held = false;
 
     // Timing set up => make the game more playable
     int gravityTimer = 0;
@@ -168,57 +190,67 @@ int main()
     while (!myGame.game_over)
     {
         // Read user inputs
-        int key = getch();
-
-        if (key != ERR) // ERR means no key was pressed
+        if (kbhit())
         {
-            // keypad(stdscr, TRUE) translates raw Linux bytes into macros, so no need process directly
-            switch (key)
+            // Call getch() wrapper
+            int key = getch();
+
+            // Linux arrow keys send 3 characters instantly => escape (27), '[', and a letter
+            if (key == 27) // Escape or arrow key?
             {
-            case KEY_LEFT:
-                if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x - 1, myGame.current.y))
+                if (kbhit() && getch() == '[') // Bracket right after?
                 {
-                    myGame.current.x--;
+                    if (kbhit()) // Decide output based on letter
+                    {
+                        switch (getch())
+                        {
+                        case 'A': // Up arrow
+                            rotateCurrentPiece(&myGame);
+                            break;
+                        case 'D': // Left arrow
+                            if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x - 1, myGame.current.y))
+                            {
+                                myGame.current.x--;
+                            }
+                            break;
+                        case 'C': // Right arrow
+                            if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x + 1, myGame.current.y))
+                            {
+                                myGame.current.x++;
+                            }
+                            break;
+                        case 'B': // Down arrow (soft drop + lock delay)
+                            if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
+                            {
+                                myGame.current.y++;
+                                gravityTimer = 0; // Reset timer to prevent double dropping
+                            }
+                            break;
+                        }
+                    }
                 }
-                break;
-            case KEY_RIGHT:
-                if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x + 1, myGame.current.y))
-                {
-                    myGame.current.x++;
-                }
-                break;
-            case KEY_DOWN: // Soft Drop
-                if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
-                {
-                    // If the piece moved successfully
-                    myGame.current.y++;
-                    gravityTimer = 0; // Prevention for double-drop stutter
-                }
-                break;
-            case KEY_UP: // Rotate
-                rotateCurrentPiece(&myGame);
-                break;
-            case ' ': // Hard Drop
+            }
+            else if (key == ' ') // Spacebar (hard drop)
+            {
                 while (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
                 {
                     myGame.current.y++;
                 }
-                // Lock immediately
                 tickGame(&myGame);
-                gravityTimer = 0; // Reset Timer
-                flushinp();       // Clear kb buffer to prevent misfire
-                break;
-            case 'c':
-            case 'C':
+                gravityTimer = 0;
+
+                // Clear the raw terminal input buffer to prevent double drops
+                tcflush(STDIN_FILENO, TCIFLUSH);
+            }
+            else if (key == 'h' || key == 'H') // H to hold
+            {
                 holdPiece(&myGame);
                 gravityTimer = 0;
-                flushinp();
-                break;
-            case 'q':
-            case 'Q':
-                // Trigger game over sequence
-                myGame.game_over = 1;
-                break;
+                tcflush(STDIN_FILENO, TCIFLUSH);
+            }
+            else if (key == 'q' || key == 'Q') // Q to quit
+            {
+                break; // Exit
             }
         }
 
@@ -238,35 +270,22 @@ int main()
     }
 
     // Clean up after game ends
-    drawBoard(&myGame); // Show final state
+    drawBoard(&myGame);
+    printf("\n\n");
+    printf("<!> ====================== <!>\n");
+    printf("<!>       GAME OVER!       <!>\n");
+    printf("<!>      Final Score: %-4d <!>\n", myGame.score);
+    printf("<!>     Lines Cleared: %-4d<!>\n", myGame.lines_cleared);
+    printf("<!> ====================== <!>\n");
+    printf("\nPress any key to exit...\n");
 
-    // Game Over Banner
-    int startY = BOARD_HEIGHT + 6;
-    mvprintw(startY, 0, "<!> ====================== <!>");
-    attron(COLOR_PAIR(5)); // RED RED
-    mvprintw(startY + 1, 0, "<!>       GAME OVER!       <!>");
-    attroff(COLOR_PAIR(5)); // Turn off color to show white text
-
-    mvprintw(startY + 2, 0, "<!>      Final Score: %-4d <!>", myGame.score);
-    mvprintw(startY + 3, 0, "<!>    Lines Cleared: %-4d <!>", myGame.lines_cleared);
-    mvprintw(startY + 4, 0, "<!> ====================== <!>");
-
-    // Blinks the prompt so the user knows they can exit
-    attron(A_BLINK);
-    mvprintw(startY + 6, 0, "Press any key to exit to terminal...");
-    attroff(A_BLINK);
-
-    // Push changes to the main screen
-    refresh();
-
-    // Turn blocking back ON
-    nodelay(stdscr, FALSE);
-
-    // Wait for input stroke
+    // Only quit when a keystroke is detected.
+    tcflush(STDIN_FILENO, TCIFLUSH);
+    while (!kbhit())
+    {
+        usleep(10000);
+    }
     getch();
-
-    // Destroy and return to normal terminal
-    endwin();
 
     return 0;
 }
