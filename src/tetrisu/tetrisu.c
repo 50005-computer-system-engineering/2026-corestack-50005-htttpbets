@@ -94,7 +94,7 @@ void drawBoard(GameState *state)
     // Draw the floor with stats
     mvprintw(BOARD_HEIGHT + 2, 0, "<!>================<!>");
     mvprintw(BOARD_HEIGHT + 3, 0, "   Score: %-6d Lines: %d", state->score, state->lines_cleared);
-    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Arrows] Move/Drop  [Space] Rotate  [Q] Quit");
+    mvprintw(BOARD_HEIGHT + 4, 0, "   Controls: [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [Q] Quit");
 
     // Force push
     refresh();
@@ -156,7 +156,7 @@ int main()
                 // Lock immediately
                 tickGame(&myGame);
                 gravityTimer = 0; // Reset Timer
-                flushinp(); // Clear kb buffer to prevent misfire
+                flushinp();       // Clear kb buffer to prevent misfire
                 break;
             case 'q':
             case 'Q':
