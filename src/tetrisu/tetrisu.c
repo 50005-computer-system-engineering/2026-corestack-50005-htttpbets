@@ -162,7 +162,7 @@ void drawBoard(GameState *state)
     // Draw the floor
     printf("----------------------\n");
     printf("Score: %d  |  Lines: %d\n", state->score, state->lines_cleared);
-    printf("   [Left | Right] Move  [Down] Soft Drop  [Up] Rotate  [Space] Hard Drop  [H] Hold  [Q] Quit");
+    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
     fflush(stdout); // Force print
 }
 
@@ -204,7 +204,7 @@ int main()
                     {
                         switch (getch())
                         {
-                        case 'A': // Up arrow
+                        case 'A': // Up arrow (rotate clockwise)
                             rotateCurrentPiece(&myGame);
                             break;
                         case 'D': // Left arrow
@@ -229,6 +229,14 @@ int main()
                         }
                     }
                 }
+            }
+            else if(key == 'x' || key == 'X') // Rotate clockwise (alternate key)
+            {
+                rotateCurrentPiece(&myGame);
+            }
+            else if(key == 'z' || key == 'Z') // Rotate counterclockwise
+            {
+                rotateCounterClockwise(&myGame);
             }
             else if (key == ' ') // Spacebar (hard drop)
             {

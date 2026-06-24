@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <time.h>
 #include "tetrisbrain.h"
 
 const int tetrominoes[7][16] = {
@@ -21,6 +22,9 @@ void startGame(GameState *state)
     // reset game state
     memset(state, 0, sizeof(GameState));
 
+    // Generate starting bag of pieces
+    srand(time(NULL)); // Seed for randomization
+
     // reset game variables
     state->held_type = 0;
     state->score = 0;
@@ -29,14 +33,43 @@ void startGame(GameState *state)
     state->level = 1;
 
     // Start spawning first piece
+    shuffleBag(state); // Shuffle first bag
     spawnNewPiece(state);
+}
+
+// Bagging system - fill the bag with the pieces and shuffle them randomly
+void shuffleBag(GameState *state)
+{
+    // Fill up the bag sequentially
+    for (int i = 0; i < 7; i++)
+    {
+        state->bag[i] = i + 1;
+    }
+    // Fisher-Yates shuffle -> ensures that our next bag is truly random with the same 7 pieces
+    for (int i = 6; i > 0; i--)
+    {
+        int j = rand() % (i + 1); // Pick random index from 0 to i
+        // Swap the pieces
+        int temp = state->bag[i];
+        state->bag[i] = state->bag[j];
+        state->bag[j] = temp;
+    }
+    // Reset the draw index
+    state->bag_index = 0;
 }
 
 // Spawns a new piece
 void spawnNewPiece(GameState *state)
 {
-    // Pick a random piece
-    state->current.type = (PieceType)((rand() % 7) + 1);
+    // Only shuffle when bag is empty
+    if (state->bag_index >= 7)
+    {
+        shuffleBag(state);
+    }
+
+    // Draw next piece from the bag
+    state->current.type = state->bag[state->bag_index];
+    state->bag_index++;
 
     state->current.rot = ROT_0;               // Default rotation
     state->current.x = (BOARD_WIDTH / 2) - 2; // Centered horizontally
@@ -101,7 +134,7 @@ bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int po
     return true;
 }
 
-// Rotation logic
+// Rotate clockwise logic
 void rotateCurrentPiece(GameState *state)
 {
     // Calculate what the next rotation state would be (0 -> 1 -> 2 -> 3 -> 0)
@@ -111,6 +144,19 @@ void rotateCurrentPiece(GameState *state)
     if (isValidPos(state, state->current.type, nextRot, state->current.x, state->current.y))
     {
         state->current.rot = nextRot; // Successful rotation
+    }
+}
+
+// Rotate clockwise logic
+void rotateCounterClockwise(GameState *state)
+{
+    // Calculate what the next rotation state would be (3 -> 0 -> 1 -> 2 )
+    int nextRot = (state->current.rot + 3) % 4;
+
+    // Check if after rotation, is the new position valid
+    if (isValidPos(state, state->current.type, nextRot, state->current.x, state->current.y))
+    {
+        state->current.rot = nextRot;
     }
 }
 

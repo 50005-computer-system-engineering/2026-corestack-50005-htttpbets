@@ -53,6 +53,8 @@ typedef struct
     Piece next;
     int held_type;
     bool has_held;
+    int bag[7];
+    int bag_index;
     int score;
     int lines_cleared;
     int level;
@@ -64,6 +66,9 @@ extern const int tetrominoes[7][16];
 //function call to start the game
 void startGame(GameState *state);
 
+// Bagging system - fill the bag with the pieces and shuffle them randomly
+void shuffleBag(GameState *state);
+
 // Spawns a new piece
 void spawnNewPiece(GameState *state);
 
@@ -73,8 +78,11 @@ int getRotationIndex(int x, int y, Rotation rot);
 // Check for collisions
 bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int posY);
 
-// Rotation logic
+// Rotate clockwise logic
 void rotateCurrentPiece(GameState *state);
+
+// Rotate counter clockwise logic
+void rotateCounterClockwise(GameState *state);
 
 // Locking the piece after it finalizes its position
 void lockPiece(GameState *state);
