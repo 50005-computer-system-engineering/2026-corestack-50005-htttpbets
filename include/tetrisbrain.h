@@ -14,11 +14,11 @@ typedef enum
     PIECE_NONE = 0,
     PIECE_I = 1, // Straight line of 4 blocks
     PIECE_O = 2, // Square block
-    PIECE_T = 3, // T-piece 
+    PIECE_T = 3, // T-piece
     PIECE_S = 4, // Z shape, offset to the right
     PIECE_Z = 5, // Z shape, offset to the left
     PIECE_J = 6, // Reverse L shape pointing to the left
-    PIECE_L = 7 // Reverse L shape pointing to the right
+    PIECE_L = 7  // Reverse L shape pointing to the right
 } PieceType;
 
 /* ----- ROTATION (SUPER ROTATION SYSTEM) ----- */
@@ -26,8 +26,8 @@ typedef enum
 {
     ROT_0 = 0, // SPAWN
     ROT_1 = 1, // RIGHT
-    ROT_2 = 2, // 180 DEG 
-    ROT_3 = 3 // LEFT
+    ROT_2 = 2, // 180 DEG
+    ROT_3 = 3  // LEFT
 } Rotation;
 
 /* ----- ACTIVE PIECE ----- */
@@ -55,6 +55,10 @@ typedef struct
     bool has_held;
     int bag[7];
     int bag_index;
+    int pieces_placed;
+    int tetrises;
+    int t_spins;
+    bool last_action_rotation;
     int score;
     int lines_cleared;
     int level;
@@ -63,7 +67,7 @@ typedef struct
 
 extern const int tetrominoes[7][16];
 
-//function call to start the game
+// function call to start the game
 void startGame(GameState *state);
 
 // Bagging system - fill the bag with the pieces and shuffle them randomly
@@ -78,6 +82,9 @@ int getRotationIndex(int x, int y, Rotation rot);
 // Check for collisions
 bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int posY);
 
+// Wall kick helper function
+bool testRotate(GameState *state, int nextRot);
+
 // Rotate clockwise logic
 void rotateCurrentPiece(GameState *state);
 
@@ -89,6 +96,9 @@ void lockPiece(GameState *state);
 
 // Tetris
 int clearLines(GameState *state);
+
+// Check for t-spin; return 1 if valid, 0 if not
+int checkTSpin(GameState *state);
 
 // Repeat function to advance the game
 int tickGame(GameState *state);

@@ -161,7 +161,7 @@ void drawBoard(GameState *state)
 
     // Draw the floor
     printf("----------------------\n");
-    printf("Score: %d  |  Lines: %d\n", state->score, state->lines_cleared);
+    printf("Score: %d  |  Lines: %d\n | T-Spins: %d\n", state->score, state->lines_cleared, state->t_spins);
     printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
     fflush(stdout); // Force print
 }
@@ -211,18 +211,21 @@ int main()
                             if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x - 1, myGame.current.y))
                             {
                                 myGame.current.x--;
+                                myGame.last_action_rotation = false;
                             }
                             break;
                         case 'C': // Right arrow
                             if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x + 1, myGame.current.y))
                             {
                                 myGame.current.x++;
+                                myGame.last_action_rotation = false;
                             }
                             break;
                         case 'B': // Down arrow (soft drop + lock delay)
                             if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
                             {
                                 myGame.current.y++;
+                                myGame.last_action_rotation = false;
                                 gravityTimer = 0; // Reset timer to prevent double dropping
                             }
                             break;
@@ -230,11 +233,11 @@ int main()
                     }
                 }
             }
-            else if(key == 'x' || key == 'X') // Rotate clockwise (alternate key)
+            else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
             {
                 rotateCurrentPiece(&myGame);
             }
-            else if(key == 'z' || key == 'Z') // Rotate counterclockwise
+            else if (key == 'z' || key == 'Z') // Rotate counterclockwise
             {
                 rotateCounterClockwise(&myGame);
             }
@@ -243,6 +246,7 @@ int main()
                 while (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1))
                 {
                     myGame.current.y++;
+                    myGame.last_action_rotation = false;
                 }
                 tickGame(&myGame);
                 gravityTimer = 0;

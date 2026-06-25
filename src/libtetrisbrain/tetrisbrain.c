@@ -27,6 +27,8 @@ void startGame(GameState *state)
 
     // reset game variables
     state->held_type = 0;
+    state->t_spins = 0;
+    state->last_action_rotation = false;
     state->score = 0;
     state->game_over = 0;
     state->lines_cleared = 0;
@@ -134,17 +136,39 @@ bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int po
     return true;
 }
 
+// Wall kick helper function
+bool testRotate(GameState *state, int nextRot)
+{
+    // { X offset, Y offset }
+    int kicks[5][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, -2}};
+
+    for (int i = 0; i < 5; i++)
+    {
+        // Add offset to current coordinates
+        int nx = state->current.x + kicks[i][0];
+        int ny = state->current.y + kicks[i][1];
+
+        if (isValidPos(state, state->current.type, nextRot, nx, ny))
+        {
+            // Apply the new coordinates and rotation
+            state->current.x = nx;
+            state->current.y = ny;
+            state->current.rot = nextRot;
+
+            // For t-spin detection
+            state->last_action_rotation = true;
+            return true;
+        }
+    }
+    return false; // Kicking failed, piece cannot rotate
+}
+
 // Rotate clockwise logic
 void rotateCurrentPiece(GameState *state)
 {
     // Calculate what the next rotation state would be (0 -> 1 -> 2 -> 3 -> 0)
     Rotation nextRot = (Rotation)((state->current.rot + 1) % 4);
-
-    // Check if after rotation, is the new position valid
-    if (isValidPos(state, state->current.type, nextRot, state->current.x, state->current.y))
-    {
-        state->current.rot = nextRot; // Successful rotation
-    }
+    testRotate(state, nextRot);
 }
 
 // Rotate clockwise logic
@@ -152,12 +176,7 @@ void rotateCounterClockwise(GameState *state)
 {
     // Calculate what the next rotation state would be (3 -> 0 -> 1 -> 2 )
     int nextRot = (state->current.rot + 3) % 4;
-
-    // Check if after rotation, is the new position valid
-    if (isValidPos(state, state->current.type, nextRot, state->current.x, state->current.y))
-    {
-        state->current.rot = nextRot;
-    }
+    testRotate(state, nextRot);
 }
 
 // Locking the piece after it finalizes its position
@@ -243,6 +262,45 @@ int clearLines(GameState *state)
     return linesCleared;
 }
 
+// Check for t-spin; return 1 if valid, 0 if not
+int checkTSpin(GameState *state)
+{
+    // 1 & 2: Must be t-piece and last action must be rotation
+    if (state->current.type != 3 || !state->last_action_rotation)
+    {
+        return 0;
+    }
+
+    // 3: 3 corner test
+    int cx = state->current.x + 1;
+    int cy = state->current.y + 1;
+    int blocked_corners = 0;
+
+    // Check for overhead
+    int corner_offsets[4][2] = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+
+    for (int i = 0; i < 4; i++)
+    {
+        int checkX = cx + corner_offsets[i][0];
+        int checkY = cy + corner_offsets[i][1];
+        if (checkX < 0 || checkX >= BOARD_WIDTH || checkY >= BOARD_HEIGHT)
+        {
+            blocked_corners++;
+        }
+        else if (checkY >= 0 && state->board.cells[checkY][checkX] != 0)
+        {
+            blocked_corners++;
+        }
+    }
+
+    if (blocked_corners >= 3)
+    {
+        return 1; // T-spin confirmed
+    }
+
+    return 0; // Not t-spin
+}
+
 // Repeat function to advance the game
 int tickGame(GameState *state)
 {
@@ -264,8 +322,15 @@ int tickGame(GameState *state)
         }
     }
 
+    // Check for t-spins
+    if (checkTSpin(state))
+    {
+        state->t_spins++;
+    }
+
     // Otherwise collision detected, so cannot move
-    lockPiece(state);                // Store in game state
+    lockPiece(state); // Store in game state
+    state->pieces_placed++;
     int cleared = clearLines(state); // Check if any rows need to be cleared
 
     // Spawn a new piece at the top
