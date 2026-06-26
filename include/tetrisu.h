@@ -4,9 +4,6 @@
 #include "tetrisbrain.h"
 
 /* ----- EVERYTHING ELSE ----- */
-// Linux in-built terminal flags
-struct termios orig_termios;
-
 // Reset terminal back to normal; if not will remain broken
 void disableRawMode(void);
 

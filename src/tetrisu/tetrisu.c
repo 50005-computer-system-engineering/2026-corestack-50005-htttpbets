@@ -184,11 +184,20 @@ int main()
 
     // Timing set up => make the game more playable
     int gravityTimer = 0;
-    int gravityThreshold = 25; // How many loop cycles before the piece drops 1 row
+    int gravityThreshold = 50; // How many loop cycles before the piece drops 1 row
+    int lockTimer = 0;
+    int lockThreshold = 50;
 
     // --- THE GAME LOOP ---
     while (!myGame.game_over)
     {
+        // Track current gravity of piece for lock delay
+        int current_gravity = gravityThreshold - ((myGame.level - 1) * 5);
+        if (current_gravity < 5)
+        {
+            current_gravity = 5;
+        }
+        
         // Read user inputs
         if (kbhit())
         {
@@ -206,12 +215,14 @@ int main()
                         {
                         case 'A': // Up arrow (rotate clockwise)
                             rotateCurrentPiece(&myGame);
+                            lockTimer = 0;
                             break;
                         case 'D': // Left arrow
                             if (isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x - 1, myGame.current.y))
                             {
                                 myGame.current.x--;
                                 myGame.last_action_rotation = false;
+                                lockTimer = 0;
                             }
                             break;
                         case 'C': // Right arrow
@@ -219,6 +230,7 @@ int main()
                             {
                                 myGame.current.x++;
                                 myGame.last_action_rotation = false;
+                                lockTimer = 0;
                             }
                             break;
                         case 'B': // Down arrow (soft drop + lock delay)
@@ -236,10 +248,12 @@ int main()
             else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
             {
                 rotateCurrentPiece(&myGame);
+                lockTimer = 0;
             }
             else if (key == 'z' || key == 'Z') // Rotate counterclockwise
             {
                 rotateCounterClockwise(&myGame);
+                lockTimer = 0;
             }
             else if (key == ' ') // Spacebar (hard drop)
             {
@@ -266,12 +280,30 @@ int main()
             }
         }
 
-        // Gravity
-        gravityTimer++;
-        if (gravityTimer >= gravityThreshold)
+        // Gravity + Lock Delay
+        bool is_resting = !isValidPos(&myGame, myGame.current.type, myGame.current.rot, myGame.current.x, myGame.current.y + 1);
+        if (is_resting)
         {
-            tickGame(&myGame);
-            gravityTimer = 0; // Reset the timer
+            // Lock Timer
+            lockTimer++;
+            if (lockTimer >= lockThreshold)
+            {
+                tickGame(&myGame); // Lock piece
+                // Reset env variables
+                lockTimer = 0;
+                gravityTimer = 0;
+            }
+        }
+        else
+        {
+            // Gravity Timer
+            lockTimer = 0;
+            gravityTimer++;
+            if (gravityTimer >= current_gravity)
+            {
+                tickGame(&myGame);
+                gravityTimer = 0;
+            }
         }
 
         // Render the board

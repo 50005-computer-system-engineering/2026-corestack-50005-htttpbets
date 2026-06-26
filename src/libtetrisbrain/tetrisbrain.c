@@ -283,7 +283,7 @@ int checkTSpin(GameState *state)
     {
         int checkX = cx + corner_offsets[i][0];
         int checkY = cy + corner_offsets[i][1];
-        if (checkX < 0 || checkX >= BOARD_WIDTH || checkY >= BOARD_HEIGHT)
+        if (checkX < 0 || checkX >= BOARD_WIDTH || checkY >= BOARD_HEIGHT || checkY < 0)
         {
             blocked_corners++;
         }
