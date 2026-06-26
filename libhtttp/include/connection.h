@@ -24,7 +24,9 @@ typedef struct {
 } Connection;
 
 int createSockets(Connection *socks);
-int listenOnServer(Connection socks);
-int acceptOnServer(Connection socks);
+int closeSockets(Connection *socks);
+int listenOnServer(Connection *socks);
+int acceptOnServer(Connection *socks);
+int connectToServer(Connection *socks, char *serverIp);
 
 #endif
