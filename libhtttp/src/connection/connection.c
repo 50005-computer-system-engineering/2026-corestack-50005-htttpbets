@@ -109,6 +109,59 @@ int acceptOnServer(Connection *socks)
     return newClientFd;
 }
 
+// Function is for SERVER and creates a Client struct
+Client buildClient(int tcpSockFd, int id)
+{
+    Client newClient;
+    newClient.id = id;
+    newClient.token = id;   // TODO unique token generation 
+    Connection newClientSocks = {
+        .tcp = tcpSockFd
+    };
+    newClient.connection = newClientSocks;
+    printf("buildClient: Client built\n");
+    return newClient;
+}
+
+// Function is exposed to SERVER to accept specified lobbySize of clients
+int openLobbyOnServer(Connection *socks, Client *clientArray, int lobbySize)
+{
+    // input checks
+    if (lobbySize < 1)
+    {
+        printf("openLobbyOnServer: invalid value for lobbySize, must 1 or more\n");
+        return -1;
+    }
+    if (checkSockets(*socks) < 0)
+    {
+        printf("openLobbyOnServer: socks struct pointer invalid\n");
+        return -1;
+    }
+    if (!clientArray)
+    {
+        printf("openLobbyOnServer: requires an array with memory allocated\n");
+        return -1;
+    }
+
+    // loop to add clients
+    printf("openLobbyOnServer: server now accepting %d clients into lobby...\n", lobbySize);
+    int slot = 0;
+    while (slot < lobbySize)
+    {
+        int newClientFd = acceptOnServer(socks);
+        if (newClientFd < 0)
+        {
+            printf("openLobbyOnServer: client with invalid socket fd\n");
+            continue;   // don't add this client to the clientArray
+        }
+        clientArray[slot] = buildClient(newClientFd, slot);
+        printf("openLobbyServer: client accepted into client list\n");
+        slot++;
+    }
+    printf("openLobbyOnServer: server done accepting clients\n");
+    return 0;
+}
+
 // CLIENT FUNCTIONS - LOBBY
 int connectToServer(Connection *socks, char *serverIp)
 {

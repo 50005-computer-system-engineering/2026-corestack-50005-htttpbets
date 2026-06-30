@@ -22,11 +22,17 @@ typedef struct {
     int udp;     // member (udp socket fd), only if present
     #endif
 } Connection;
+typedef struct {
+    int id;
+    int token;  // will replace with proper token with encryption later on
+    Connection connection;
+} Client;
 
 int createSockets(Connection *socks);
 int closeSockets(Connection *socks);
 int listenOnServer(Connection *socks);
 int acceptOnServer(Connection *socks);
+int openLobbyOnServer(Connection *socks, Client *clientArray, int lobbySize);
 int connectToServer(Connection *socks, char *serverIp);
 
 #endif
