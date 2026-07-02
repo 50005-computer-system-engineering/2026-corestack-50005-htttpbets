@@ -30,7 +30,7 @@ int main(void) {
         //     printf("server: failed to accept new clients\n");
         //     return -1;
         // }
-        Client *clientArray = malloc(sizeof(Client) * lobbySize);
+        Record *clientArray = malloc(sizeof(Record) * lobbySize);
         if (!(clientArray))
         {
             perror("server malloc");

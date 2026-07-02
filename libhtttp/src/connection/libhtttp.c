@@ -1,4 +1,4 @@
-#include "connection.h"
+#include "libhtttp.h"
 
 // Helper function for BOTH to check if file descriptor in Connection struct has been setup properly 
 int checkSockets(Connection socks)
@@ -110,21 +110,20 @@ int acceptOnServer(Connection *socks)
 }
 
 // Function is for SERVER and creates a Client struct
-Client buildClient(int tcpSockFd, int id)
+Record buildRecord(int tcpSockFd, uint8_t id)
 {
-    Client newClient;
-    newClient.id = id;
-    newClient.token = id;   // TODO unique token generation 
-    Connection newClientSocks = {
+    Record newRecord;
+    newRecord.id = id;
+    newRecord.token = 0;   // TODO unique token generation 
+    Connection newRecordSocks = {
         .tcp = tcpSockFd
     };
-    newClient.connection = newClientSocks;
-    printf("buildClient: Client built\n");
-    return newClient;
+    newRecord.connection = newRecordSocks;
+    return newRecord;
 }
 
 // Function is exposed to SERVER to accept specified lobbySize of clients
-int openLobbyOnServer(Connection *socks, Client *clientArray, int lobbySize)
+int openLobbyOnServer(Connection *socks, Record *clientArray, int lobbySize)
 {
     // input checks
     if (lobbySize < 1)
@@ -145,8 +144,8 @@ int openLobbyOnServer(Connection *socks, Client *clientArray, int lobbySize)
 
     // loop to add clients
     printf("openLobbyOnServer: server now accepting %d clients into lobby...\n", lobbySize);
-    int slot = 0;
-    while (slot < lobbySize)
+    uint8_t slot = 1;   // id 0 reserved for server
+    while (slot <= lobbySize)
     {
         int newClientFd = acceptOnServer(socks);
         if (newClientFd < 0)
@@ -154,7 +153,7 @@ int openLobbyOnServer(Connection *socks, Client *clientArray, int lobbySize)
             printf("openLobbyOnServer: client with invalid socket fd\n");
             continue;   // don't add this client to the clientArray
         }
-        clientArray[slot] = buildClient(newClientFd, slot);
+        clientArray[slot - 1] = buildRecord(newClientFd, slot);
         printf("openLobbyServer: client accepted into client list\n");
         slot++;
     }
@@ -185,3 +184,4 @@ int connectToServer(Connection *socks, char *serverIp)
     printf("connectToServer: connection to server success\n");
     return serverFd;
 }
+
