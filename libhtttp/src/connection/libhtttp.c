@@ -185,3 +185,42 @@ int connectToServer(Connection *socks, char *serverIp)
     return serverFd;
 }
 
+// MESSAGE FUNCTIONS
+// same functions as in common.c in PA2, not exposed to library users
+unsigned char *readBytes(int sockfd, uint64_t length)
+{
+    unsigned char *buffer = malloc(length);
+    if (!buffer)
+    {
+        perror("readBytes malloc");
+        return NULL;
+    }
+
+    uint64_t bytesReceived = 0;
+    while (bytesReceived < length)
+    {
+        uint64_t remaining = length - bytesReceived;
+        size_t chunk remaining < 1024 ? (size_t) remaining: 1024;
+        ssize_t n = recv(sockfd, buffer + bytesReceived, chunk, 0);
+        if (n <= 0)
+        {
+            fprintf(stderr, "Socket connection broken\n");
+            free(buffer);
+            return NULL;
+        }
+        bytesReceived += (uint64_t)n;
+    }
+
+    return buffer;
+}
+
+int sendBytes(int sockfd, const unsigned char *buf, uint64_t length)
+{
+    uint64_t totalSent = 0;
+    while (totalSent < length)
+    {
+        ssize_t m = send(sockfd, buf + totalSent, (size_t))
+    }
+    return 0;
+}
+
