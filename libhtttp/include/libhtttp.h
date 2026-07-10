@@ -8,10 +8,16 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 
 // known ports
 #define PORT_TCP 6700
 #define PORT_UDP 6767
+// message codes
+#define MSG_REG 0       // registration related
+#define MSG_DEREG 1     // deregistering client
+#define MSG_ADMIN 2     // kicking, banning, start game, etc. (libhtttp actions)
+#define MSG_APP 3       // for higher level protocol used built on HTTTP (Tetris/Bomberman)
 
 // misc
 #define MAX_CONNECTIONS 100
@@ -36,8 +42,8 @@ typedef struct {
 // message structs
 typedef struct {
     uint8_t sourceId;       // member determines session token to be used (0 refers to server)
-    uint8_t code;           // member would determine how the receiver handles the content
-    uint16_t length;        // member specifies number of bytes of content to be received
+    uint8_t type;           // member would determine how the receiver handles the content
+    uint32_t length;        // member specifies number of bytes of content to be received
     unsigned char *content; // raw bytes to be handled by functions or higher level protocol
 } Message;
 
