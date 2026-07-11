@@ -119,6 +119,10 @@ void drawBoard(GameState *state)
             {
                 printf("[]"); // Top Layer: Active falling piece
             }
+            else if (state->board.cells[y][x] == 8)
+            {
+                printf("><");
+            }
             else if (state->board.cells[y][x] != 0)
             {
                 printf("##"); // Middle Layer: Locked blocks
