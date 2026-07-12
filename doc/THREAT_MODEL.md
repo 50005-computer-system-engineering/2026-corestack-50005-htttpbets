@@ -1,9 +1,4 @@
 # Architectural Threat & Resilience Model
-**File:** `/doc/THREAT_MODEL.MD`
-**Owner:** Ng Sheng Qi Ethan
-**Status:** Not Started (Execution Deferred)
-**Blocker:** Pending stable networked server architecture.
-
 ## 1. Overview & Testing Strategy
 This document outlines the adversarial testing and load resilience plan for the `bombd` multiplayer game server. To guarantee a rigorous systems engineering approach, the iterative development and testing phases are bound by five crucial properties. 
 
