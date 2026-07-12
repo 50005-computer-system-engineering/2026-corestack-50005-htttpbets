@@ -3,6 +3,7 @@ CFLAGS = -Wall -Wextra -I./include
 
 TARGET = tetris_test
 
+# Please edit this if you want to verify garbage clearing logic
 SRCS = src/libtetrisbrain/tetrisbrain.c src/tetrisu/tetrisu.c
 OBJS = $(SRCS:.c=.o)
 
