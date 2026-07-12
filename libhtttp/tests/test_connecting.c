@@ -1,8 +1,9 @@
 #include "libhtttp.h"
 
-int main(void) {
+int main(void) 
+{
     int lobbySize = 2;
-    printf("test_libhtttp.c start\nforking into server and client tests with %d clients\n", lobbySize);
+    printf("test_connecting.c start\nforking into server and client tests with %d clients\n", lobbySize);
     int pid = fork();
     if (pid < 0)
     {
@@ -23,13 +24,6 @@ int main(void) {
             printf("server: failed to start server listener\n");
             return -1;
         }
-        // Old test case for acceptOnServer
-        // int newClient = acceptOnServer(socks);
-        // if (newClient < 0)
-        // {
-        //     printf("server: failed to accept new clients\n");
-        //     return -1;
-        // }
         Record *clientArray = malloc(sizeof(Record) * lobbySize);
         if (!(clientArray))
         {
@@ -45,6 +39,7 @@ int main(void) {
             printf("server: checking client array\n\tid = %d\n\ttoken = %d\n\tconnection.tcp = %d\n", clientArray[i].id, clientArray[i].token, clientArray[i].connection.tcp);
         }
         printf("server: no probrem\n");
+        wait(NULL);
         closeSockets(socks);
         return 0;  
     }
@@ -57,13 +52,13 @@ int main(void) {
         {
             perror("client fork");
             printf("client: forking into 2 failed");
-            return -1;
+            exit(-1);
         }
         Connection *socks = malloc(sizeof(Connection));
         if (createSockets(socks) < 0) 
         {
             printf("client: failed to create sockets\n");
-            return -1;
+            exit(-1);
         }
         // TODO replace with proper synchronisation
         sleep(1);
@@ -71,10 +66,14 @@ int main(void) {
         if (server < 0)
         {
             printf("client: failed to connect to server server\n");
-            return -1;
+            exit(-1);
         }
         printf("client: no probrem\n");
         closeSockets(socks);
-            return 0;
+        if (pid > 0)
+        {
+            wait(NULL);
+        }
+        exit(0);
     }
 }

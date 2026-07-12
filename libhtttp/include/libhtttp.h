@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 // known ports
 #define PORT_TCP 6700
@@ -56,8 +59,7 @@ int openLobbyOnServer(Connection *socks, Record *clientList, int lobbySize);
 int connectToServer(Connection *socks, char *serverIp);
 
 // // messaging functions
-// int startTcpListener(Connection *socks);
-// int buildHtttpMessage(Connection *socks);
-// int sendHtttpMesssage(Connection *socks);
+int receiveMessage(int sockfd, Message **returnPtr);
+int sendMessage(int sockfd, Message completeMsg);
 
 #endif

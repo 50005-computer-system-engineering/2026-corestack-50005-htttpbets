@@ -47,13 +47,29 @@ build $(OBJ_DIR) $(LIB_DIR):
 	mkdir -p $@
 
 # --- Test ---
-test: $(TEST_BIN)
-	@echo "Running tests..."
-	./$(TEST_BIN)
+TEST_DIR := tests
+TEST_BIN_DIR := build/tests
 
-$(TEST_BIN): $(TEST_SRC) $(TARGET_STATIC) | build
+# Explicit list of test source files (add new tests here)
+TEST_SRCS := \
+	$(TEST_DIR)/test_connecting.c \
+	$(TEST_DIR)/test_sending.c
+
+TEST_BINS := $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SRCS))
+
+test: $(TEST_BINS)
+	@echo "Running tests..."
+	@for bin in $(TEST_BINS); do \
+		echo "--- $$bin ---"; \
+		./$$bin || exit 1; \
+	done
+
+$(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
 	$(CC) $(CFLAGS) $< -o $@ -Lbuild/lib -lhtttp
 	@echo "Built test binary: $@"
+
+$(TEST_BIN_DIR):
+	mkdir -p $@
 
 # --- Clean ---
 clean:
