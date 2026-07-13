@@ -1,0 +1,6 @@
+-Iinclude
+-Iinclude/lib
+-Wall
+-Wextra
+-g
+-pthread
