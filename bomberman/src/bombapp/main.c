@@ -2,14 +2,15 @@
 
 int main() {
     // (1) Init App
-    InitWindow(800, 450, "Bomberman");
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    InitWindow(0, 0, "Bombs Away!");
     SetTargetFPS(60);
 
     // (2) Main Loop
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(SKYBLUE);
-        DrawText("Hello, World!", 190, 200, 20, LIGHTGRAY);
+        DrawText("Hello, World!", 190, 200, 20, BLACK);
         EndDrawing();
     }
 
