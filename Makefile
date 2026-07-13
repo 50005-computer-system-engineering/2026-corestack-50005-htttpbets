@@ -39,5 +39,5 @@ clean:
 	$(MAKE) -C bomberman clean
 
 # Also remove dependencies (eg: raylib build)
-depclean: clean
-	$(MAKE) -C bomberman depclean
+distclean: clean
+	$(MAKE) -C bomberman distclean
