@@ -14,7 +14,8 @@ void enableRawMode();
 int kbhit(void);
 
 // Wrapper to grab the character (input) from stdin once we know it's there
-int getch(void);
+// Commented this out as getch is already defined in a Linux ecosystem :(
+// int getch(void);
 
 /* ----- UI RENDERING ----- */
 // Renders the board and active piece to the terminal

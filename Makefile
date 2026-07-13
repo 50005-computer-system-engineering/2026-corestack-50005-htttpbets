@@ -1,26 +1,43 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -I./include
+# ======================================================================
+# Root Makefile: Builds all three subprojects in the correct order.
+# Usage:
+#	make              build everything
+#   make tetris       build corestack + tetris only
+#   make bomberman    build corestack + bomberman only
+#   make test         run all tests across all projects
+#   make clean        wipe all build artifacts
+#
+# Additional Flag:
+#   make BUILD_TYPE=Release  build with an optimised build
+#   Defaults to Debug
+# ======================================================================
+BUILD_TYPE ?= Debug
 
-TARGET = tetris_test
+.PHONY: all corestack tetris bomberman test clean depclean
 
-# Please edit this if you want to verify garbage clearing logic
-SRCS = src/libtetrisbrain/tetrisbrain.c src/tetrisu/tetrisu.c
-OBJS = $(SRCS:.c=.o)
+all: corestack tetris bomberman
 
-all: $(TARGET)
+corestack: clean
+	$(MAKE) -C corestack
 
-$(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET)
+tetris: corestack
+	$(MAKE) -C tetris
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+bomberman: corestack
+	$(MAKE) -C bomberman
 
-run: $(TARGET)
-	./$(TARGET)
+# Runs all tests across all 3 projects
+test: all
+	$(MAKE) -C corestack test
+	$(MAKE) -C tetris    test
+	$(MAKE) -C bomberman test
 
+# Remove all compiled output
 clean:
-	rm -f $(OBJS) $(TARGET)
+	$(MAKE) -C corestack clean
+	$(MAKE) -C tetris    clean
+	$(MAKE) -C bomberman clean
 
-re: clean all
-
-.PHONY: all run clean re
+# Also remove dependencies (eg: raylib build)
+depclean: clean
+	$(MAKE) -C bomberman depclean
