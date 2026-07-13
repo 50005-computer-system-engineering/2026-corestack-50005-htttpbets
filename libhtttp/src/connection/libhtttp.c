@@ -210,7 +210,7 @@ int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length)
         ssize_t n = recv(sockfd, *returnBuf + bytesReceived, (size_t)remaining, 0);
         if (n <= 0)
         {
-            printf("readBytes: recv failed\n");
+            perror("readBytes recv");
             free(*returnBuf);
             *returnBuf = NULL;
             return -1;
@@ -249,7 +249,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
     unsigned char *buffer = NULL;
     if (readBytes(sockfd, &buffer, sizeof(uint8_t)) < 0)
     {
-        printf("readMessage: failed to read sourceId");
+        printf("readMessage: failed to read sourceId\n");
         goto fail;
     } 
     returnMsg->sourceId = *buffer;
@@ -258,7 +258,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
 
     if (readBytes(sockfd, &buffer, sizeof(uint8_t)) < 0)
     {
-        printf("readMessage: failed to read type");
+        printf("readMessage: failed to read type\n");
         goto fail;
     } 
     returnMsg->type = *buffer;
@@ -267,7 +267,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
 
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        printf("readMessage: failed to read length");
+        printf("readMessage: failed to read length\n");
         goto fail;
     } 
     uint32_t lenBytes;
@@ -280,10 +280,10 @@ int receiveMessage(int sockfd, Message **returnPtr)
     printf("readMessage: now listening for message with header:\n\tsourceId: %u\n\ttype: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->type, returnMsg->length);
     if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
     {
-        printf("readMessage: failed to read length");
+        printf("readMessage: failed to read length\n");
         goto fail;
     }
-    returnMsg->content = malloc(sizeof(returnMsg->length));
+    returnMsg->content = malloc(returnMsg->length);
     if (returnMsg->content == NULL)
     {
         perror("receiveMessage malloc");
@@ -314,12 +314,12 @@ fail:
 
 int sendMessage(int sockfd, const Message completeMsg)
 {
-    printf("sendMessage: sending message with the header:\n\tsourceId: %u\n\ttype: %u\n\tlengthF %u\n", completeMsg.sourceId, completeMsg.type, completeMsg.length);
+    printf("sendMessage: sending message with the header:\n\tsourceId: %u\n\ttype: %u\n\tlength: %u\n", completeMsg.sourceId, completeMsg.type, completeMsg.length);
     sendBytes(sockfd, &completeMsg.sourceId, sizeof(uint8_t));
     sendBytes(sockfd, &completeMsg.type, sizeof(uint8_t));
     uint32_t length = htonl(completeMsg.length);
     sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
     sendBytes(sockfd, completeMsg.content, completeMsg.length);
-    printf("sendMessage: message sending probably worked");
+    printf("sendMessage: message sending probably worked\n");
     return 0;
 }
