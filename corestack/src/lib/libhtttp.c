@@ -1,4 +1,4 @@
-#include "libhtttp.h"
+#include "lib/libhtttp.h"
 
 // Helper function for BOTH to check if file descriptor in Connection struct has been setup properly 
 int checkSockets(Connection socks)
