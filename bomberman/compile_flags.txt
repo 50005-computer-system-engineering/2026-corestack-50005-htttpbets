@@ -1,4 +1,6 @@
+-Iinclude
 -Iinclude/lib
+-Iinclude/bombapp
 -I../corestack/include
 -Ideps/raylib-6.0/src
 -Wall
