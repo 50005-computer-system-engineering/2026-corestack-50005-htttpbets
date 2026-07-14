@@ -394,31 +394,29 @@ void addGarbage(GameState *state, int lines)
         }
     }
 
+    // Random x coord to spawn hole for the player
+    int hole = rand() % BOARD_WIDTH;
+
     // Add the new garbage lines at the bottom
     for (int y = BOARD_HEIGHT - lines; y < BOARD_HEIGHT; y++)
     {
-        // Random x coord to spawn hole for the player
-        int hole = rand() % BOARD_WIDTH;
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
             if (x == hole)
             {
-                if (x == hole)
-                {
-                    // The gap
-                    state->board.cells[y][x] = 0;
-                } 
-                else 
-                {
-                    // Used 8 as a separate ID since 0-7 already in use
-                    state->board.cells[y][x] = 8;
-                }
+                // The gap
+                state->board.cells[y][x] = 0;
+            }
+            else
+            {
+                // Used 8 as a separate ID since 0-7 already in use
+                state->board.cells[y][x] = 8;
             }
         }
     }
 
-    // Push falling piece up 
+    // Push falling piece up
     state->current.y -= lines;
 
     // Game over check
@@ -431,7 +429,7 @@ void addGarbage(GameState *state, int lines)
 // Calculate garbage based on lines cleared (following TETR.IO guideline rules)
 int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
 {
-    (void) state;
+    (void)state;
     if (lines_cleared == 0)
     {
         return 0;

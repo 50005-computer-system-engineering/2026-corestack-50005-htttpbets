@@ -65,7 +65,7 @@ int getch(void)
 }
 
 // Renders the board and active piece to the terminal
-// --- 1V1 SPLIT-SCREEN RENDERER ---
+// 1 board for each player => only done for testing purposes
 void drawBothBoards(GameState *p1, GameState *p2)
 {
     printf("\e[1;1H"); // Move cursor to top left to prevent flickering
@@ -74,70 +74,100 @@ void drawBothBoards(GameState *p1, GameState *p2)
     printf("      === PLAYER 1 ===                      === PLAYER 2 ===   \n");
     printf("                                                \n");
 
-    // --- 1. GHOST PIECE MATH FOR BOTH PLAYERS ---
+    // --- GHOST PIECE MATH FOR BOTH PLAYERS ---
     int p1_ghostY = p1->current.y;
     while (isValidPos(p1, p1->current.type, p1->current.rot, p1->current.x, p1_ghostY + 1))
+    {
         p1_ghostY++;
+    }
 
     int p2_ghostY = p2->current.y;
     while (isValidPos(p2, p2->current.type, p2->current.rot, p2->current.x, p2_ghostY + 1))
+    {
         p2_ghostY++;
+    }
 
-    // --- 2. THE ROW-BY-ROW TYPEWRITER ---
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
-        // ---------------------------------------------------------
-        //                     PLAYER 1 HALF
-        // ---------------------------------------------------------
-        printf("<!>"); // P1 Left Wall
+        // P1 Half
+        printf("|"); // P1 Left Wall
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
-            bool active = false;
-            bool ghost = false;
+            // Check if the active piece is hovering over this exact (X, Y)
+            bool isActivePieceHere = false;
+            bool isGhostPieceHere = false;
 
             // P1 Active Piece
             if (x >= p1->current.x && x < p1->current.x + 4 && y >= p1->current.y && y < p1->current.y + 4)
             {
-                int px = x - p1->current.x, py = y - p1->current.y;
-                if (tetrominoes[p1->current.type - 1][getRotationIndex(px, py, p1->current.rot)] != 0)
-                    active = true;
+                // Translate the global board coordinate back to a local coordinates
+                int px = x - p1->current.x;
+                int py = y - p1->current.y;
+                // Check our Tetris array
+                int cellIndex = getRotationIndex(px, py, p1->current.rot);
+                int shapeIndex = p1->current.type - 1;
+
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    isActivePieceHere = true; // Solid block found
+                }
             }
             // P1 Ghost Piece
             if (x >= p1->current.x && x < p1->current.x + 4 && y >= p1_ghostY && y < p1_ghostY + 4)
             {
-                int px = x - p1->current.x, py = y - p1_ghostY;
+                int px = x - p1->current.x;
+                int py = y - p1_ghostY;
                 if (tetrominoes[p1->current.type - 1][getRotationIndex(px, py, p1->current.rot)] != 0)
-                    ghost = true;
+                {
+                    isGhostPieceHere = true;
+                }
             }
 
             // P1 Draw Priorities
-            if (active)
-                printf("[]");
+            if (isActivePieceHere)
+            {
+                printf("[]"); // Top Layer: Active falling piece
+            }
             else if (p1->board.cells[y][x] == 8)
-                printf("><"); // Garbage
+            {
+                printf("><");
+            }
             else if (p1->board.cells[y][x] != 0)
-                printf("##"); // Locked
-            else if (ghost)
+            {
+                printf("##"); // Middle Layer: Locked blocks
+            }
+            else if (isGhostPieceHere) // Ghost Piece
+            {
                 printf("::");
+            }
             else
-                printf(" .");
+            {
+                printf(" ."); // Background: Empty space
+            }
         }
-        printf("<!>"); // P1 Right Wall
+        printf("|"); // P1 Right Wall
 
         // P1 Hold Box (STRICT 10 CHARACTER WIDTH)
         if (y == 0)
+        {
             printf("   HOLD   ");
+        }
         else if (y >= 1 && y <= 4)
         {
             printf(" "); // 1 space padding
             int hy = y - 1;
             for (int hx = 0; hx < 4; hx++)
             {
-                if (p1->held_type != 0 && tetrominoes[p1->held_type - 1][getRotationIndex(hx, hy, 0)] != 0)
-                    printf("[]");
+                if (p1->held_type != 0)
+                {
+                    if (tetrominoes[p1->held_type - 1][getRotationIndex(hx, hy, 0)] != 0)
+                        printf("[]");
+                    else
+                        printf("  ");
+                }
                 else
-                    printf("  ");
+                    printf("  "); // Empty space if nothing held
             }
             printf(" "); // 1 space padding
         }
@@ -146,67 +176,91 @@ void drawBothBoards(GameState *p1, GameState *p2)
             printf("          "); // 10 spaces of empty padding to keep P2 aligned!
         }
 
-        // ---------------------------------------------------------
-        //                      MIDDLE DIVIDER
-        // ---------------------------------------------------------
+        // Middle Divider
         printf(" | ");
 
-        // ---------------------------------------------------------
-        //                     PLAYER 2 HALF
-        // ---------------------------------------------------------
-        printf("<!>"); // P2 Left Wall
+        // P2 Half
+        printf("|"); // P2 Left Wall
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
-            bool active = false;
-            bool ghost = false;
+            // Check if the active piece is hovering over this exact (X, Y)
+            bool isActivePieceHere = false;
+            bool isGhostPieceHere = false;
 
             // P2 Active Piece
             if (x >= p2->current.x && x < p2->current.x + 4 && y >= p2->current.y && y < p2->current.y + 4)
             {
-                int px = x - p2->current.x, py = y - p2->current.y;
-                if (tetrominoes[p2->current.type - 1][getRotationIndex(px, py, p2->current.rot)] != 0)
-                    active = true;
+                 // Translate the global board coordinate back to a local coordinates
+                int px = x - p2->current.x;
+                int py = y - p2->current.y;
+                // Check our Tetris array
+                int cellIndex = getRotationIndex(px, py, p2->current.rot);
+                int shapeIndex = p2->current.type - 1;
+
+                if (tetrominoes[shapeIndex][cellIndex] != 0)
+                {
+                    isActivePieceHere = true; // Solid block found
+                }
             }
             // P2 Ghost Piece
             if (x >= p2->current.x && x < p2->current.x + 4 && y >= p2_ghostY && y < p2_ghostY + 4)
             {
-                int px = x - p2->current.x, py = y - p2_ghostY;
+                int px = x - p2->current.x;
+                int py = y - p2_ghostY;
                 if (tetrominoes[p2->current.type - 1][getRotationIndex(px, py, p2->current.rot)] != 0)
-                    ghost = true;
+                {
+                    isGhostPieceHere = true;
+                }
             }
 
-            // P2 Draw Priorities
-            if (active)
-                printf("[]");
+            if (isActivePieceHere)
+            {
+                printf("[]"); // Top Layer: Active falling piece
+            }
             else if (p2->board.cells[y][x] == 8)
-                printf("><"); // Garbage
+            {
+                printf("><");
+            }
             else if (p2->board.cells[y][x] != 0)
-                printf("##"); // Locked
-            else if (ghost)
+            {
+                printf("##"); // Middle Layer: Locked blocks
+            }
+            else if (isGhostPieceHere) // Ghost Piece
+            {
                 printf("::");
+            }
             else
-                printf(" .");
+            {
+                printf(" ."); // Background: Empty space
+            }
         }
-        printf("<!>"); // P2 Right Wall
+        printf("|"); // P2 Right Wall
 
         // P2 Hold Box
         if (y == 0)
+        {
             printf("   HOLD   ");
+        }
         else if (y >= 1 && y <= 4)
         {
-            printf(" ");
+            printf(" "); // Padding
             int hy = y - 1;
             for (int hx = 0; hx < 4; hx++)
             {
-                if (p2->held_type != 0 && tetrominoes[p2->held_type - 1][getRotationIndex(hx, hy, 0)] != 0)
-                    printf("[]");
+                if (p2->held_type != 0)
+                {
+                    if (tetrominoes[p2->held_type - 1][getRotationIndex(hx, hy, 0)] != 0)
+                        printf("[]");
+                    else
+                        printf("  ");
+                }
                 else
-                    printf("  ");
+                    printf("  "); // Empty space if nothing held
             }
         }
 
-        printf("\n"); // FINALLY push to the next row!
+        printf("\n"); // Finally push to next row
     }
 
     // --- 3. DUAL DASHBOARD ---
@@ -224,7 +278,6 @@ void drawBothBoards(GameState *p1, GameState *p2)
 int main()
 {
     // Spawn a game state
-    // TESTING PURPOSES ONLY !!!!
     GameState player1;
     GameState player2;
 
@@ -234,7 +287,6 @@ int main()
     printf("\e[1;1H\e[2J");
     fflush(stdout);
 
-    // TESTING PURPOSES ONLY !!!!
     startGame(&player1);
     player1.held_type = 0; // Initialize hold box
     player1.has_held = false;
@@ -245,7 +297,6 @@ int main()
     int p1_lockTimer = 0;
     int p1_lockThreshold = 50;
 
-    // TESTING PURPOSES ONLY !!!!
     startGame(&player2);
     player2.held_type = 0; // Initialize hold box
     player2.has_held = false;
@@ -337,11 +388,17 @@ int main()
                     player2.current.y++;
                     player2.last_action_rotation = false;
                 }
+
+                // Calculate Garbage and send
                 bool p2_tspin = checkTSpin(&player2);
                 int cleared = tickGame(&player2);
                 int p2_damage = calculateGarbage(&player2, cleared, p2_tspin);
                 addGarbage(&player1, p2_damage);
+
                 p2_gravityTimer = 0;
+
+                // Clear the raw terminal input buffer to prevent double drops
+                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'h' || key == 'H') // H to hold
             {
@@ -350,6 +407,7 @@ int main()
                     holdPiece(&player2);
                     p2_gravityTimer = 0;
                 }
+                tcflush(STDIN_FILENO, TCIFLUSH);
             }
 
             // --- PLAYER 1 (WASD) Controls ---
@@ -392,11 +450,16 @@ int main()
                     player1.current.y++;
                     player1.last_action_rotation = false;
                 }
+
+                // Calculate Garbage and send
                 bool p1_tspin = checkTSpin(&player1);
                 int cleared = tickGame(&player1);
                 int p1_damage = calculateGarbage(&player1, cleared, p1_tspin);
                 addGarbage(&player2, p1_damage);
+
                 p1_gravityTimer = 0;
+                // Clear the raw terminal input buffer to prevent double drops
+                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'f' || key == 'F') // P1 Hold
             {
@@ -404,13 +467,15 @@ int main()
                 {
                     holdPiece(&player1);
                     p1_gravityTimer = 0;
-                }            
+                }
+                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'q' || key == 'Q') // Q to quit
             {
+                // Set game over states for both P1 and P2
                 player1.game_over = true;
                 player2.game_over = true;
-                break;
+                break; // Exit
             }
         }
 
@@ -422,10 +487,12 @@ int main()
             p1_lockTimer++;
             if (p1_lockTimer >= p1_lockThreshold)
             {
+                // Calculate Garbage and send
                 bool p1_tspin = checkTSpin(&player1);
                 int cleared = tickGame(&player1); 
                 int p1_damage = calculateGarbage(&player1, cleared, p1_tspin);
                 addGarbage(&player2, p1_damage);
+
                 // Reset env variables
                 p1_lockTimer = 0;
                 p1_gravityTimer = 0;
@@ -451,10 +518,12 @@ int main()
             p2_lockTimer++;
             if (p2_lockTimer >= p2_lockThreshold)
             {
+                // Calculate Garbage and send
                 bool p2_tspin = checkTSpin(&player2);
                 int cleared = tickGame(&player2); 
                 int p2_damage = calculateGarbage(&player2, cleared, p2_tspin);
                 addGarbage(&player1, p2_damage);
+
                 // Reset env variables
                 p2_lockTimer = 0;
                 p2_gravityTimer = 0;
@@ -472,7 +541,7 @@ int main()
             }
         }
 
-        // Render the board
+        // Render the boards
         drawBothBoards(&player1, &player2);
 
         // Delay frames to be visible to the human eye

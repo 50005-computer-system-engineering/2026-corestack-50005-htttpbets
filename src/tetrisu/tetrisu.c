@@ -112,7 +112,9 @@ void drawBoard(GameState *state)
                 int px = x - state->current.x;
                 int py = y - ghostY;
                 if (tetrominoes[state->current.type - 1][getRotationIndex(px, py, state->current.rot)] != 0)
+                {
                     isGhostPieceHere = true;
+                }
             }
 
             if (isActivePieceHere)
@@ -274,8 +276,11 @@ int main()
             }
             else if (key == 'h' || key == 'H') // H to hold
             {
-                holdPiece(&myGame);
-                gravityTimer = 0;
+                if (!myGame.has_held)
+                {
+                    holdPiece(&myGame);
+                    gravityTimer = 0;
+                }
                 tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'q' || key == 'Q') // Q to quit
