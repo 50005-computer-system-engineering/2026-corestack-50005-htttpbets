@@ -23,20 +23,19 @@ typedef struct {
 typedef struct {
     uint8_t id;             // on server it is record of client ID, on client it is record of own ID
     int token;              // will replace with proper token with encryption later on
-    Connection connection;  // member is 
+    Connection *socks;      // member tracks TCP and UDP sockets
 } Record;   // struct used to track connections by BOTH
 typedef struct {
-    Connection socks;           // member tracks own TCP and UDP sockets
+    Connection *socks;           // member tracks own TCP and UDP sockets
     uint8_t numClients;         // member tracks number of clients
     Record *clientList;   // member is list of clients according to id
 } Server;
 
 // connection functions
-int createSockets(Connection *socks);
+int createSockets(Connection **socks);
 int closeSockets(Connection *socks);
-int listenOnServer(Connection *socks);
-int acceptOnServer(Connection *socks);
-int openLobbyOnServer(Connection *socks, Record *clientList, int lobbySize);
-int connectToServer(Connection *socks, char *serverIp);
+int listenOnTCP(Connection *socks);
+int acceptOnTCP(Connection *socks);
+int connectOnTCP(Connection *socks, char *serverIp);
 
 #endif
