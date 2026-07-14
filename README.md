@@ -6,6 +6,11 @@
 
 **CoreStack** is a comprehensive distributed multi-component architecture powering a Bomberman Battle Royale-styled Tetris game, modeled after Jackbox's host-player system. This project is developed as part of the **50.005 Computer System Engineering** course.
 
+## How 2 Run (temp):
+`make bomberman` or `make tetris`
+
+Then run `./bomberman/launcher` or `./tetris/launcher`
+
 ## 👥 Team HTTTPBets (C1C7)
 
 | Student ID | Full Name | Role |

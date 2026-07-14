@@ -1,0 +1,27 @@
+#ifndef TETRISU_H
+#define TETRISU_H
+
+#include "tetrisbrain.h"
+
+/* ----- EVERYTHING ELSE ----- */
+// Reset terminal back to normal; if not will remain broken
+void disableRawMode(void);
+
+// Invoke terminal settings
+void enableRawMode();
+
+// Checks if a key has been pressed (Non-blocking)
+int kbhit(void);
+
+// Wrapper to grab the character (input) from stdin once we know it's there
+// Commented this out as getch is already defined in a Linux ecosystem :(
+// int getch(void);
+
+/* ----- UI RENDERING ----- */
+// Renders the board and active piece to the terminal
+// void drawBoard(GameState *state);
+
+/* ----- ONLY FOR 2XUTETRISU ----- */
+void drawBothBoards(GameState *p1, GameState *p2);
+
+#endif
