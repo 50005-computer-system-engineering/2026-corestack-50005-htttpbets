@@ -1,14 +1,16 @@
-#include "spritesheet.h"
+#include "bombapp/spritesheet.h"
+#include <raylib.h>
 
-void spritesheet_init(Spritesheet *s, Texture2D texture, int cols, int rows, float scale, int fps, bool should_loop) {
-    s->texture = texture;
-    s->should_loop = should_loop;
-    s->columns = cols;
-    s->scale = scale;
-    s->tile_size = Create(texture.width / cols, texture.height / rows);
-    s->last_frame = cols * rows;
+void spritesheet_init(Spritesheet *s, const SpritesheetAsset asset) {
+    s->texture = LoadTexture(asset.path);
+    s->should_loop = asset.should_loop;
+    s->columns = asset.cols;
+    s->scale = asset.scale;
+    s->tile_width = (int)(s->texture.width / asset.cols);
+    s->tile_height = (int)(s->texture.height / asset.rows);
+    s->last_frame = asset.cols * asset.rows;
     s->curr_frame = 0;
-    s->time_per_frame = 1.0f / fps;
+    s->time_per_frame = 1.0f / asset.fps;
     s->time_elapsed = 0.0f;
 }
 
@@ -43,24 +45,24 @@ void spritesheet_draw(Spritesheet *s, Vector2 position, float rotation, Color ti
  
     // Source: the current frame's crop within the spritesheet texture
     Rectangle source = {
-        .x      = col * s->tile_size.x,
-        .y      = row * s->tile_size.y,
-        .width  = s->tile_size.x,
-        .height = s->tile_size.y
+        .x      = col * s->tile_width,
+        .y      = row * s->tile_height,
+        .width  = s->tile_width,
+        .height = s->tile_height
     };
  
     // Dest: where + how on actual screen to draw (world position)
     Rectangle dest = {
         .x      = position.x,
         .y      = position.y,
-        .width  = s->tile_size.x * s->scale,
-        .height = s->tile_size.y * s->scale,
+        .width  = s->tile_width* s->scale,
+        .height = s->tile_height * s->scale,
     };
  
     // Center point of tile
     Vector2 origin = {
-        .x = s->tile_size.x * 0.5f,
-        .y = s->tile_size.y * 0.5f
+        .x = s->tile_width* 0.5f,
+        .y = s->tile_height * 0.5f
     };
  
     // Finally, draw the texture

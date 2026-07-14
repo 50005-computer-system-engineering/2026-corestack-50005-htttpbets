@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "bombapp/spritesheet.h"
+
 // Controls
 typedef struct {
     const int MOVE_UP;
@@ -11,10 +13,20 @@ typedef struct {
     const int EXIT;
 } Keybindings;
 
-// TODO: Add more config types here!
+typedef struct {
+    const SpritesheetAsset PLAYER_STAND[4]; // Up, Down, Left, Right
+    const SpritesheetAsset PLAYER_WALK[4]; // Up, Down, Left, Right
+    const SpritesheetAsset PLAYER_WIN;
+} Assets;
+
+typedef struct {
+    const float PLAYER_SPEED;
+} Physics;
 
 typedef struct {
     Keybindings KEYS;
+    Assets ASSETS;
+    Physics PHYSICS;
 } Config;
 
 // Single global instance

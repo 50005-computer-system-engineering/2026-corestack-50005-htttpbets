@@ -3,10 +3,16 @@
 #include "lib/libeventbus.h"
 #include "events.h"
 #include "bombapp/input.h"
+#include "bombapp/player.h"
+
+#include <stdio.h>
 
 void initalise() {
     // Initialise event bus
     event_bus_init(EVENT_COUNT);
+
+    // Initialise player
+    player_init();
 }
 
 void update_loop() {
@@ -14,6 +20,7 @@ void update_loop() {
     input_update();
 
     // Update player state
+    player_update();
 }
 
 void draw_loop() {
@@ -22,17 +29,24 @@ void draw_loop() {
     ClearBackground(DARKGREEN);
     DrawText("Hello, World!", 190, 200, 20, BLACK);
     
+    player_draw();
     EndDrawing();
 }
 
 void cleanup() {
     // Free event bus
     event_bus_free();
+
+    // Free player
+    player_cleanup();
 }
 
 
 int main() {
     // (1) Init App
+    // Force the program to look in the directory where the executable is running
+    ChangeDirectory(GetApplicationDirectory()); 
+    
     // TODO: Uncomment during final release for fullscreen mode
     // SetConfigFlags(FLAG_FULLSCREEN_MODE);
     // InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
@@ -40,7 +54,6 @@ int main() {
     
     // Windowed mode for debugging purposes
     InitWindow(600, 400, "Bombs Away! \U0001F4A3");
-    
     SetTargetFPS(60);
 
     initalise();

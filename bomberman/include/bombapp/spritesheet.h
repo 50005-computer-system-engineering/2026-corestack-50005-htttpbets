@@ -2,17 +2,27 @@
 #define SPRITESHEET_H
 
 #include <raylib.h>
-#include "lib/vector2int.h"
+
+typedef struct {
+    char* path; 
+    int cols; 
+    int rows; 
+    float scale; 
+    int fps; 
+    bool should_loop;
+
+} SpritesheetAsset;
 
 typedef struct {
     // Initialised
     Texture2D texture;
-    bool should_loop; // whether we should loop the animation
+    bool should_loop; 
     int columns; // No need to store rows since we can calculate everything from col
     float scale; // Scale factor
 
     // Dynamically calculated from above
-    Vector2Int tile_size; // Size of a single tile from original spritesheet
+    int tile_width; // Size of a single tile from original spritesheet
+    int tile_height;
     int last_frame;
     int curr_frame;
     double time_per_frame;
@@ -23,14 +33,14 @@ typedef struct {
  * @brief Initialise a spritesheet
  *
  * @param s Spritesheet to initialise
- * @param texture Loaded raylib texture to use as the spritesheet
+ * @param spritesheet_path path to the spritesheet
  * @param cols Number of sprite columns in the sheet
  * @param rows Number of sprite rows in the sheet
  * @param scale Scale factor, 1.0f is 100% default size
  * @param fps Frames per second for the animation
  * @param should_loop Whether we should loop the animation
  */
-void spritesheet_init(Spritesheet *s, Texture2D texture, int cols, int rows, float scale, int fps,bool should_loop);
+void spritesheet_init(Spritesheet *s, const SpritesheetAsset asset);
  
 // Restart animation from the first frame
 void spritesheet_restart(Spritesheet *s);
