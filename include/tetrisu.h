@@ -18,6 +18,9 @@ int getch(void);
 
 /* ----- UI RENDERING ----- */
 // Renders the board and active piece to the terminal
-void drawBoard(GameState *state);
+// void drawBoard(GameState *state);
+
+/* ----- ONLY FOR 2XUTETRISU ----- */
+void drawBothBoards(GameState *p1, GameState *p2);
 
 #endif

@@ -345,8 +345,11 @@ int main()
             }
             else if (key == 'h' || key == 'H') // H to hold
             {
-                holdPiece(&player2);
-                p2_gravityTimer = 0;
+                if (!player2.has_held)
+                {
+                    holdPiece(&player2);
+                    p2_gravityTimer = 0;
+                }
             }
 
             // --- PLAYER 1 (WASD) Controls ---
@@ -397,8 +400,11 @@ int main()
             }
             else if (key == 'f' || key == 'F') // P1 Hold
             {
-                holdPiece(&player1);
-                p1_gravityTimer = 0;
+                if (!player1.has_held)
+                {
+                    holdPiece(&player1);
+                    p1_gravityTimer = 0;
+                }            
             }
             else if (key == 'q' || key == 'Q') // Q to quit
             {
