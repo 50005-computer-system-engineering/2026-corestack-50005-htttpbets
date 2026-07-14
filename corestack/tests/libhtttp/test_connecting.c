@@ -1,4 +1,7 @@
-#include "lib/libhtttp.h"
+#include "connection.h"
+
+#include <sys/wait.h>
+#include <unistd.h>
 
 int main(void) 
 {

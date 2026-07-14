@@ -201,22 +201,21 @@ all: $(ALL_LIB_ARCHIVES) $(ALL_BINS)
 # ----------------------------------------------------------------------
 # Testing
 # ----------------------------------------------------------------------
-# Section is AI generated for my current tests
-# Major TODO is to rewrite and use Unity testing
 TEST_DIR     := tests
 TEST_BIN_DIR := build/tests
 
-# Static library the tests link against (build/lib/libhtttp.a)
+# Test-only include path: lets libhtttp tests #include "protocol.h" directly
+TEST_CFLAGS := $(CFLAGS) -Isrc/lib/libhtttp
+
 TARGET_STATIC := $(LIB_OUT)/libhtttp.a
 
-# Explicit list of test source files (add new tests here)
-TEST_SRCS := \
-	$(TEST_DIR)/test_connecting.c \
-	$(TEST_DIR)/test_sending.c
-
+# Auto-discover every .c file under tests/libhtttp/
+TEST_SRCS := $(wildcard $(TEST_DIR)/libhtttp/*.c)
 TEST_BINS := $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SRCS))
 
 test: $(TEST_BINS)
+	@echo "TEST_SRCS = $(TEST_SRCS)"
+	@echo "TEST_BINS = $(TEST_BINS)"
 	@echo "Running tests..."
 	@for bin in $(TEST_BINS); do \
 		echo "--- $$bin ---"; \
@@ -224,12 +223,13 @@ test: $(TEST_BINS)
 	done
 
 $(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
-	$(CC) $(CFLAGS) $< -o $@ -L$(LIB_OUT) -lhtttp
+	@mkdir -p $(dir $@)
+	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lhtttp
 	@echo "Built test binary: $@"
 
 $(TEST_BIN_DIR):
 	mkdir -p $@
-
+	
 # ----------------------------------------------------------------------
 # Cleaning
 # ----------------------------------------------------------------------

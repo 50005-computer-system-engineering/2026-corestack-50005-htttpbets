@@ -1,29 +1,17 @@
-#ifndef LIBHTTTP_H
-#define LIBHTTTP_H
+#ifndef LIBHTTTP_CONNECTION_H
+#define LIBHTTTP_CONNECTION_H
 
 #include <arpa/inet.h>
-#include <endian.h>
-#include <unistd.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
 
 // known ports
 #define PORT_TCP 6700
 #define PORT_UDP 6767
-// message codes
-#define MSG_REG 0       // registration related
-#define MSG_DEREG 1     // deregistering client
-#define MSG_ADMIN 2     // kicking, banning, start game, etc. (libhtttp actions)
-#define MSG_APP 3       // for higher level protocol used built on HTTTP (Tetris/Bomberman)
-
-// misc
-#define MAX_CONNECTIONS 100
 
 // connection structs 
 typedef struct {
@@ -42,13 +30,6 @@ typedef struct {
     uint8_t numClients;         // member tracks number of clients
     Record *clientList;   // member is list of clients according to id
 } Server;
-// message structs
-typedef struct {
-    uint8_t sourceId;       // member determines session token to be used (0 refers to server)
-    uint8_t type;           // member would determine how the receiver handles the content
-    uint32_t length;        // member specifies number of bytes of content to be received
-    unsigned char *content; // raw bytes to be handled by functions or higher level protocol
-} Message;
 
 // connection functions
 int createSockets(Connection *socks);
@@ -57,9 +38,5 @@ int listenOnServer(Connection *socks);
 int acceptOnServer(Connection *socks);
 int openLobbyOnServer(Connection *socks, Record *clientList, int lobbySize);
 int connectToServer(Connection *socks, char *serverIp);
-
-// // messaging functions
-int receiveMessage(int sockfd, Message **returnPtr);
-int sendMessage(int sockfd, Message completeMsg);
 
 #endif
