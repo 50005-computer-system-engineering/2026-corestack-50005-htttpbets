@@ -79,7 +79,15 @@ void drawBoard(GameState *state)
 
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
-        printf("|"); // Draw the left wall
+        // Draw the Left Wall
+        if (BOARD_HEIGHT - y <= state->pending_garbage)
+        {
+            printf("<#>");
+        }
+        else
+        {
+            printf("<|>");
+        }
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -138,7 +146,6 @@ void drawBoard(GameState *state)
                 printf(" ."); // Background: Empty space
             }
         }
-        printf("|"); // Draw the right wall
 
         // For hold box to the right of the board
         if (y == 0)

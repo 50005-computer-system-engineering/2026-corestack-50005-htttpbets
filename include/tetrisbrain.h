@@ -59,6 +59,8 @@ typedef struct
     int tetrises;
     int t_spins;
     bool last_action_rotation;
+    int pending_garbage;
+    int outgoing_garbage;
     int score;
     int lines_cleared;
     int level;

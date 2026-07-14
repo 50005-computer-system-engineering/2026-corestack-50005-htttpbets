@@ -33,6 +33,8 @@ void startGame(GameState *state)
     state->game_over = 0;
     state->lines_cleared = 0;
     state->level = 1;
+    state->pending_garbage = 0;
+    state->outgoing_garbage = 0;
 
     // Start spawning first piece
     shuffleBag(state); // Shuffle first bag
@@ -323,7 +325,8 @@ int tickGame(GameState *state)
     }
 
     // Check for t-spins
-    if (checkTSpin(state))
+    bool tspin = checkTSpin(state);
+    if (tspin)
     {
         state->t_spins++;
     }
@@ -333,7 +336,32 @@ int tickGame(GameState *state)
     state->pieces_placed++;
     int cleared = clearLines(state); // Check if any rows need to be cleared
 
-    // Spawn a new piece at the top
+    // Dealing with Garbage
+    int damage = calculateGarbage(state, cleared, tspin);
+    // Defend Phase: Cancel incoming garbage with our attack
+    if (damage > 0 && state->pending_garbage > 0)
+    {
+        if (damage >= state->pending_garbage)
+        {
+            damage -= state->pending_garbage;
+            state->pending_garbage = 0;
+        }
+        else 
+        {
+            state->pending_garbage -= damage;
+            damage = 0;
+        }
+    }
+    // Attack Phase: Send remaining damage to opponent
+    state->outgoing_garbage = damage;
+    // Recieve Phase: eat that shit up
+    if (cleared == 0 && state->pending_garbage > 0)
+    {
+        addGarbage(state, state->pending_garbage);
+        state->pending_garbage = 0;
+    }
+
+    // Spawn a new piece at the top AFTER garbage has been settled
     spawnNewPiece(state);
 
     // Game Over Check
@@ -414,15 +442,6 @@ void addGarbage(GameState *state, int lines)
                 state->board.cells[y][x] = 8;
             }
         }
-    }
-
-    // Push falling piece up
-    state->current.y -= lines;
-
-    // Game over check
-    if (!isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y))
-    {
-        state->game_over = true;
     }
 }
 

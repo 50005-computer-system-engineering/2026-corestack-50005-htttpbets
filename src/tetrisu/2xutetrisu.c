@@ -90,7 +90,15 @@ void drawBothBoards(GameState *p1, GameState *p2)
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
         // P1 Half
-        printf("|"); // P1 Left Wall
+        // P1 Left Wall
+        if (BOARD_HEIGHT - y <= p1->pending_garbage)
+        {
+            printf("<#>");
+        }
+        else
+        {
+            printf("<|>");
+        }
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -176,11 +184,16 @@ void drawBothBoards(GameState *p1, GameState *p2)
             printf("          "); // 10 spaces of empty padding to keep P2 aligned!
         }
 
-        // Middle Divider
-        printf(" | ");
-
         // P2 Half
-        printf("|"); // P2 Left Wall
+        // P2 Left Wall
+        if (BOARD_HEIGHT - y <= p2->pending_garbage)
+        {
+            printf("<#>");
+        }
+        else
+        {
+            printf("<|>");
+        }
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -191,7 +204,7 @@ void drawBothBoards(GameState *p1, GameState *p2)
             // P2 Active Piece
             if (x >= p2->current.x && x < p2->current.x + 4 && y >= p2->current.y && y < p2->current.y + 4)
             {
-                 // Translate the global board coordinate back to a local coordinates
+                // Translate the global board coordinate back to a local coordinates
                 int px = x - p2->current.x;
                 int py = y - p2->current.y;
                 // Check our Tetris array
@@ -390,15 +403,13 @@ int main()
                 }
 
                 // Calculate Garbage and send
-                bool p2_tspin = checkTSpin(&player2);
-                int cleared = tickGame(&player2);
-                int p2_damage = calculateGarbage(&player2, cleared, p2_tspin);
-                addGarbage(&player1, p2_damage);
-
+                tickGame(&player2);
+                if (player2.outgoing_garbage > 0)
+                {
+                    player1.pending_garbage += player2.outgoing_garbage;
+                    player2.outgoing_garbage = 0; // Reset after sending
+                }
                 p2_gravityTimer = 0;
-
-                // Clear the raw terminal input buffer to prevent double drops
-                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'h' || key == 'H') // H to hold
             {
@@ -407,7 +418,6 @@ int main()
                     holdPiece(&player2);
                     p2_gravityTimer = 0;
                 }
-                tcflush(STDIN_FILENO, TCIFLUSH);
             }
 
             // --- PLAYER 1 (WASD) Controls ---
@@ -452,14 +462,14 @@ int main()
                 }
 
                 // Calculate Garbage and send
-                bool p1_tspin = checkTSpin(&player1);
-                int cleared = tickGame(&player1);
-                int p1_damage = calculateGarbage(&player1, cleared, p1_tspin);
-                addGarbage(&player2, p1_damage);
+                tickGame(&player1);
+                if (player1.outgoing_garbage > 0)
+                {
+                    player2.pending_garbage += player1.outgoing_garbage;
+                    player1.outgoing_garbage = 0; // Reset after sending
+                }
 
                 p1_gravityTimer = 0;
-                // Clear the raw terminal input buffer to prevent double drops
-                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'f' || key == 'F') // P1 Hold
             {
@@ -468,7 +478,6 @@ int main()
                     holdPiece(&player1);
                     p1_gravityTimer = 0;
                 }
-                tcflush(STDIN_FILENO, TCIFLUSH);
             }
             else if (key == 'q' || key == 'Q') // Q to quit
             {
@@ -488,10 +497,12 @@ int main()
             if (p1_lockTimer >= p1_lockThreshold)
             {
                 // Calculate Garbage and send
-                bool p1_tspin = checkTSpin(&player1);
-                int cleared = tickGame(&player1); 
-                int p1_damage = calculateGarbage(&player1, cleared, p1_tspin);
-                addGarbage(&player2, p1_damage);
+                tickGame(&player1);
+                if (player1.outgoing_garbage > 0)
+                {
+                    player2.pending_garbage += player1.outgoing_garbage;
+                    player1.outgoing_garbage = 0; // Reset after sending
+                }
 
                 // Reset env variables
                 p1_lockTimer = 0;
@@ -519,11 +530,12 @@ int main()
             if (p2_lockTimer >= p2_lockThreshold)
             {
                 // Calculate Garbage and send
-                bool p2_tspin = checkTSpin(&player2);
-                int cleared = tickGame(&player2); 
-                int p2_damage = calculateGarbage(&player2, cleared, p2_tspin);
-                addGarbage(&player1, p2_damage);
-
+                tickGame(&player2);
+                if (player2.outgoing_garbage > 0)
+                {
+                    player1.pending_garbage += player2.outgoing_garbage;
+                    player2.outgoing_garbage = 0; // Reset after sending
+                }
                 // Reset env variables
                 p2_lockTimer = 0;
                 p2_gravityTimer = 0;
