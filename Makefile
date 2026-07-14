@@ -6,12 +6,7 @@
 #   make bomberman    build corestack + bomberman only
 #   make test         run all tests across all projects
 #   make clean        wipe all build artifacts
-#
-# Additional Flag:
-#   make BUILD_TYPE=Release  build with an optimised build
-#   Defaults to Debug
 # ======================================================================
-BUILD_TYPE ?= Debug
 
 .PHONY: all corestack tetris bomberman test clean depclean
 

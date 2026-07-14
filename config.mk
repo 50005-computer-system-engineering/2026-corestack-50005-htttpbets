@@ -28,9 +28,17 @@ CS_LIB := $(CORESTACK_DIR)/build/lib
 #                                libcssh → -lcssh, libhtttp → -lhtttp, etc.
 #
 # Convention: every library directory under corestack/src/ MUST start with
-# 'lib' (e.g. libcssh/, libutils/). This is what makes the patsubst work.
-_CS_LIB_DIRS := $(patsubst %/,%,$(wildcard $(CORESTACK_DIR)/src/lib/*/))
-CS_LDLIBS    := $(patsubst lib%,-l%,$(notdir $(_CS_LIB_DIRS)))
+# 'lib' (e.g. libcssh/, libutils/). This is what makes the patsubst work
+
+# Subdirectory libs  e.g. src/lib/libcssh/
+_CS_LIB_DIRS  := $(patsubst %/,%,$(wildcard $(CORESTACK_DIR)/src/lib/*/))
+_CS_DIR_LIBS  := $(patsubst lib%,-l%,$(notdir $(_CS_LIB_DIRS)))
+
+# Flat file libs  e.g. src/lib/libeventbus.c
+_CS_FLAT_SRCS := $(wildcard $(CORESTACK_DIR)/src/lib/*.c)
+_CS_FLAT_LIBS := $(patsubst lib%,-l%,$(notdir $(_CS_FLAT_SRCS:.c=)))
+
+CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS)
 
 # Compiler flags shared across all projects
 #
