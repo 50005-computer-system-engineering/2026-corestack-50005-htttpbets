@@ -53,7 +53,7 @@ typedef struct
     Piece next;
     int held_type;
     bool has_held;
-    int bag[7];
+    int bag[14];
     int bag_index;
     int pieces_placed;
     int tetrises;
@@ -72,8 +72,11 @@ extern const int tetrominoes[7][16];
 // function call to start the game
 void startGame(GameState *state);
 
-// Bagging system - fill the bag with the pieces and shuffle them randomly
-void shuffleBag(GameState *state);
+// Helper method to shuffle arrays
+void shuffleArray(int *array, int size);
+
+// Shifts the upcoming bag forward and generates a new one
+void refillBag(GameState *state);
 
 // Spawns a new piece
 void spawnNewPiece(GameState *state);

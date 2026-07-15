@@ -70,9 +70,9 @@ void drawBothBoards(GameState *p1, GameState *p2)
 {
     printf("\e[1;1H"); // Move cursor to top left to prevent flickering
 
-    // 75-character wide header
-    printf("      === PLAYER 1 ===                      === PLAYER 2 ===   \n");
-    printf("                                                \n");
+    // Header
+    printf("      === PLAYER 1 ===                             === PLAYER 2 ===   \n");
+    printf("                                                                   \n");
 
     // --- GHOST PIECE MATH FOR BOTH PLAYERS ---
     int p1_ghostY = p1->current.y;
@@ -91,14 +91,7 @@ void drawBothBoards(GameState *p1, GameState *p2)
     {
         // P1 Half
         // P1 Left Wall
-        if (BOARD_HEIGHT - y <= p1->pending_garbage)
-        {
-            printf("<#>");
-        }
-        else
-        {
-            printf("<|>");
-        }
+        printf("<|>");
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -154,7 +147,13 @@ void drawBothBoards(GameState *p1, GameState *p2)
                 printf(" ."); // Background: Empty space
             }
         }
-        printf("|"); // P1 Right Wall
+        // P1 Right Wall
+        printf("<|> ");
+        if (BOARD_HEIGHT - y <= p1->pending_garbage)
+        {
+            printf(" \e[0;31m#\e[0m ");
+        }
+        printf(" <|>");
 
         // P1 Hold Box (STRICT 10 CHARACTER WIDTH)
         if (y == 0)
@@ -179,21 +178,59 @@ void drawBothBoards(GameState *p1, GameState *p2)
             }
             printf(" "); // 1 space padding
         }
+        else if (y == 5)
+        {
+            printf("   NEXT   ");
+        }
+        else if (y >= 6 && y <= 9) // Rows 6-9: Next Piece #1
+        {
+            printf("  ");
+            int ny = y - 6;
+            int next_piece_1 = p1->bag[p1->bag_index]; // Point to the next piece about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_1 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 11 && y <= 14) // Rows 11-14: Next Piece #2
+        {
+            printf("  ");
+            int ny = y - 11;
+            int next_piece_2 = p1->bag[(p1->bag_index + 1) % 14]; // Point to the next two pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_2 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 16 && y <= 19) // Rows 16-19: Next Piece #3
+        {
+            printf("  ");
+            int ny = y - 16;
+            int next_piece_3 = p1->bag[(p1->bag_index + 2) % 14]; // Point to the next three pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_3 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
         else
         {
             printf("          "); // 10 spaces of empty padding to keep P2 aligned!
         }
 
+        printf("  |  "); // Middle Divider
+
         // P2 Half
         // P2 Left Wall
-        if (BOARD_HEIGHT - y <= p2->pending_garbage)
-        {
-            printf("<#>");
-        }
-        else
-        {
-            printf("<|>");
-        }
+        printf("<|>");
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -248,7 +285,13 @@ void drawBothBoards(GameState *p1, GameState *p2)
                 printf(" ."); // Background: Empty space
             }
         }
-        printf("|"); // P2 Right Wall
+        // P2 Right Wall
+        printf("<|> ");
+        if (BOARD_HEIGHT - y <= p2->pending_garbage)
+        {
+            printf(" \e[0;31m#\e[0m ");
+        }
+        printf(" <|>");
 
         // P2 Hold Box
         if (y == 0)
@@ -272,17 +315,59 @@ void drawBothBoards(GameState *p1, GameState *p2)
                     printf("  "); // Empty space if nothing held
             }
         }
+        else if (y == 5)
+        {
+            printf("  NEXT");
+        }
+        else if (y >= 6 && y <= 9) // Rows 6-9: Next Piece #1
+        {
+            printf("  ");
+            int ny = y - 6;
+            int next_piece_1 = p2->bag[p2->bag_index]; // Point to the next piece about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_1 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 11 && y <= 14) // Rows 11-14: Next Piece #2
+        {
+            printf("  ");
+            int ny = y - 11;
+            int next_piece_2 = p2->bag[(p2->bag_index + 1) % 14]; // Point to the next two pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_2 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 16 && y <= 19) // Rows 16-19: Next Piece #3
+        {
+            printf("  ");
+            int ny = y - 16;
+            int next_piece_3 = p2->bag[(p2->bag_index + 2) % 14]; // Point to the next three pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_3 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
 
         printf("\n"); // Finally push to next row
     }
 
-    // --- 3. DUAL DASHBOARD ---
-    printf("<!>====================<!>             <!>====================<!>\n");
-    printf(" Lvl: %-2d  Score: %-5d                 Lvl: %-2d  Score: %-5d\n", p1->level, p1->score, p2->level, p2->score);
-    printf(" Lines: %-3d   T-Spins: %-2d              Lines: %-3d   T-Spins: %-2d\n", p1->lines_cleared, p1->t_spins, p2->lines_cleared, p2->t_spins);
-
-    // CRITICAL: Still no \n on the very last line to prevent terminal scrolling bugs!
-    printf(" Controls: WASD / F / G                Controls: Arrows / H / Space");
+    // DUAL DASHBOARD
+    printf("<!>====================<!>                     <!>====================<!>\n");
+    printf(" Lvl: %-2d  Score: %-5d                         Lvl: %-2d  Score: %-5d\n", p1->level, p1->score, p2->level, p2->score);
+    printf(" Lines: %-3d   T-Spins: %-2d                      Lines: %-3d   T-Spins: %-2d\n", p1->lines_cleared, p1->t_spins, p2->lines_cleared, p2->t_spins);
+    printf(" Controls: Move / Hold / Hard Drop             Controls: Move / Hold / Hard Drop\n");
+    printf(" Controls: WASD / F / G                        Controls: Arrows / H / Space");
 
     fflush(stdout);
 }

@@ -36,44 +36,67 @@ void startGame(GameState *state)
     state->pending_garbage = 0;
     state->outgoing_garbage = 0;
 
+    // Initialize the 14-bag for preview pieces
+    int bag1[7] = {1, 2, 3, 4, 5, 6, 7};
+    int bag2[7] = {1, 2, 3, 4, 5, 6, 7};
+    shuffleArray(bag1, 7); 
+    shuffleArray(bag2, 7);
+    for (int i = 0; i < 7; i++) 
+    {
+        state->bag[i] = bag1[i];
+    }
+    for (int i = 0; i < 7; i++)
+    {
+        state->bag[i + 7] = bag2[i];
+    }
+    state->bag_index = 0;
+
     // Start spawning first piece
-    shuffleBag(state); // Shuffle first bag
     spawnNewPiece(state);
 }
 
-// Bagging system - fill the bag with the pieces and shuffle them randomly
-void shuffleBag(GameState *state)
+// Helper method to shuffle arrays
+void shuffleArray(int *array, int size)
 {
-    // Fill up the bag sequentially
+    for (int i = size - 1; i > 0; i--)
+    {
+        int j = rand() % (i + 1);
+        int temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}
+
+// Shifts the upcoming bag forward and generates a new one
+void refillBag(GameState *state)
+{
     for (int i = 0; i < 7; i++)
     {
-        state->bag[i] = i + 1;
+        state->bag[i] = state->bag[i + 7]; // Copy last 7 pieces and add to the first 7 slots
     }
-    // Fisher-Yates shuffle -> ensures that our next bag is truly random with the same 7 pieces
-    for (int i = 6; i > 0; i--)
+
+    int new_bag[7] = {1, 2, 3, 4, 5, 6, 7};
+    shuffleArray(new_bag, 7);
+    for (int i = 0; i < 7; i++)
     {
-        int j = rand() % (i + 1); // Pick random index from 0 to i
-        // Swap the pieces
-        int temp = state->bag[i];
-        state->bag[i] = state->bag[j];
-        state->bag[j] = temp;
+        state->bag[i + 7] = new_bag[i]; // Generate new 7 pieces and put to the back 7 slots
     }
-    // Reset the draw index
-    state->bag_index = 0;
+
+    state->bag_index = 0; // Reset bag index
 }
 
 // Spawns a new piece
 void spawnNewPiece(GameState *state)
 {
-    // Only shuffle when bag is empty
-    if (state->bag_index >= 7)
-    {
-        shuffleBag(state);
-    }
-
     // Draw next piece from the bag
     state->current.type = state->bag[state->bag_index];
     state->bag_index++;
+
+    // Only shuffle when bag is empty
+    if (state->bag_index >= 7)
+    {
+        refillBag(state);
+    }
 
     state->current.rot = ROT_0;               // Default rotation
     state->current.x = (BOARD_WIDTH / 2) - 2; // Centered horizontally
@@ -346,7 +369,7 @@ int tickGame(GameState *state)
             damage -= state->pending_garbage;
             state->pending_garbage = 0;
         }
-        else 
+        else
         {
             state->pending_garbage -= damage;
             damage = 0;

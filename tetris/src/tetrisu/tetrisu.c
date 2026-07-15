@@ -80,14 +80,7 @@ void drawBoard(GameState *state)
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
         // Draw the Left Wall
-        if (BOARD_HEIGHT - y <= state->pending_garbage)
-        {
-            printf("<#>");
-        }
-        else
-        {
-            printf("<|>");
-        }
+        printf("<|>");
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
@@ -147,6 +140,14 @@ void drawBoard(GameState *state)
             }
         }
 
+        // Draw the right wall
+        printf("<|> ");
+        if (BOARD_HEIGHT - y <= state->pending_garbage)
+        {
+            printf(" \e[0;31m#\e[0m ");
+        }
+        printf(" <|>");
+
         // For hold box to the right of the board
         if (y == 0)
         {
@@ -168,6 +169,53 @@ void drawBoard(GameState *state)
                 else
                     printf("  "); // Empty space if nothing held
             }
+        }
+        else if (y == 5)
+        {
+            printf("  NEXT");
+        }
+        else if (y >= 6 && y <= 9) // Rows 6-9: Next Piece #1
+        {
+            printf(" ");
+            int ny = y - 6;
+            int next_piece_1 = state->bag[state->bag_index]; // Point to the next piece about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_1 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 11 && y <= 14) // Rows 11-14: Next Piece #2
+        {
+            printf("  ");
+            int ny = y - 11;
+            int next_piece_2 = state->bag[(state->bag_index + 1) % 14]; // Point to the next two pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_2 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else if (y >= 16 && y <= 19) // Rows 16-19: Next Piece #3
+        {
+            printf("  ");
+            int ny = y - 16;
+            int next_piece_3 = state->bag[(state->bag_index + 2) % 14]; // Point to the next three pieces about to spawn
+            for (int hx = 0; hx < 4; hx++)
+            {
+                if (tetrominoes[next_piece_3 - 1][getRotationIndex(hx, ny, 0)] != 0)
+                    printf("[]");
+                else
+                    printf("  ");
+            }
+        }
+        else
+        {
+            printf("      "); // Blank spaces for row gaps
         }
         printf("\n"); // Push to next row
     }
@@ -210,7 +258,7 @@ int main()
         {
             current_gravity = 5;
         }
-        
+
         // Read user inputs
         if (kbhit())
         {
