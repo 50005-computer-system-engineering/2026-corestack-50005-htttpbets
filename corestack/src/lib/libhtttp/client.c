@@ -17,17 +17,15 @@ int createClient(LibhtttpClient **clientPtr)
 int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 {
     Record *thisClient = clientPtr;
-    int serverFd = connectOnTCP(thisClient->socks, ipAddress); 
-    if (serverFd < 0)
-    {
-        printf("libhtttp/client joinLobby: failed to connect to server at IP\n");
-        return -1;
-    }
     if (createSockets(&thisClient->socks) < 0)
     {
         printf("libhtttp/client createClient: socket creation failed\n");
         return -1;
     }
-    thisClient->socks->tcp = serverFd;
+    if (connectOnTCP(thisClient->socks, ipAddress) < 0)
+    {
+        printf("libhtttp/client joinLobby: failed to connect to server at IP\n");
+        return -1;
+    }
     return 0;
 }
