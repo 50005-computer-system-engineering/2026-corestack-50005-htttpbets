@@ -62,21 +62,14 @@ int receiveMessage(int sockfd, Message **returnPtr)
     // read Message header bytes
     printf("receiveMessage: allocated memory for Message, listening for header...\n");
     unsigned char *buffer = NULL;
-    if (readBytes(sockfd, &buffer, sizeof(uint8_t)) < 0)
+    if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
         printf("readMessage: failed to read sourceId\n");
         goto fail;
     } 
-    returnMsg->sourceId = *buffer;
-    free(buffer);
-    buffer = NULL;
-
-    if (readBytes(sockfd, &buffer, sizeof(uint8_t)) < 0)
-    {
-        printf("readMessage: failed to read type\n");
-        goto fail;
-    } 
-    returnMsg->type = *buffer;
+    uint32_t sourceBytes;
+    memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
+    returnMsg->sourceId = ntohl(lenBytes);
     free(buffer);
     buffer = NULL;
 
@@ -92,7 +85,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
     buffer = NULL;
 
     // listen for message considering the header
-    printf("readMessage: now listening for message with header:\n\tsourceId: %u\n\ttype: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->type, returnMsg->length);
+    printf("readMessage: now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
     if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
     {
         printf("readMessage: failed to read length\n");
@@ -129,9 +122,9 @@ fail:
 
 int sendMessage(int sockfd, const Message completeMsg)
 {
-    printf("sendMessage: sending message with the header:\n\tsourceId: %u\n\ttype: %u\n\tlength: %u\n", completeMsg.sourceId, completeMsg.type, completeMsg.length);
-    sendBytes(sockfd, &completeMsg.sourceId, sizeof(uint8_t));
-    sendBytes(sockfd, &completeMsg.type, sizeof(uint8_t));
+    printf("sendMessage: sending message with the header:\n\tsourceId: %u\n\tlength: %u\n", completeMsg.sourceId, completeMsg.length);
+    uint32_t sourceId = htonl(completeMsg.sourceId);
+    sendBytes(sockfd, (const unsigned char *)&sourceId, sizeof(uint32_t));
     uint32_t length = htonl(completeMsg.length);
     sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
     sendBytes(sockfd, completeMsg.content, completeMsg.length);
