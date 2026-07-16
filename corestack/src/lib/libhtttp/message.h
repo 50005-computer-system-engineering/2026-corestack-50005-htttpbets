@@ -18,6 +18,10 @@ typedef struct {
 } Message;
 typedef void ClientRecord;
 
+// send/recv functions
+int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length);
+int sendBytes(int sockfd, const unsigned char *buf, uint64_t length);
+
 // messaging functions
 int receiveMessage(int sockfd, Message **returnPtr);
 int sendMessage(int sockfd, Message completeMsg);

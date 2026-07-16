@@ -13,6 +13,9 @@
 #define PORT_TCP 6700
 #define PORT_UDP 6767
 
+// important values
+#define NONCE_LEN 8
+
 // connection structs 
 typedef struct {
     int tcp;     // member (tcp socket fd)
@@ -22,7 +25,7 @@ typedef struct {
 } Connection;
 typedef struct {
     uint32_t id;             // on server it is record of client ID, on client it is record of own ID
-    int token;              // will replace with proper token with encryption later on
+    unsigned char token[NONCE_LEN];              // will replace with proper token with encryption later on
     Connection *socks;      // member tracks TCP and UDP sockets
 } Record;   // struct used to track connections by BOTH
 typedef struct {

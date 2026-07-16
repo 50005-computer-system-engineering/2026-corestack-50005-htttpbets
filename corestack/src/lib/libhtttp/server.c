@@ -63,7 +63,6 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         // adding valid client record
         Record *current_slot = &thisServer->clientList[slot - 1];
         current_slot->id = slot;
-        current_slot->token = 0; // TODO nonce generation
         current_slot->socks = malloc(sizeof(Connection));
         if (current_slot->socks == NULL)
         {
