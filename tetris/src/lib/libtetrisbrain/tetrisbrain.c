@@ -436,6 +436,12 @@ void addGarbage(GameState *state, int lines)
         return;
     }
 
+    // Out of bounds check
+    if (lines > BOARD_HEIGHT)
+    {
+        lines = BOARD_HEIGHT;
+    }
+
     // Bump all existing blocks up by the number of garbage lines
     for (int y = 0; y < BOARD_HEIGHT - lines; y++)
     {
@@ -445,12 +451,11 @@ void addGarbage(GameState *state, int lines)
         }
     }
 
-    // Random x coord to spawn hole for the player
-    int hole = rand() % BOARD_WIDTH;
-
     // Add the new garbage lines at the bottom
     for (int y = BOARD_HEIGHT - lines; y < BOARD_HEIGHT; y++)
     {
+        // Random x coord to spawn hole for the player
+        int hole = rand() % BOARD_WIDTH;
 
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
