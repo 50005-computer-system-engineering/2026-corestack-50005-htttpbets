@@ -4,19 +4,23 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "state.h"
+#include "piece.h"
 
 /* ----- BOARD LOGISTICS ----- */
 #define BOARD_WIDTH 10
 #define BOARD_HEIGHT 20
 
+// Forward declaration to avoid circular includes
+struct GameState;
+
 // Check for collisions
-bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int posY);
+bool isValidPos(struct GameState *state, PieceType type, Rotation rot, int posX, int posY);
 
 // Locking the piece after it finalizes its position
-void lockPiece(GameState *state);
+void lockPiece(struct GameState *state);
 
 // Tetris
-int clearLines(GameState *state);
+int clearLines(struct GameState *state);
 
 /* ----- BOARD ----- */
 typedef struct

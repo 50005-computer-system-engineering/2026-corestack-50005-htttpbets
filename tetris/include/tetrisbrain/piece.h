@@ -35,16 +35,19 @@ typedef struct
 
 extern const int tetrominoes[7][16];
 
+// Forward declaration to avoid circular includes
+struct GameState;
+
 // Convert 2D (x,y) coordinates into 1D index for array
 int getRotationIndex(int x, int y, Rotation rot);
 
 // Wall kick helper function
-bool testRotate(GameState *state, int nextRot);
+bool testRotate(struct GameState *state, int nextRot);
 
 // Rotate clockwise logic
-void rotateCurrentPiece(GameState *state);
+void rotateCurrentPiece(struct GameState *state);
 
 // Rotate counter clockwise logic
-void rotateCounterClockwise(GameState *state);
+void rotateCounterClockwise(struct GameState *state);
 
 #endif
