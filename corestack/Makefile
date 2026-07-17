@@ -215,47 +215,34 @@ init:
 # Testing
 # Placeholder for now, to change later!
 # ----------------------------------------------------------------------
-TESTS_DIR := ./tests
-UNIT_DIR  := $(TESTS_DIR)/unit
-INT_DIR   := $(TESTS_DIR)/integration
-UNITY_DIR := $(TESTS_DIR)/unity
-UNIT_BIN  := $(UNIT_DIR)/bin
+TEST_DIR     := tests
+TEST_BIN_DIR := build/tests
 
-UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
-UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
+# Test-only include path: lets libhtttp tests #include "protocol.h" directly
+TEST_CFLAGS := $(CFLAGS) -Isrc/lib/libhtttp
 
-TEST_CFLAGS  := $(CFLAGS) -I$(UNITY_DIR)
-TEST_LDFLAGS := -L$(LIB_OUT) -lpthread
-TEST_LDLIBS  := $(LDLIBS)
+TARGET_STATIC := $(LIB_OUT)/libhtttp.a
 
-$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
-	@mkdir -p $(UNIT_BIN)
-	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
+# Auto-discover every .c file under tests/libhtttp/
+TEST_SRCS := $(wildcard $(TEST_DIR)/libhtttp/*.c)
+TEST_BINS := $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SRCS))
 
-unit: $(UNIT_BINS)
-	@echo "==> Running corestack unit tests"
-	@pass=0; fail=0; \
-	for t in $(UNIT_BINS); do \
-	  echo "--- $$t ---"; \
-	  if $$t; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
-	done; \
-	echo ""; \
-	echo "Unit tests: $$pass passed, $$fail failed"; \
-	test $$fail -eq 0
+test: $(TEST_BINS)
+	@echo "TEST_SRCS = $(TEST_SRCS)"
+	@echo "TEST_BINS = $(TEST_BINS)"
+	@echo "Running tests..."
+	@for bin in $(TEST_BINS); do \
+		echo "--- $$bin ---"; \
+		./$$bin || exit 1; \
+	done
 
-integration: all
-	@echo "==> Running corestack integration tests"
-	@pass=0; fail=0; \
-	for s in $(INT_DIR)/*.sh; do \
-	  [ -f "$$s" ] || continue; \
-	  echo "--- $$s ---"; \
-	  if bash $$s; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
-	done; \
-	echo ""; \
-	echo "Integration tests: $$pass passed, $$fail failed"; \
-	test $$fail -eq 0
+$(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lhtttp
+	@echo "Built test binary: $@"
 
-test: unit integration
+$(TEST_BIN_DIR):
+	mkdir -p $@
 
 # ----------------------------------------------------------------------
 # Cleaning
