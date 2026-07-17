@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "piece.h"
+#include <stdbool.h>
 
 /* ----- GAME STATE ----- */
 typedef struct
@@ -27,8 +28,8 @@ typedef struct
 } GameState;
 
 // Spawn game state(s)
-GameState gamestate_p1;
-GameState gamestate_p2;
+extern GameState gamestate_p1;
+extern GameState gamestate_p2;
 
 // Function call to start the game
 void startGame(GameState *state);

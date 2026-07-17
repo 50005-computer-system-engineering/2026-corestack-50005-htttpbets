@@ -1,4 +1,4 @@
-#include "bombapp/spritesheet.h"
+#include "spritesheet.h"
 #include <raylib.h>
 
 void spritesheet_init(Spritesheet *s, const SpritesheetAsset asset) {

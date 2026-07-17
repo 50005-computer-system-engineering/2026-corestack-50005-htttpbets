@@ -40,7 +40,7 @@ AR := ar rcs
 # ----------------------------------------------------------------------
 SRC_DIR    := ./src
 LIB_SUBDIR := lib
-INC_DIR    := ./include
+INC_DIR    := include
 OBJ_DIR    := ./build/obj
 LIB_OUT    := ./build/lib
 BIN_OUT    := ./build/bin
@@ -88,6 +88,8 @@ ALL_LIB_ARCHIVES :=
 
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
+# Note that we include each directory's own path to the CFLAGS to
+# (eg: Allow src/lib/libhtttp/client.c to #include "client.h" instead of "libhtttp/client.h")
 # 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
 # 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
 # 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
@@ -97,6 +99,7 @@ define LIB_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c) 
 $(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
              $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
 
 $(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c
 	@mkdir -p $$(dir $$@)
@@ -160,14 +163,17 @@ ALL_BINS :=
 # 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
 # ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
 # See: https://devdocs.io/gnu_make/prerequisite-types
-# 3) Compile every file to binary, including linker paths
-# 4) Append compiled binary to running list of binaries to build at top-level
+# 3) Also include each directory's own path to the search path 
+# (eg: Allow tetrisu/test.c to #include "test.h" instead of "tetrisu/test.h")
+# 4) Compile every file to binary, including linker paths
+# 5) Append compiled binary to running list of binaries to build at top-level
 define BIN_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
 
 $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $$($(1)_CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
 
 ALL_BINS += $(BIN_OUT)/$(1)
 endef
@@ -192,11 +198,18 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all unit integration test clean
+.PHONY: all init unit integration test clean
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS)
+
+# Print a Heart emoji for Corestack :D
+# TODO: Implement pretty-print for other commands
+init: 
+	make clean
+	bear -- make
+	@printf "\U0001F499 Created compile_commands for Intellisense!\n"
 
 # ----------------------------------------------------------------------
 # Testing

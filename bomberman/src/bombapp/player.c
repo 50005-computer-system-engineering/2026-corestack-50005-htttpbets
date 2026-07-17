@@ -1,9 +1,9 @@
 #include <raylib.h>
 #include <raymath.h>
-#include "bombapp/config.h"
-#include "bombapp/player.h"
-#include "bombapp/spritesheet.h"
-#include "bombapp/config.h"
+#include "config.h"
+#include "player.h"
+#include "spritesheet.h"
+#include "config.h"
 #include "lib/libeventbus.h"
 #include "events.h"
 

@@ -1,8 +1,8 @@
 #include <raylib.h>
 #include <stdio.h>
 #include "lib/libeventbus.h"
-#include "bombapp/config.h"
-#include "bombapp/input.h"
+#include "config.h"
+#include "input.h"
 #include "events.h"
 
 void input_update(void) {

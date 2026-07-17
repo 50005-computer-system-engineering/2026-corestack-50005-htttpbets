@@ -1,16 +1,23 @@
 # ======================================================================
 # Root Makefile: Builds all three subprojects in the correct order.
 # Usage:
-#	make              build everything
-#   make tetris       build corestack + tetris only
-#   make bomberman    build corestack + bomberman only
-#   make test         run all tests across all projects
-#   make clean        wipe all build artifacts
+#	make 			build everything
+#	make init		runs bear -- make on every subfolder to prepare intellisense
+#   make tetris 	build corestack + tetris only
+#   make bomberman 	build corestack + bomberman only
+#   make test 		run all tests across all projects
+#   make clean 		wipe all build artifacts
+#	make distclean 	wipe everything including dependencies downloaded
 # ======================================================================
 
-.PHONY: all corestack tetris bomberman test clean depclean
+.PHONY: all corestack tetris bomberman test clean distclean
 
 all: corestack tetris bomberman
+
+init:
+	$(MAKE) -C corestack init
+	$(MAKE) -C tetris init
+	$(MAKE) -C bomberman init
 
 corestack: clean
 	$(MAKE) -C corestack

@@ -1,4 +1,4 @@
-#include "tetrisu/config.h"
+#include "config.h"
 
 const int GRAVITY_THRESHOLD_START = 50;
 const int LOCK_THRESHOLD_START = 50;

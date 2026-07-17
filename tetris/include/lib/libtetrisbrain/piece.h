@@ -1,6 +1,5 @@
 #ifndef TETRISBRAIN_PIECE_H
 #define TETRISBRAIN_PIECE_H
-#include "state.h"
 
 /* ----- TETRIS PIECES ----- */
 typedef enum
@@ -34,17 +33,4 @@ typedef struct
 } Piece;
 
 extern const int tetrominoes[7][16];
-
-// Convert 2D (x,y) coordinates into 1D index for array
-int getRotationIndex(int x, int y, Rotation rot);
-
-// Wall kick helper function
-bool testRotate(GameState *state, int nextRot);
-
-// Rotate clockwise logic
-void rotateCurrentPiece(GameState *state);
-
-// Rotate counter clockwise logic
-void rotateCounterClockwise(GameState *state);
-
 #endif

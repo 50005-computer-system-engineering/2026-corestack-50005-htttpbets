@@ -39,7 +39,7 @@ AR := ar rcs
 # ----------------------------------------------------------------------
 SRC_DIR    := ./src
 LIB_SUBDIR := lib
-INC_DIR    := ./include
+INC_DIR    := include
 OBJ_DIR    := ./build/obj
 LIB_OUT    := ./build/lib
 BIN_OUT    := ./build/bin
@@ -51,7 +51,6 @@ BIN_OUT    := ./build/bin
 # ----------------------------------------------------------------------
 TARGET       := launcher
 # ! IMPORTANT ! Main entry point
-# Change this to ncurses_tetrisu or 2xutetrisu to test other versions
 LAUNCHER_BIN := tetrisu
 
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
@@ -103,6 +102,8 @@ ALL_LIB_ARCHIVES :=
 
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
+# Note that we include each directory's own path to the CFLAGS to
+# (eg: Allow src/lib/libhtttp/client.c to #include "client.h" instead of "libhtttp/client.h")
 # 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
 # 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
 # 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
@@ -112,10 +113,11 @@ define LIB_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c)
 $(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
              $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
 
 $(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) -c $$< -o $$@
+	$(CC) $$($(1)_CFLAGS) -c $$< -o $$@
 
 $(LIB_OUT)/$(1).a: $$($(1)_OBJ)
 	@mkdir -p $(LIB_OUT)
@@ -169,47 +171,29 @@ FLAT_BIN_NAMES := $(patsubst $(SRC_DIR)/%.c,%,$(FLAT_BIN_SRCS))
 # Final container of all binaries, empty for now
 ALL_BINS :=
 
-# TODO: Remove me once we settle on version of tetrisu
-_ALL_BIN_SRCS    := $(foreach d,$(_BIN_SRCDIRS),$(wildcard $(d)/*.c))
-# $(1) = full path to a .c file, e.g. src/tetrisu/ncurses_tetrisu.c
-#
-# $(notdir $(1:.c=)) strips the path and extension in two steps:
-#   $(1:.c=)    → src/tetrisu/ncurses_tetrisu   (removes .c)
-#   $(notdir …) → ncurses_tetrisu               (removes path)
-#
-# Each file compiles independently — if files share logic, that logic
-# should live in a library under src/lib/ rather than being duplicated.
-define FILE_BIN_template =
-$(BIN_OUT)/$(notdir $(1:.c=)): $(1) | $(ALL_LIB_ARCHIVES)
-	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$< -o $$@ $(LDFLAGS) $(LDLIBS)
+# Directory Binary Template: Subdirectory -> Binary
+# Similar to library templates,
+# 1) Create list of every .c file found in directory
+# 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
+# ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
+# See: https://devdocs.io/gnu_make/prerequisite-types
+# 3) Also include each directory's own path to the search path 
+# (eg: Allow src/tetrisu/test.c to #include "test.h" instead of "tetrisu/test.h")
+# 4) Compile every file to binary, including linker paths
+# 5) Append compiled binary to running list of binaries to build at top-level
+define BIN_template =
+$(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
 
-ALL_BINS += $(BIN_OUT)/$(notdir $(1:.c=))
+$(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
+	@mkdir -p $$(dir $$@)
+	$(CC) $$($(1)_CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
+
+ALL_BINS += $(BIN_OUT)/$(1)
 endef
 
-$(foreach src,$(_ALL_BIN_SRCS),$(eval $(call FILE_BIN_template,$(src))))
-
-# TODO: Uncomment me once we settle on version of tetrisu
-# # Directory Binary Template: Subdirectory -> Binary
-# # Similar to library templates,
-# # 1) Create list of every .c file found in directory
-# # 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
-# # ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
-# # See: https://devdocs.io/gnu_make/prerequisite-types
-# # 3) Compile every file to binary, including linker paths
-# # 4) Append compiled binary to running list of binaries to build at top-level
-# define BIN_template =
-# $(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
-
-# $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
-# 	@mkdir -p $$(dir $$@)
-# 	$(CC) $(CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
-
-# ALL_BINS += $(BIN_OUT)/$(1)
-# endef
-
 # Runs template once per directory binary name
-# $(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
+$(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
 
 # Flat Binary Template: Single .c File -> Binary
 # Identical to BIN_template except source is a single named file ($$<) rather than 
@@ -229,14 +213,18 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # Top-Level Targets
 # ----------------------------------------------------------------------
 # 'all' is ran by default when make is ran with no arguments
-.PHONY: all setup run unit integration test clean
+.PHONY: all init run unit integration test clean
 
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS) $(TARGET)
 
-setup:
+# Print a block emoji for Tetris :D
+# TODO: Implement pretty-print for other commands
+init: 
+	make clean
+	bear -- make
 	@mkdir -p var/log var/run
-	@echo "Runtime directories ready."
+	@printf "\U0001F9F1 Created runtime directories and compile_commands for Intellisense!\n"
 
 # ----------------------------------------------------------------------
 # Testing
