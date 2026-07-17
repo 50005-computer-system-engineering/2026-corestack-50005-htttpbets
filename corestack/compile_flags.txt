@@ -4,4 +4,3 @@
 -Wextra
 -g
 -pthread
--DCORESTACK_INTERNAL_ACCESS

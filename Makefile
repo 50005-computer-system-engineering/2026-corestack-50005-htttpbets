@@ -8,7 +8,7 @@
 #   make clean        wipe all build artifacts
 # ======================================================================
 
-.PHONY: all corestack tetris bomberman test clean distclean
+.PHONY: all corestack tetris bomberman test clean depclean
 
 all: corestack tetris bomberman
 
