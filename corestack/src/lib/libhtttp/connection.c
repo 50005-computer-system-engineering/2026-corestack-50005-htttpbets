@@ -103,10 +103,10 @@ int acceptOnTCP(Connection *socks)
     int newClientFd = accept(socks->tcp, NULL, NULL);
     if (newClientFd < 0)
     {
-        perror("acceptOnServer accept");
+        perror("acceptOnTCP accept");
         return -1;
     }
-    printf("acceptOnServer: server accepted new TCP client\n");
+    printf("acceptOnTCP: server accepted new TCP client\n");
     return newClientFd;
 }
 

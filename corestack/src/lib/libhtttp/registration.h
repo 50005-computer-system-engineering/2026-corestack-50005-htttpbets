@@ -9,8 +9,11 @@
 #include <string.h>
 #include <sys/socket.h>
 
+#include "connection.h"
+#include "message.h"
+
 // new client functions
-int registerNewClient(Server *myServer, int clientId);
+int registerNewClient(Record *newClient);
 int registerWithServer(Record *myClient);
 
 // // admin action functions

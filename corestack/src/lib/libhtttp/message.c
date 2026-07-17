@@ -69,7 +69,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
     } 
     uint32_t sourceBytes;
     memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
-    returnMsg->sourceId = ntohl(lenBytes);
+    returnMsg->sourceId = ntohl(sourceBytes);
     free(buffer);
     buffer = NULL;
 
