@@ -3,7 +3,7 @@
 #include <termios.h> // Linux terminal control
 #include <unistd.h>  // POSIX OS API
 #include <fcntl.h>   // File control (for non-blocking reads)
-#include "tetrisu/input.h"
+#include "input.h"
 
 // --- TERMINAL CONTROL (termios) ---
 // Linux in-built terminal flags

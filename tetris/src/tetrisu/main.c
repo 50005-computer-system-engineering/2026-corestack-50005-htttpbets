@@ -1,13 +1,15 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include "libeventbus.h"
-#include "tetrisu/config.h"
-#include "tetrisu/events.h"
-#include "tetrisu/input.h"
-#include "tetrisu/renderer.h"
-#include "tetrisbrain/state.h"
+#include "lib/libeventbus.h"
+#include "config.h"
+#include "events.h"
+#include "input.h"
+#include "renderer.h"
+#include "lib/libtetrisbrain/engine.h"
+#include "lib/libtetrisbrain/board_control.h"
+#include "lib/libtetrisbrain//hold.h"
+#include "lib/libtetrisbrain/state.h"
 
 // --- MAIN GAME LOOP ---
 int main()
@@ -55,18 +57,18 @@ int main()
         // Read user inputs
         while (kbhit())
         {
-            // Call getch() wrapper
-            int key = getch();
+            // Call getchar() wrapper
+            int key = getchar();
 
             // Player 2 keybinds
             // Linux arrow keys send 3 characters instantly => escape (27), '[', and a letter
             if (key == 27) // Escape or arrow key?
             {
-                if (kbhit() && getch() == '[') // Bracket right after?
+                if (kbhit() && getchar() == '[') // Bracket right after?
                 {
                     if (kbhit()) // Decide output based on letter
                     {
-                        switch (getch())
+                        switch (getchar())
                         {
                         case 'A': // Up arrow (rotate clockwise)
                             rotateCurrentPiece(&gamestate_p2);
@@ -329,7 +331,7 @@ int main()
     {
         usleep(DELAY_MICROSECONDS);
     }
-    getch();
+    getchar();
 
     return 0;
 }
@@ -372,17 +374,17 @@ int main()
         // Read user inputs
         if (kbhit())
         {
-            // Call getch() wrapper
-            int key = getch();
+            // Call getchar() wrapper
+            int key = getchar();
 
             // Linux arrow keys send 3 characters instantly => escape (27), '[', and a letter
             if (key == 27) // Escape or arrow key?
             {
-                if (kbhit() && getch() == '[') // Bracket right after?
+                if (kbhit() && getchar() == '[') // Bracket right after?
                 {
                     if (kbhit()) // Decide output based on letter
                     {
-                        switch (getch())
+                        switch (getchar())
                         {
                         case 'A': // Up arrow (rotate clockwise)
                             rotateCurrentPiece(&myGame);
@@ -503,7 +505,7 @@ int main()
     {
         usleep(10000);
     }
-    getch();
+    getchar();
 
     return 0;
 }

@@ -1,5 +1,5 @@
 #include "engine.h"
-#include "board.h"
+#include "board_control.h"
 #include "bag.h"
 #include "garbage.h"
 

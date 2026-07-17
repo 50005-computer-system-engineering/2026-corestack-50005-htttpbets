@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include "lib/libtetrisbrain/board_control.h"
 #include "renderer.h"
 
 // Renders the board and active piece to the terminal

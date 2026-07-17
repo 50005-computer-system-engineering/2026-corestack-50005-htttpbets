@@ -2,6 +2,12 @@
 #include "bag.h"
 
 #include <string.h>
+#include <time.h>
+#include <stdlib.h>
+
+// Initialise gamestates
+GameState gamestate_p1;
+GameState gamestate_p2;
 
 // Function call to start the game
 void startGame(GameState *state)

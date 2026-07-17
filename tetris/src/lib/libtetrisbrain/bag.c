@@ -1,4 +1,4 @@
-#include "tetrisbrain/bag.h"
+#include "bag.h"
 #include <stdlib.h>
 
 // Helper method to shuffle arrays
