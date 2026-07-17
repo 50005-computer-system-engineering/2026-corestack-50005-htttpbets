@@ -51,7 +51,6 @@ BIN_OUT    := ./build/bin
 # ----------------------------------------------------------------------
 TARGET       := launcher
 # ! IMPORTANT ! Main entry point
-# Change this to ncurses_tetrisu or 2xutetrisu to test other versions
 LAUNCHER_BIN := tetrisu
 
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
@@ -169,47 +168,26 @@ FLAT_BIN_NAMES := $(patsubst $(SRC_DIR)/%.c,%,$(FLAT_BIN_SRCS))
 # Final container of all binaries, empty for now
 ALL_BINS :=
 
-# TODO: Remove me once we settle on version of tetrisu
-_ALL_BIN_SRCS    := $(foreach d,$(_BIN_SRCDIRS),$(wildcard $(d)/*.c))
-# $(1) = full path to a .c file, e.g. src/tetrisu/ncurses_tetrisu.c
-#
-# $(notdir $(1:.c=)) strips the path and extension in two steps:
-#   $(1:.c=)    → src/tetrisu/ncurses_tetrisu   (removes .c)
-#   $(notdir …) → ncurses_tetrisu               (removes path)
-#
-# Each file compiles independently — if files share logic, that logic
-# should live in a library under src/lib/ rather than being duplicated.
-define FILE_BIN_template =
-$(BIN_OUT)/$(notdir $(1:.c=)): $(1) | $(ALL_LIB_ARCHIVES)
-	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$< -o $$@ $(LDFLAGS) $(LDLIBS)
+# Directory Binary Template: Subdirectory -> Binary
+# Similar to library templates,
+# 1) Create list of every .c file found in directory
+# 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
+# ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
+# See: https://devdocs.io/gnu_make/prerequisite-types
+# 3) Compile every file to binary, including linker paths
+# 4) Append compiled binary to running list of binaries to build at top-level
+define BIN_template =
+$(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
 
-ALL_BINS += $(BIN_OUT)/$(notdir $(1:.c=))
+$(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
+	@mkdir -p $$(dir $$@)
+	$(CC) $(CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
+
+ALL_BINS += $(BIN_OUT)/$(1)
 endef
 
-$(foreach src,$(_ALL_BIN_SRCS),$(eval $(call FILE_BIN_template,$(src))))
-
-# TODO: Uncomment me once we settle on version of tetrisu
-# # Directory Binary Template: Subdirectory -> Binary
-# # Similar to library templates,
-# # 1) Create list of every .c file found in directory
-# # 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
-# # ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
-# # See: https://devdocs.io/gnu_make/prerequisite-types
-# # 3) Compile every file to binary, including linker paths
-# # 4) Append compiled binary to running list of binaries to build at top-level
-# define BIN_template =
-# $(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
-
-# $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
-# 	@mkdir -p $$(dir $$@)
-# 	$(CC) $(CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
-
-# ALL_BINS += $(BIN_OUT)/$(1)
-# endef
-
 # Runs template once per directory binary name
-# $(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
+$(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
 
 # Flat Binary Template: Single .c File -> Binary
 # Identical to BIN_template except source is a single named file ($$<) rather than 
