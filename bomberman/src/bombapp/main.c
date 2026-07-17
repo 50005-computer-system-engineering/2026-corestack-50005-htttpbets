@@ -2,10 +2,8 @@
 
 #include "lib/libeventbus.h"
 #include "events.h"
-#include "bombapp/input.h"
-#include "bombapp/player.h"
-
-#include <stdio.h>
+#include "input.h"
+#include "player.h"
 
 void initalise() {
     // Initialise event bus

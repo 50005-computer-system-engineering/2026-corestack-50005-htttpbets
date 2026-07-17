@@ -60,3 +60,6 @@ dkms.conf
 **/tests/unit/bin/
 **/launcher
 tetris/var/
+
+# Ignore compile_commands, as this is unique to each user
+compile_commands.json

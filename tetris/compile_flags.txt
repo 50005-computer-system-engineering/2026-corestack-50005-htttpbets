@@ -1,8 +1,0 @@
--Iinclude
--Iinclude/lib
--I../corestack/include
--Wall
--Wextra
--g
--pthread
--lncurses

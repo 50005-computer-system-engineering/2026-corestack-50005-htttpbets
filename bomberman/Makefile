@@ -20,8 +20,7 @@
 #   make              runs 'all' by default, builds everything (downloads raylib if needed)
 #   make deps         explicitly fetch and build missing dependencies only
 #   make clean        wipe build/ and test bins (deps/ is kept)
-#   make clean-deps   wipe deps/ (forces re-download on next build)
-#   make distclean    clean + clean-deps
+#   make distclean    clean + wipe deps/ (forces re-download on next build)
 #   make test			runs all tests
 #	make unit			runs unit tests
 #	make integration	runs integration tests
@@ -45,7 +44,7 @@ AR := ar rcs
 # ----------------------------------------------------------------------
 SRC_DIR    := ./src
 LIB_SUBDIR := lib
-INC_DIR    := ./include
+INC_DIR    := include
 OBJ_DIR    := ./build/obj
 LIB_OUT    := ./build/lib
 BIN_OUT    := ./build/bin
@@ -184,6 +183,8 @@ ALL_LIB_ARCHIVES :=
 
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
+# Note that we include each directory's own path to the CFLAGS to
+# (eg: Allow src/lib/libhtttp/client.c to #include "client.h" instead of "libhtttp/client.h")
 # 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
 # 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
 # 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
@@ -193,10 +194,11 @@ define LIB_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c)
 $(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
              $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
 
 $(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) -c $$< -o $$@
+	$(CC) $$($(1)_CFLAGS)  -c $$< -o $$@
 
 $(LIB_OUT)/$(1).a: $$($(1)_OBJ)
 	@mkdir -p $(LIB_OUT)
@@ -262,17 +264,20 @@ ALL_BINS :=
 # 2) Declare binary as target with prerequisites src (normal), libraries & extra deps (order-only)
 # ie: src is rebuilt whenever it's modified, libraries/deps are rebuilt only if its existence changes
 # See: https://devdocs.io/gnu_make/prerequisite-types
-# 3) Compile every file to binary, including linker paths
-# 4) Append compiled binary to running list of binaries to build at top-level
+# 3) Also include each directory's own path to the search path 
+# (eg: Allow src/tetrisu/test.c to #include "test.h" instead of "tetrisu/test.h")
+# 4) Compile every file to binary, including linker paths
+# 5) Append compiled binary to running list of binaries to build at top-level
 define BIN_template =
 $(1)_SRC          := $$(wildcard $(SRC_DIR)/$(1)/*.c)
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
 $(1)_EXTRA_CFLAGS  := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_CFLAGS))
 $(1)_EXTRA_LDFLAGS := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_LDFLAGS))
 $(1)_EXTRA_DEPS    := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_DEP))
 
 $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES) $$($(1)_EXTRA_DEPS)
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$($(1)_EXTRA_CFLAGS) $$($(1)_SRC) -o $$@ \
+	$(CC) $$($(1)_CFLAGS) $$($(1)_EXTRA_CFLAGS) $$($(1)_SRC) -o $$@ \
 		$(LDFLAGS) $(LDLIBS) $$($(1)_EXTRA_LDFLAGS)
 
 ALL_BINS += $(BIN_OUT)/$(1)
@@ -303,11 +308,18 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all deps run unit integration test clean clean-deps distclean
+.PHONY: all init deps run unit integration test clean clean-deps distclean
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS) $(TARGET)
+
+# Print a Bomb emoji for Bomberman :D
+# TODO: Implement pretty-print for other commands
+init: 
+	make clean
+	bear -- make
+	@printf "\U0001F4A3 Created compile_commands for Intellisense!\n"
 
 # ----------------------------------------------------------------------
 # Testing
@@ -359,13 +371,12 @@ test: unit integration
 # ----------------------------------------------------------------------
 # Cleaning
 # ----------------------------------------------------------------------
-# Keeps /deps intact
+# Keeps /deps intact while cleaning build artifacts
 clean:
 	rm -rf ./build $(UNIT_BIN)
 	rm -f $(TARGET)
 
-# Removes /deps
-clean-deps:
+# Remove /deps and build artifacts
+distclean: 
+	clean clean-deps
 	rm -rf $(DEPS_DIR)
-
-distclean: clean clean-deps
