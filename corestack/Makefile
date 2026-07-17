@@ -40,7 +40,7 @@ AR := ar rcs
 # ----------------------------------------------------------------------
 SRC_DIR    := ./src
 LIB_SUBDIR := lib
-INC_DIR    := ./include
+INC_DIR    := include
 OBJ_DIR    := ./build/obj
 LIB_OUT    := ./build/lib
 BIN_OUT    := ./build/bin
@@ -88,6 +88,8 @@ ALL_LIB_ARCHIVES :=
 
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
+# Note that we include each directory's own path to the CFLAGS to
+# (eg: Allow src/lib/libhtttp/client.c to #include "client.h" instead of "libhtttp/client.h")
 # 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
 # 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
 # 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
@@ -97,6 +99,7 @@ define LIB_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c) 
 $(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
              $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
 
 $(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c
 	@mkdir -p $$(dir $$@)
@@ -160,14 +163,17 @@ ALL_BINS :=
 # 2) Declare binary as target with prerequisites src (normal) and libraries (order-only)
 # ie: src is rebuilt whenever it's modified, libraries are rebuilt only if its existence changes
 # See: https://devdocs.io/gnu_make/prerequisite-types
-# 3) Compile every file to binary, including linker paths
-# 4) Append compiled binary to running list of binaries to build at top-level
+# 3) Also include each directory's own path to the search path 
+# (eg: Allow tetrisu/test.c to #include "test.h" instead of "tetrisu/test.h")
+# 4) Compile every file to binary, including linker paths
+# 5) Append compiled binary to running list of binaries to build at top-level
 define BIN_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(1)/*.c)
+$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
 
 $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $$($(1)_CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
 
 ALL_BINS += $(BIN_OUT)/$(1)
 endef
@@ -192,44 +198,65 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all test clean
+.PHONY: all init unit integration test clean
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS)
 
+# Print a Heart emoji for Corestack :D
+# TODO: Implement pretty-print for other commands
+init: 
+	make clean
+	bear -- make
+	@printf "\U0001F499 Created compile_commands for Intellisense!\n"
+
 # ----------------------------------------------------------------------
 # Testing
+# Placeholder for now, to change later!
 # ----------------------------------------------------------------------
-TEST_DIR     := tests
-TEST_BIN_DIR := build/tests
+TESTS_DIR := ./tests
+UNIT_DIR  := $(TESTS_DIR)/unit
+INT_DIR   := $(TESTS_DIR)/integration
+UNITY_DIR := $(TESTS_DIR)/unity
+UNIT_BIN  := $(UNIT_DIR)/bin
 
-# Test-only include path: lets libhtttp tests #include "protocol.h" directly
-TEST_CFLAGS := $(CFLAGS) -Isrc/lib/libhtttp
+UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
+UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
 
-TARGET_STATIC := $(LIB_OUT)/libhtttp.a
+TEST_CFLAGS  := $(CFLAGS) -I$(UNITY_DIR)
+TEST_LDFLAGS := -L$(LIB_OUT) -lpthread
+TEST_LDLIBS  := $(LDLIBS)
 
-# Auto-discover every .c file under tests/libhtttp/
-TEST_SRCS := $(wildcard $(TEST_DIR)/libhtttp/*.c)
-TEST_BINS := $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SRCS))
+$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
+	@mkdir -p $(UNIT_BIN)
+	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
 
-test: $(TEST_BINS)
-	@echo "TEST_SRCS = $(TEST_SRCS)"
-	@echo "TEST_BINS = $(TEST_BINS)"
-	@echo "Running tests..."
-	@for bin in $(TEST_BINS); do \
-		echo "--- $$bin ---"; \
-		./$$bin || exit 1; \
-	done
+unit: $(UNIT_BINS)
+	@echo "==> Running corestack unit tests"
+	@pass=0; fail=0; \
+	for t in $(UNIT_BINS); do \
+	  echo "--- $$t ---"; \
+	  if $$t; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
+	done; \
+	echo ""; \
+	echo "Unit tests: $$pass passed, $$fail failed"; \
+	test $$fail -eq 0
 
-$(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
-	@mkdir -p $(dir $@)
-	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lhtttp
-	@echo "Built test binary: $@"
+integration: all
+	@echo "==> Running corestack integration tests"
+	@pass=0; fail=0; \
+	for s in $(INT_DIR)/*.sh; do \
+	  [ -f "$$s" ] || continue; \
+	  echo "--- $$s ---"; \
+	  if bash $$s; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
+	done; \
+	echo ""; \
+	echo "Integration tests: $$pass passed, $$fail failed"; \
+	test $$fail -eq 0
 
-$(TEST_BIN_DIR):
-	mkdir -p $@
-	
+test: unit integration
+
 # ----------------------------------------------------------------------
 # Cleaning
 # ----------------------------------------------------------------------
