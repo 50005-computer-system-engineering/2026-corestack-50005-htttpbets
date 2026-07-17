@@ -1,5 +1,5 @@
 #include <raylib.h>
-#include "bombapp/config.h"
+#include "config.h"
 
 const int player_fps = 10;
 const float player_scale = 2.0f;
