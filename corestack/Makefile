@@ -7,16 +7,17 @@
 #	Files without a directory also work, just follow the directory convention
 #
 # Expected Layout:
-#	auth/		certificates and keys
-#	build/		compiled outputs (auto-created)
-#		/bin/	compiled binaries
-#		/lib/	static libraries
-#		/obj/	intermediate .o files
-#	include		headers
-#		/lib/	library-specific headers
-#	src			.c source files
-#		/lib/	library source files
-#	tests		unit tests
+#	auth/			certificates and keys
+#	build/			compiled outputs (auto-created)
+#		/bin/		compiled binaries
+#		/lib/		static libraries
+#		/obj/		intermediate .o files
+#	include			headers
+#		/internal/	internal headers, this won't be exported to external projects like tetris/bomberman
+#		/lib/		library-specific headers
+#	src				.c source files
+#		/lib/		library source files
+#	tests			unit tests
 #
 # Usage:
 #	make				runs 'all' by default, builds everything
@@ -50,10 +51,11 @@ BIN_OUT    := ./build/bin
 # ----------------------------------------------------------------------
 # -I$(INC_DIR)          find headers in include/
 # -I$(INC_DIR)/lib      find headers in include/lib/ (library-specific headers)
+# -DCORESTACK_INTERNAL_ACCESS  enable internal header access, this flag isn't added to other projects so they will error out if they try to include them
 # -Wall -Wextra         enable comprehensive warnings
 # -g                    embed debug symbols
 # -pthread              enable POSIX threads at compile and link time
-CFLAGS := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -Wall -Wextra -g -pthread
+CFLAGS := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -DCORESTACK_INTERNAL_ACCESS -Wall -Wextra -g -pthread
 
 # LDFLAGS: flags for the linker (search paths and system libs)
 # LDLIBS is filled in after library auto-discovery below!
@@ -88,7 +90,7 @@ ALL_LIB_ARCHIVES :=
 
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
-# 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
+# 1) Convert every .c file found in directory to machine code as an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
 # 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
 # 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
 # 4) Append built archive to running list of libraries to build at top-level
@@ -113,7 +115,7 @@ endef
 $(foreach lib,$(LIB_NAMES),$(eval $(call LIB_template,$(lib))))
 
 # Flat Library Template: Single .c file -> Archive
-# 1) Compile single flat source file directory into a .o
+# 1) Compile single flat source file directory into machine code as .o file
 # 2) Archive the single .o into .a
 # 3) Append built archive to running list of libraries to build
 define FLAT_LIB_template =
