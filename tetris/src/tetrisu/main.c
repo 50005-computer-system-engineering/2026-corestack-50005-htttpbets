@@ -7,10 +7,7 @@
 #include "tetrisu/events.h"
 #include "tetrisu/input.h"
 #include "tetrisu/renderer.h"
-
-// Spawn a game state
-GameState player1;
-GameState player2;
+#include "tetrisbrain/state.h"
 
 // --- MAIN GAME LOOP ---
 int main()
@@ -21,13 +18,13 @@ int main()
     printf("\e[1;1H\e[2J");
     fflush(stdout);
 
-    startGame(&player1);
-    player1.held_type = 0; // Initialize hold box
-    player1.has_held = false;
+    startGame(&gamestate_p1);
+    gamestate_p1.held_type = 0; // Initialize hold box
+    gamestate_p1.has_held = false;
 
-    startGame(&player2);
-    player2.held_type = 0; // Initialize hold box
-    player2.has_held = false;
+    startGame(&gamestate_p2);
+    gamestate_p2.held_type = 0; // Initialize hold box
+    gamestate_p2.has_held = false;
 
     // Event Bus setup
     event_bus_init(EVENT_COUNT);
@@ -40,16 +37,16 @@ int main()
     int p2_lockTimer = 0;
 
     // --- THE GAME LOOP ---
-    while (!player1.game_over && !player2.game_over)
+    while (!gamestate_p1.game_over && !gamestate_p2.game_over)
     {
         // Track current gravity of piece for lock delay
-        int p1_current_gravity = GRAVITY_THRESHOLD_START - ((player1.level - 1) * 5);
+        int p1_current_gravity = GRAVITY_THRESHOLD_START - ((gamestate_p1.level - 1) * 5);
         if (p1_current_gravity < 5)
         {
             p1_current_gravity = 5;
         }
 
-        int p2_current_gravity = GRAVITY_THRESHOLD_START - ((player2.level - 1) * 5);
+        int p2_current_gravity = GRAVITY_THRESHOLD_START - ((gamestate_p2.level - 1) * 5);
         if (p2_current_gravity < 5)
         {
             p2_current_gravity = 5;
@@ -72,30 +69,30 @@ int main()
                         switch (getch())
                         {
                         case 'A': // Up arrow (rotate clockwise)
-                            rotateCurrentPiece(&player2);
+                            rotateCurrentPiece(&gamestate_p2);
                             p2_lockTimer = 0;
                             break;
                         case 'D': // Left arrow
-                            if (isValidPos(&player2, player2.current.type, player2.current.rot, player2.current.x - 1, player2.current.y))
+                            if (isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x - 1, gamestate_p2.current.y))
                             {
-                                player2.current.x--;
-                                player2.last_action_rotation = false;
+                                gamestate_p2.current.x--;
+                                gamestate_p2.last_action_rotation = false;
                                 p2_lockTimer = 0;
                             }
                             break;
                         case 'C': // Right arrow
-                            if (isValidPos(&player2, player2.current.type, player2.current.rot, player2.current.x + 1, player2.current.y))
+                            if (isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x + 1, gamestate_p2.current.y))
                             {
-                                player2.current.x++;
-                                player2.last_action_rotation = false;
+                                gamestate_p2.current.x++;
+                                gamestate_p2.last_action_rotation = false;
                                 p2_lockTimer = 0;
                             }
                             break;
                         case 'B': // Down arrow (soft drop + lock delay)
-                            if (isValidPos(&player2, player2.current.type, player2.current.rot, player2.current.x, player2.current.y + 1))
+                            if (isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x, gamestate_p2.current.y + 1))
                             {
-                                player2.current.y++;
-                                player2.last_action_rotation = false;
+                                gamestate_p2.current.y++;
+                                gamestate_p2.last_action_rotation = false;
                                 p2_gravityTimer = 0; // Reset timer to prevent double dropping
                             }
                             break;
@@ -105,43 +102,43 @@ int main()
             }
             else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
             {
-                rotateCurrentPiece(&player2);
+                rotateCurrentPiece(&gamestate_p2);
                 p2_lockTimer = 0;
             }
             else if (key == 'z' || key == 'Z') // Rotate counterclockwise
             {
-                rotateCounterClockwise(&player2);
+                rotateCounterClockwise(&gamestate_p2);
                 p2_lockTimer = 0;
             }
             else if (key == ' ') // Spacebar (hard drop)
             {
-                while (isValidPos(&player2, player2.current.type, player2.current.rot, player2.current.x, player2.current.y + 1))
+                while (isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x, gamestate_p2.current.y + 1))
                 {
-                    player2.current.y++;
-                    player2.last_action_rotation = false;
+                    gamestate_p2.current.y++;
+                    gamestate_p2.last_action_rotation = false;
                 }
 
                 // Calculate Garbage and send
-                tickGame(&player2);
-                if (player2.outgoing_garbage > 0)
+                tickGame(&gamestate_p2);
+                if (gamestate_p2.outgoing_garbage > 0)
                 {
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 2,
                             .target_player = 1,
-                            .lines = player2.outgoing_garbage};
+                            .lines = gamestate_p2.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                    player2.outgoing_garbage = 0; // Reset after sending
+                    gamestate_p2.outgoing_garbage = 0; // Reset after sending
                 }
                 p2_gravityTimer = 0;
             }
             else if (key == 'h' || key == 'H') // H to hold
             {
-                if (!player2.has_held)
+                if (!gamestate_p2.has_held)
                 {
-                    holdPiece(&player2);
+                    holdPiece(&gamestate_p2);
                     p2_gravityTimer = 0;
                 }
             }
@@ -149,80 +146,80 @@ int main()
             // --- PLAYER 1 (WASD) Controls ---
             else if (key == 'w' || key == 'W') // P1 Rotate CW
             {
-                rotateCurrentPiece(&player1);
+                rotateCurrentPiece(&gamestate_p1);
                 p1_lockTimer = 0;
             }
             else if (key == 'a' || key == 'A') // P1 Left
             {
-                if (isValidPos(&player1, player1.current.type, player1.current.rot, player1.current.x - 1, player1.current.y))
+                if (isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x - 1, gamestate_p1.current.y))
                 {
-                    player1.current.x--;
-                    player1.last_action_rotation = false;
+                    gamestate_p1.current.x--;
+                    gamestate_p1.last_action_rotation = false;
                     p1_lockTimer = 0;
                 }
             }
             else if (key == 'd' || key == 'D') // P1 Right
             {
-                if (isValidPos(&player1, player1.current.type, player1.current.rot, player1.current.x + 1, player1.current.y))
+                if (isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x + 1, gamestate_p1.current.y))
                 {
-                    player1.current.x++;
-                    player1.last_action_rotation = false;
+                    gamestate_p1.current.x++;
+                    gamestate_p1.last_action_rotation = false;
                     p1_lockTimer = 0;
                 }
             }
             else if (key == 's' || key == 'S') // P1 Down (Soft Drop)
             {
-                if (isValidPos(&player1, player1.current.type, player1.current.rot, player1.current.x, player1.current.y + 1))
+                if (isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x, gamestate_p1.current.y + 1))
                 {
-                    player1.current.y++;
-                    player1.last_action_rotation = false;
+                    gamestate_p1.current.y++;
+                    gamestate_p1.last_action_rotation = false;
                     p1_gravityTimer = 0;
                 }
             }
             else if (key == 'g' || key == 'G') // P1 Hard Drop
             {
-                while (isValidPos(&player1, player1.current.type, player1.current.rot, player1.current.x, player1.current.y + 1))
+                while (isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x, gamestate_p1.current.y + 1))
                 {
-                    player1.current.y++;
-                    player1.last_action_rotation = false;
+                    gamestate_p1.current.y++;
+                    gamestate_p1.last_action_rotation = false;
                 }
 
                 // Calculate Garbage and send
-                tickGame(&player1);
-                if (player1.outgoing_garbage > 0)
+                tickGame(&gamestate_p1);
+                if (gamestate_p1.outgoing_garbage > 0)
                 {
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 1,
                             .target_player = 2,
-                            .lines = player1.outgoing_garbage};
+                            .lines = gamestate_p1.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                    player1.outgoing_garbage = 0; // Reset after sending
+                    gamestate_p1.outgoing_garbage = 0; // Reset after sending
                 }
 
                 p1_gravityTimer = 0;
             }
             else if (key == 'f' || key == 'F') // P1 Hold
             {
-                if (!player1.has_held)
+                if (!gamestate_p1.has_held)
                 {
-                    holdPiece(&player1);
+                    holdPiece(&gamestate_p1);
                     p1_gravityTimer = 0;
                 }
             }
             else if (key == 'q' || key == 'Q') // Q to quit
             {
                 // Set game over states for both P1 and P2
-                player1.game_over = true;
-                player2.game_over = true;
+                gamestate_p1.game_over = true;
+                gamestate_p2.game_over = true;
                 break; // Exit
             }
         }
 
         // Gravity + Lock Delay
-        bool p1_resting = !isValidPos(&player1, player1.current.type, player1.current.rot, player1.current.x, player1.current.y + 1);
+        bool p1_resting = !isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x, gamestate_p1.current.y + 1);
         if (p1_resting)
         {
             // Lock Timer
@@ -230,18 +227,18 @@ int main()
             if (p1_lockTimer >= LOCK_THRESHOLD_START)
             {
                 // Calculate Garbage and send
-                tickGame(&player1);
-                if (player1.outgoing_garbage > 0)
+                tickGame(&gamestate_p1);
+                if (gamestate_p1.outgoing_garbage > 0)
                 {
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 1,
                             .target_player = 2,
-                            .lines = player1.outgoing_garbage};
+                            .lines = gamestate_p1.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                    player1.outgoing_garbage = 0; // Reset after sending
+                    gamestate_p1.outgoing_garbage = 0; // Reset after sending
                 }
 
                 // Reset env variables
@@ -256,13 +253,13 @@ int main()
             p1_gravityTimer++;
             if (p1_gravityTimer >= p1_current_gravity)
             {
-                tickGame(&player1);
+                tickGame(&gamestate_p1);
                 p1_gravityTimer = 0;
             }
         }
 
         // For player 2
-        bool p2_resting = !isValidPos(&player2, player2.current.type, player2.current.rot, player2.current.x, player2.current.y + 1);
+        bool p2_resting = !isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x, gamestate_p2.current.y + 1);
         if (p2_resting)
         {
             // Lock Timer
@@ -270,19 +267,18 @@ int main()
             if (p2_lockTimer >= LOCK_THRESHOLD_START)
             {
                 // Calculate Garbage and send
-                tickGame(&player2);
-                if (player2.outgoing_garbage > 0)
+                tickGame(&gamestate_p2);
+                if (gamestate_p2.outgoing_garbage > 0)
                 {
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 2,
                             .target_player = 1,
-                            .lines = player2.outgoing_garbage};
+                            .lines = gamestate_p2.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                    // player1.pending_garbage += player2.outgoing_garbage;
-                    player2.outgoing_garbage = 0; // Reset after sending
+                    gamestate_p2.outgoing_garbage = 0; // Reset after sending
                 }
                 // Reset env variables
                 p2_lockTimer = 0;
@@ -296,28 +292,28 @@ int main()
             p2_gravityTimer++;
             if (p2_gravityTimer >= p2_current_gravity)
             {
-                tickGame(&player2);
+                tickGame(&gamestate_p2);
                 p2_gravityTimer = 0;
             }
         }
 
         // Render the boards
-        drawBothBoards(&player1, &player2);
+        drawBothBoards(&gamestate_p1, &gamestate_p2);
 
         // Delay frames to be visible to the human eye
         usleep(DELAY_MICROSECONDS);
     }
 
     // Clean up after game ends
-    drawBothBoards(&player1, &player2);
+    drawBothBoards(&gamestate_p1, &gamestate_p2);
     printf("\n\n");
     printf("<!> ====================== <!>\n");
 
-    if (player1.game_over && !player2.game_over)
+    if (gamestate_p1.game_over && !gamestate_p2.game_over)
     {
         printf("<!>    PLAYER 2 WINS!      <!>\n");
     }
-    else if (player2.game_over && !player1.game_over)
+    else if (gamestate_p2.game_over && !gamestate_p1.game_over)
     {
         printf("<!>    PLAYER 1 WINS!      <!>\n");
     }
@@ -511,6 +507,5 @@ int main()
 
     return 0;
 }
-
 
 */
