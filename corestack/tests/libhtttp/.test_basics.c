@@ -78,7 +78,6 @@ int main(void)
         // build message and send
         Message msgTo = {
             .sourceId = (uint8_t)10,
-            .type = (uint8_t)100,
             .length = (uint32_t)11,
             .content = malloc(11)
         };

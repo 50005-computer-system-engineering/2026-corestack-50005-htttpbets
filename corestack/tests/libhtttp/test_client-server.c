@@ -53,7 +53,6 @@ int main(void)
             exit(-1);
         }
         printf("client: joined lobby without issue\n");
-        printf("clint: printing out details for checking -\n\tid: %u\n\t");
         exit(0);
     }
 }
