@@ -1,7 +1,7 @@
 // TODO: CHANGE THIS TO HANDLE MORE FUNCTIONALITY + ONE PLAYER ONLY
 
 #include "tetrisu/events.h"
-#include "tetrisu.h"
+#include "tetrisbrain.h"
 
 // Spawn a game state => shifted to global for testing event routing
 extern GameState player1;
