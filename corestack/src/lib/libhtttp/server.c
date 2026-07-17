@@ -1,5 +1,6 @@
 #include "lib/libhtttp/server.h"
 #include "connection.h"
+#include "registration.h"
 
 int createServer(LibhtttpServer **serverPtr)
 {
@@ -27,7 +28,7 @@ fail:
 int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
 {
     // check parameters
-    if (serverPtr != NULL)
+    if (serverPtr == NULL)
     {
         printf("libhtttp/server openLobby: serverPtr has no server allocated\n");
         return -1;
@@ -48,6 +49,13 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
     }
 
     // start listening until lobbySize of clients connect to server
+    if (listenOnTCP(thisServer->socks))
+    {
+        printf("libhtttp/server openLobby: failed to bind port for listening\n");
+        return -1;
+    }
+
+    // start accepting clients for TCP connections
     uint8_t slot = 1;   // ID 0 is reserved for server
     while (slot <= lobbySize)
     {
@@ -61,17 +69,22 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         printf("libhtttp/server openLobby: accept succses, adding new client to slot %u/%u...\n", slot, lobbySize);
         
         // adding valid client record
-        Record *current_slot = &thisServer->clientList[slot - 1];
-        current_slot->id = slot;
-        current_slot->socks = malloc(sizeof(Connection));
-        if (current_slot->socks == NULL)
+        Record *currentSlot = &thisServer->clientList[slot - 1];
+        currentSlot->id = slot;
+        currentSlot->socks = malloc(sizeof(Connection));
+        if (currentSlot->socks == NULL)
         {
             perror("server malloc");
             // TODO handling of this specific error
             return -1;
         }
-        current_slot->socks->tcp = clientFd;
-        // TODO registration (sending them their ID and token)
+        currentSlot->socks->tcp = clientFd;
+        if (registerNewClient(currentSlot) < 0)
+        {
+            printf("libhtttp/server openLobby: failed to register new client\n");
+            // TODO cleanup current slot
+            continue;
+        }
 
         slot++;
     } // TODO implement halting lobby joining
