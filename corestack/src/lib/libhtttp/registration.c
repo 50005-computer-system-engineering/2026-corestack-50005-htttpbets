@@ -65,7 +65,7 @@ int registerWithServer(Endpoint *myClient)
 
     if (sendBytes(myClient->socks->tcp, buffer, NONCE_LEN) < 0)
     {
-        printf("libhtttp/registration.h registerNewClient: failed to send NONCE");
+        printf("libhtttp/registration.h registerNewClient: failed to send NONCE\n");
         return -1;
     }
     free(buffer);

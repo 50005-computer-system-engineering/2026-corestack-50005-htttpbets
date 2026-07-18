@@ -1,5 +1,6 @@
 #include "lib/libhtttp/server.h"
 #include "common.h"
+#include "registration.h"
 
 typedef struct {
     Endpoint *self;
@@ -8,12 +9,12 @@ typedef struct {
 } Server;
 
 // private functions
-int listenOnTCP(Connection *socks)
+int listenOnTCP(Server *serverPtr)
 {
     // Check if sockets have valid fd 
-    if (checkSockets(*socks) < 0)
+    if (checkSockets(*(serverPtr->self->socks)) < 0)
     {
-        printf("listenOnSever: sockets in Connection invalid\n");
+        printf("listenOnSever: sockets in Sockets invalid\n");
         return -1;
     }
 
@@ -23,14 +24,14 @@ int listenOnTCP(Connection *socks)
         .sin_port = htons(PORT_TCP),
         .sin_addr.s_addr = INADDR_ANY
     };
-    if (bind(socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    if (bind(serverPtr->self->socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
         perror("listenOnServer bind");
         return -1;
     }
 
     // Listen on sockets for TCP connections 
-    if (listen(socks->tcp, 100))
+    if (listen(serverPtr->self->socks->tcp, 100))
     {
         perror("listenOnServer listen");
         return -1;
@@ -39,10 +40,10 @@ int listenOnTCP(Connection *socks)
     return 0;
 }
 
-int acceptOnTCP(Connection *socks)
+int acceptOnTCP(Server *serverPtr)
 {
     printf("acceptOnServer: server now accepting a TCP client...\n");
-    int newClientFd = accept(socks->tcp, NULL, NULL);
+    int newClientFd = accept(serverPtr->self->socks->tcp, NULL, NULL);
     if (newClientFd < 0)
     {
         perror("acceptOnTCP accept");
@@ -61,7 +62,7 @@ int createServer(LibhtttpServer **serverPtr)
         perror("server malloc");
         return -1;
     }
-    if (newEndpoint(&newServer->self) < 0)
+    if (createEndpoint(&newServer->self) < 0)
     {
         printf("createServer: endpoint creation failed\n");
         goto fail;
@@ -92,7 +93,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
 
     // allocate space for client array
     Server *thisServer = serverPtr;
-    thisServer->clientList = malloc(sizeof(Record) * lobbySize);
+    thisServer->clientList = malloc(sizeof(Endpoint) * lobbySize);
     if (thisServer->clientList == NULL)
     {
         perror("libhtttp/server malloc");
@@ -100,7 +101,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
     }
 
     // start listening until lobbySize of clients connect to server
-    if (listenOnTCP(thisServer->socks))
+    if (listenOnTCP(thisServer) < 0)
     {
         printf("libhtttp/server openLobby: failed to bind port for listening\n");
         return -1;
@@ -111,7 +112,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
     while (slot <= lobbySize)
     {
         // blocks until client connects
-        int clientFd = acceptOnTCP(thisServer->socks);
+        int clientFd = acceptOnTCP(thisServer);
         if (clientFd < 0)
         {
             printf("libhtttp/server openLobby: accept failed to find client, skipping loop iteration...\n");
@@ -120,9 +121,9 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         printf("libhtttp/server openLobby: accept succses, adding new client to slot %u/%u...\n", slot, lobbySize);
         
         // adding valid client record
-        Record *currentSlot = &thisServer->clientList[slot - 1];
+        Endpoint *currentSlot = &thisServer->clientList[slot - 1];
         currentSlot->id = slot;
-        currentSlot->socks = malloc(sizeof(Connection));
+        currentSlot->socks = malloc(sizeof(Sockets));
         if (currentSlot->socks == NULL)
         {
             perror("server malloc");
@@ -140,7 +141,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         slot++;
     } // TODO implement halting lobby joining
 
-    printf("libhtttp/server openLobby: Lobby opening complete");
+    printf("libhtttp/server openLobby: Lobby opening complete\n");
     return 0;
 }
 

@@ -41,6 +41,7 @@ int main(void)
     // client
     if (pid == 0)
     {
+        sleep(1);
         LibhtttpClient *client = NULL;
         if (createClient(&client) < 0)
         {

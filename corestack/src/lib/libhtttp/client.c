@@ -28,7 +28,7 @@ int connectOnTCP(Sockets *socks, char *serverIp)
 
 // public functions
 // allows developers to create a libhtttp client in application
-int startClient(LibhtttpClient **clientPtr)
+int createClient(LibhtttpClient **clientPtr)
 {
     Endpoint *newClient = NULL;
 
