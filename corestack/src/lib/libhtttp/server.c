@@ -1,6 +1,6 @@
 #include "lib/libhtttp/server.h"
 #include "common.h"
-#include "registration.h"
+#include "message.h"
 
 typedef struct {
     Endpoint *self;
@@ -150,3 +150,5 @@ int closeLobby(LibhtttpServer *serverPtr)
     // TODO Implement close
     return 0;
 }
+
+int listenForClientMsg()
