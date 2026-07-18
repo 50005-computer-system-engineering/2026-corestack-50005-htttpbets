@@ -1,6 +1,8 @@
+#include "common.h"
+#include "message.h"
 #include "registration.h"
 
-int registerNewClient(Record *newClient)
+int registerNewClient(Endpoint *newClient)
 {
     if (newClient == NULL) 
     {
@@ -48,7 +50,7 @@ int registerNewClient(Record *newClient)
 }
 
 // client function which waits for the client 
-int registerWithServer(Record *myClient)
+int registerWithServer(Endpoint *myClient)
 {
     // step 1: send nonce
     unsigned char *buffer = NULL;
@@ -70,7 +72,7 @@ int registerWithServer(Record *myClient)
     buffer = NULL;
     // TODO implement authentication by verification of signed nonce
 
-    // step 2: receive user id and save to record
+    // step 2: receive user id and save to Endpoint
     buffer = malloc(sizeof(uint32_t));
     if (buffer == NULL)
     {

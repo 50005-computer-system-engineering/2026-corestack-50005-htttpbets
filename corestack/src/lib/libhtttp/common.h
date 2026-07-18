@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <string.h>
 
 // known ports
 #define PORT_TCP 6700
@@ -34,3 +35,5 @@ int createSockets(Sockets **socks);
 int closeSockets(Sockets *socks);
 int createEndpoint(Endpoint **endpt);
 int closeEnpoint(Endpoint **endpt);
+
+#endif

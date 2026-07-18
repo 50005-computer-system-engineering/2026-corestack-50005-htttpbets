@@ -1,10 +1,9 @@
 #include "lib/libhtttp/client.h"
 #include "common.h"
-
-typedef struct Endpoint Client;
+#include "registration.h"
 
 // private functions
-int connectOnTCP(Connection *socks, char *serverIp)
+int connectOnTCP(Sockets *socks, char *serverIp)
 {
     printf("connectToServer: Attempting connection to server at %s:%d...\n", serverIp, PORT_TCP);
     // sockaddr_in of server to connect to
@@ -31,7 +30,7 @@ int connectOnTCP(Connection *socks, char *serverIp)
 // allows developers to create a libhtttp client in application
 int startClient(LibhtttpClient **clientPtr)
 {
-    Client *newClient = NULL;
+    Endpoint *newClient = NULL;
 
     // create endpoint
     if (createEndpoint(&newClient) < 0)
@@ -48,7 +47,7 @@ int startClient(LibhtttpClient **clientPtr)
 // connects to a libhtttp server
 int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 {
-    Record *thisClient = clientPtr;
+    Endpoint *thisClient = clientPtr;
 
     if (createSockets(&thisClient->socks) < 0)
     {

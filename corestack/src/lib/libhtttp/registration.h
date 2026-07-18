@@ -9,15 +9,12 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "connection.h"
-#include "message.h"
-
 // new client functions
-int registerNewClient(Record *newClient);
-int registerWithServer(Record *myClient);
+int registerNewClient(Endpoint *newClient);
+int registerWithServer(Endpoint *myClient);
 
 // // admin action functions
-// int adminActionOnClient(int sockfd, Record **Record);
-// int handleKickFromServer(int sockfd, Record **Record);
+// int adminActionOnClient(int sockfd, Endpoint **Endpoint);
+// int handleKickFromServer(int sockfd, Endpoint **Endpoint);
 
 #endif
