@@ -33,3 +33,4 @@ int checkSockets(Sockets socks);
 int createSockets(Sockets **socks);
 int closeSockets(Sockets *socks);
 int createEndpoint(Endpoint **endpt);
+int closeEnpoint(Endpoint **endpt);
