@@ -96,7 +96,7 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
         goto fail;
     }
 
-    printf("sendAsClient: message has been sent");
+    printf("sendAsClient: message has been sent\n");
 
     return 0;
 

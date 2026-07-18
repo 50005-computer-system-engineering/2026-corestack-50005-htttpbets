@@ -151,4 +151,27 @@ int closeLobby(LibhtttpServer *serverPtr)
     return 0;
 }
 
-int listenForClientMsg()
+int listenForClientMsg(LibhtttpServer *serverPtr, unsigned char **returnBuffer)
+{
+    Server *thisServer = serverPtr;
+
+    Message **returnMsg = NULL;
+
+    if (receiveMessage(thisServer->clientList->socks->tcp, returnMsg) < 0)
+    {
+        printf("listenForClientMsg: failed to receive message\n");
+        return -1;
+    }
+
+    *returnBuffer = malloc((*returnMsg)->length);
+    if (*returnBuffer == NULL)
+    {
+        perror("malloc");
+        return -1;
+    }
+
+    memcpy(*returnBuffer, (*returnMsg)->content, (*returnMsg)->length);
+
+    printf("listenForClientMsg: received message\n");
+    return 0;
+}

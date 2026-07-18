@@ -182,20 +182,21 @@ int receiveMessage(int sockfd, Message **returnPtr)
     buffer = NULL;
 
     // listen for message considering the header
-    printf("readMessage: now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
+    printf("receiveMessage: now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
     if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
     {
-        printf("readMessage: failed to read length\n");
+        printf("readMessage: failed to read message\n");
         goto fail;
     }
-    returnMsg->content = malloc(returnMsg->length);
-    if (returnMsg->content == NULL)
-    {
-        perror("receiveMessage malloc");
-        goto fail;
-    }
-    memcpy(returnMsg->content, buffer, returnMsg->length);
-    free(buffer);
+    // returnMsg->content = malloc(returnMsg->length);
+    // if (returnMsg->content == NULL)
+    // {
+    //     perror("receiveMessage malloc");
+    //     goto fail;
+    // }
+    // memcpy(returnMsg->content, buffer, returnMsg->length);
+    // free(buffer);
+    returnMsg->content = buffer;
     buffer = NULL;
 
     // return this ptr
