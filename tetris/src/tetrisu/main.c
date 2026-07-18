@@ -10,6 +10,7 @@
 #include "lib/libtetrisbrain/board_control.h"
 #include "lib/libtetrisbrain//hold.h"
 #include "lib/libtetrisbrain/state.h"
+#include "lib/libtetrisbrain/targeting.h"
 
 // --- MAIN GAME LOOP ---
 int main()
@@ -20,11 +21,18 @@ int main()
     printf("\e[1;1H\e[2J");
     fflush(stdout);
 
+    // TODO: REPLACE WITH DYNAMIC LOBBY
+    GameState *lobby[2] = {&gamestate_p1, &gamestate_p2};
+
     startGame(&gamestate_p1);
+    gamestate_p1.player_id = 1; // Assign player ID
+    gamestate_p1.target_player_id = 2; // Fixed player target
     gamestate_p1.held_type = 0; // Initialize hold box
     gamestate_p1.has_held = false;
 
     startGame(&gamestate_p2);
+    gamestate_p2.player_id = 2; // Assign player ID
+    gamestate_p2.target_player_id = 1; // Fixed player target
     gamestate_p2.held_type = 0; // Initialize hold box
     gamestate_p2.has_held = false;
 
@@ -112,6 +120,15 @@ int main()
                 rotateCounterClockwise(&gamestate_p2);
                 p2_lockTimer = 0;
             }
+            else if (key == 't' || key == 'T') // Change target mode
+            {
+                cycleTargetMode(&gamestate_p2);
+            }
+            else if (key == 'r' || key == 'R') // Change target ID
+            {
+                // Manually swap target directly
+                gamestate_p2.target_player_id = 3 - gamestate_p2.target_player_id;
+            }
             else if (key == ' ') // Spacebar (hard drop)
             {
                 while (isValidPos(&gamestate_p2, gamestate_p2.current.type, gamestate_p2.current.rot, gamestate_p2.current.x, gamestate_p2.current.y + 1))
@@ -124,11 +141,13 @@ int main()
                 tickGame(&gamestate_p2);
                 if (gamestate_p2.outgoing_garbage > 0)
                 {
+                    // Find target
+                    int current_victim = resolveTargetID(&gamestate_p2, lobby, 2);
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 2,
-                            .target_player = 1,
+                            .target_player = current_victim,
                             .lines = gamestate_p2.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
@@ -178,6 +197,15 @@ int main()
                     p1_gravityTimer = 0;
                 }
             }
+            else if (key == 'v' || key == 'V') // Change target mode
+            {
+                cycleTargetMode(&gamestate_p1);
+            }
+            else if (key == 'b' || key == 'B') // Change target ID
+            {
+                // Manually swap target directly
+                gamestate_p1.target_player_id = 3 - gamestate_p1.target_player_id;
+            }
             else if (key == 'g' || key == 'G') // P1 Hard Drop
             {
                 while (isValidPos(&gamestate_p1, gamestate_p1.current.type, gamestate_p1.current.rot, gamestate_p1.current.x, gamestate_p1.current.y + 1))
@@ -190,11 +218,14 @@ int main()
                 tickGame(&gamestate_p1);
                 if (gamestate_p1.outgoing_garbage > 0)
                 {
+                    // Find target
+                    int current_victim = resolveTargetID(&gamestate_p1, lobby, 2);
+
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 1,
-                            .target_player = 2,
+                            .target_player = current_victim,
                             .lines = gamestate_p1.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
@@ -232,11 +263,13 @@ int main()
                 tickGame(&gamestate_p1);
                 if (gamestate_p1.outgoing_garbage > 0)
                 {
+                    // Find target
+                    int current_victim = resolveTargetID(&gamestate_p1, lobby, 2);
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 1,
-                            .target_player = 2,
+                            .target_player = current_victim,
                             .lines = gamestate_p1.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
@@ -272,11 +305,13 @@ int main()
                 tickGame(&gamestate_p2);
                 if (gamestate_p2.outgoing_garbage > 0)
                 {
+                    // Find target
+                    int current_victim = resolveTargetID(&gamestate_p2, lobby, 2);
                     // Pack the payload
                     AttackPayload payload =
                         {
                             .source_player = 2,
-                            .target_player = 1,
+                            .target_player = current_victim,
                             .lines = gamestate_p2.outgoing_garbage};
                     // Trigger Event Bus
                     event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
@@ -427,6 +462,15 @@ int main()
             {
                 rotateCounterClockwise(&myGame);
                 lockTimer = 0;
+            }
+            else if (key == 't' || key == 'T') // Change target mode
+            {
+                cycleTargetMode(&myGame);
+            }
+            else if (key == 'r' || key == 'R') // Change target ID
+            {
+                // Manually swap target directly
+                myGame.target_player_id = 3 - gamestate_p1.target_player_id; // TODO: EDIT THIS LINE
             }
             else if (key == ' ') // Spacebar (hard drop)
             {
