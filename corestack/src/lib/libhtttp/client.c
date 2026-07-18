@@ -1,37 +1,73 @@
 #include "lib/libhtttp/client.h"
-#include "connection.h"
-#include "registration.h"
+#include "common.h"
 
-int createClient(LibhtttpClient **clientPtr)
+typedef struct Endpoint Client;
+
+// private functions
+int connectOnTCP(Connection *socks, char *serverIp)
 {
-    Record *newClient = malloc(sizeof(Record));
-    if (newClient == NULL)
+    printf("connectToServer: Attempting connection to server at %s:%d...\n", serverIp, PORT_TCP);
+    // sockaddr_in of server to connect to
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_TCP),
+    };
+    if (inet_pton(AF_INET, serverIp, &serverAddr.sin_addr) < 0) 
     {
-        perror("client malloc");
+        perror("connectToServer inet_pton");
         return -1;
     }
+    int serverFd = connect(socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (serverFd < 0) 
+    {
+        perror("connectToServer connect");
+        return -1;
+    }
+    printf("connectToServer: connection to server success\n");
+    return serverFd;
+}
+
+// public functions
+// allows developers to create a libhtttp client in application
+int startClient(LibhtttpClient **clientPtr)
+{
+    Client *newClient = NULL;
+
+    // create endpoint
+    if (createEndpoint(&newClient) < 0)
+    {
+        printf("client: could not create endpoint struct for client\n");
+        return -1;
+    }
+
     printf("libhtttp/client createClient: new client created\n");
     *clientPtr = newClient;
     return 0;
 }
 
+// connects to a libhtttp server
 int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 {
     Record *thisClient = clientPtr;
+
     if (createSockets(&thisClient->socks) < 0)
     {
         printf("libhtttp/client createClient: socket creation failed\n");
         return -1;
     }
+
     if (connectOnTCP(thisClient->socks, ipAddress) < 0)
     {
         printf("libhtttp/client joinLobby: failed to connect to server at IP\n");
         return -1;
     }
-    if (registerWithServer(thisClient))
-    {
-        printf("libhtttp/client joinLobby: failed to register\n");
-        return -1;
-    }
+
+    // if (registerWithServer(thisClient))
+    // {
+    //     printf("libhtttp/client joinLobby: failed to register\n");
+    //     return -1;
+    // }
     return 0;
 }
+
+// pending functions - message sending, receiving, lobby leaving
