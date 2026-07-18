@@ -1,7 +1,58 @@
 #include "lib/libhtttp/server.h"
-#include "connection.h"
-#include "registration.h"
+#include "common.h"
 
+typedef struct {
+    Endpoint *self;
+    Endpoint *clientList;
+    // ClientLL *clients;   // TODO client linked list
+} Server;
+
+// private functions
+int listenOnTCP(Connection *socks)
+{
+    // Check if sockets have valid fd 
+    if (checkSockets(*socks) < 0)
+    {
+        printf("listenOnSever: sockets in Connection invalid\n");
+        return -1;
+    }
+
+    // Bind sockets to port 
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_TCP),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+    if (bind(socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("listenOnServer bind");
+        return -1;
+    }
+
+    // Listen on sockets for TCP connections 
+    if (listen(socks->tcp, 100))
+    {
+        perror("listenOnServer listen");
+        return -1;
+    }
+    printf("listenOnServer: server now listening for TCP connections on port %d\n", PORT_TCP);
+    return 0;
+}
+
+int acceptOnTCP(Connection *socks)
+{
+    printf("acceptOnServer: server now accepting a TCP client...\n");
+    int newClientFd = accept(socks->tcp, NULL, NULL);
+    if (newClientFd < 0)
+    {
+        perror("acceptOnTCP accept");
+        return -1;
+    }
+    printf("acceptOnTCP: server accepted new TCP client\n");
+    return newClientFd;
+}
+
+// public functions
 int createServer(LibhtttpServer **serverPtr)
 {
     Server *newServer = malloc(sizeof(Server));
@@ -10,9 +61,9 @@ int createServer(LibhtttpServer **serverPtr)
         perror("server malloc");
         return -1;
     }
-    if (createSockets(&newServer->socks) < 0)
+    if (newEndpoint(&newServer->self) < 0)
     {
-        printf("libhtttp/server createServer: socket creation failed\n");
+        printf("createServer: endpoint creation failed\n");
         goto fail;
     }
     printf("libhtttp/server createServer: new server created with sockets created\n");
@@ -79,12 +130,12 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
             return -1;
         }
         currentSlot->socks->tcp = clientFd;
-        if (registerNewClient(currentSlot) < 0)
-        {
-            printf("libhtttp/server openLobby: failed to register new client\n");
-            // TODO cleanup current slot
-            continue;
-        }
+        // if (registerNewClient(currentSlot) < 0)
+        // {
+        //     printf("libhtttp/server openLobby: failed to register new client\n");
+        //     // TODO cleanup current slot
+        //     continue;
+        // }
 
         slot++;
     } // TODO implement halting lobby joining
