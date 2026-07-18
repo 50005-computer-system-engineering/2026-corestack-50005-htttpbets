@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "lib/libtetrisbrain/board_control.h"
 #include "renderer.h"
+#include "lib/libtetrisbrain/killfeed.h"
 
 // Renders the board and active piece to the terminal
 // 1 board for each player => only done for testing purposes
@@ -308,6 +309,7 @@ void drawBothBoards(GameState *p1, GameState *p2)
     printf(" Controls: Move / Hold / Hard Drop             Controls: Move / Hold / Hard Drop\n");
     printf(" Controls: WASD / F / G                        Controls: Arrows / H / Space");
 
+    drawKillFeed();
     fflush(stdout);
 }
 
@@ -475,6 +477,7 @@ void drawBoard(GameState *state)
     printf("----------------------\n");
     printf("Score: %d  |  Lines: %d\n | T-Spins: %d\n", state->score, state->lines_cleared, state->t_spins);
     printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
+    drawKillFeed();
     fflush(stdout); // Force print
 }
     
