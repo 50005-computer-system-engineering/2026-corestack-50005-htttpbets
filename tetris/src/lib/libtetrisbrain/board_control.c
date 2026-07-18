@@ -136,7 +136,10 @@ void lockPiece(GameState *state)
                 // Save final position onto the board
                 if (boardY >= 0 && boardY < BOARD_HEIGHT)
                 {
-                    state->board.cells[boardY][boardX] = state->current.type;
+                    if (boardX >= 0 && boardX < BOARD_WIDTH)
+                    {
+                        state->board.cells[boardY][boardX] = state->current.type;
+                    }
                 }
             }
         }
