@@ -149,7 +149,7 @@ int registerWithServer(Endpoint *myClient)
 // app layer message functions
 int receiveMessage(int sockfd, Message **returnPtr)
 {
-    Message *returnMsg = malloc(sizeof(Message));
+    Message *returnMsg = calloc(1, sizeof(Message));
     if (returnMsg == NULL)
     {
         perror("readBytes malloc");

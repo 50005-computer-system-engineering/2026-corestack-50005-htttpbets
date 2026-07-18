@@ -35,14 +35,14 @@ int main(void)
         }
         printf("server: successfully accepted 1 client\n");
 
-        unsigned char **buffer = NULL;
-        if (listenForClientMsg(server, buffer) < 0)
+        unsigned char *buffer = NULL;
+        if (listenForClientMsg(server, &buffer) < 0)
         {
             printf("server: could not read message\n");
             return -1;
         }
 
-        printf("server: received message %s\n", *buffer);
+        printf("server: received message %s\n", buffer);
 
         return 0;
     }
