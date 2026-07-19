@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "lib/libtetrisbrain/board_control.h"
 #include "renderer.h"
+#include "lib/libtetrisbrain/killfeed.h"
 
 // Renders the board and active piece to the terminal
 // 1 board for each player => only done for testing purposes
@@ -302,12 +303,15 @@ void drawBothBoards(GameState *p1, GameState *p2)
     }
 
     // DUAL DASHBOARD
+    // Convert targeting enum back to clear text strings
+    const char *mode_strings[] = {"MANUAL", "RANDOM", "KILL-OUT"};
     printf("<!>====================<!>                     <!>====================<!>\n");
     printf(" Lvl: %-2d  Score: %-5d                         Lvl: %-2d  Score: %-5d\n", p1->level, p1->score, p2->level, p2->score);
     printf(" Lines: %-3d   T-Spins: %-2d                      Lines: %-3d   T-Spins: %-2d\n", p1->lines_cleared, p1->t_spins, p2->lines_cleared, p2->t_spins);
-    printf(" Controls: Move / Hold / Hard Drop             Controls: Move / Hold / Hard Drop\n");
-    printf(" Controls: WASD / F / G                        Controls: Arrows / H / Space");
-
+    printf(" Controls: Move / Hold / Change Targeting Mode / Set Target / Hard Drop             Controls: Move / Hold / Change Targeting Mode / Set Target / Hard Drop\n");
+    printf(" Controls: WASD / F / V / B / G                        Controls: Arrows / H / T / R / Space\n");
+    printf(" Target: P%d (%s)                             Target: P%d (%s)\n", p1->target_player_id, mode_strings[p1->target_mode], p2->target_player_id, mode_strings[p2->target_mode]);
+    drawKillFeed();
     fflush(stdout);
 }
 
@@ -471,11 +475,15 @@ void drawBoard(GameState *state)
         printf("\n"); // Push to next row
     }
 
-    // Draw the floor
+    // Dashboard
+    // Convert targeting enum back to clear text strings
+    const char* mode_strings[] = { "MANUAL", "RANDOM", "KILL-OUT" };
     printf("----------------------\n");
     printf("Score: %d  |  Lines: %d\n | T-Spins: %d\n", state->score, state->lines_cleared, state->t_spins);
-    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
+    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [T] Change Targeting Mode\n   [R] Swap Targets\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
+    printf(" Target: P%d (%s)                             Target: P%d (%s)\n", state->target_player_id, mode_strings[state->target_mode]);
+    drawKillFeed();
     fflush(stdout); // Force print
 }
-    
+
 */
