@@ -22,6 +22,8 @@ typedef struct
     TargetingMode target_mode;
     int player_id;
     int target_player_id;
+    int gravity_timer;
+    int lock_timer;
     int held_type;
     bool has_held;
     int bag[14];

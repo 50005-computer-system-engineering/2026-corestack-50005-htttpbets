@@ -7,6 +7,31 @@ void cycleTargetMode(GameState *player)
     player->target_mode = (player->target_mode + 1) % TARGET_MODE_COUNT;
 }
 
+// Cycle manual target selection
+// Find current target in the lobby => move forward one at at time, wrap with total players
+// Skips own player ID and anyone who is eliminated => lands on first valid hit
+void cycleManualTarget(GameState *attacker, GameState *all_players[], int total_players)
+{
+    int current_index = -1;
+    for (int i = 0; i < total_players; i++)
+    {
+        if (all_players[i]->player_id == attacker->target_player_id)
+        {
+            current_index = i;
+            break;
+        }
+    }
+    for (int step = 1; step <= total_players; step++)
+    {
+        int index = (current_index + step + total_players) % total_players;
+        if (all_players[index]->player_id != attacker->player_id && !all_players[index]->game_over)
+        {
+            attacker->target_player_id = all_players[index]->player_id;
+            return;
+        }
+    }
+}
+
 // Resolve and return correct target ID based on attacker's mode
 int resolveTargetID(GameState *attacker, GameState *all_players[], int total_players)
 {
@@ -25,8 +50,9 @@ int resolveTargetID(GameState *attacker, GameState *all_players[], int total_pla
         }
         if (count == 0) // Nobody left to hit
         {
-            return candidates[rand() % count];
+            return attacker->player_id;
         }
+        return candidates[rand() % count];
     }
     case TARGET_KO:
         int target_id = attacker->player_id; // Fallback if no target id found

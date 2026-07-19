@@ -9,4 +9,7 @@ int resolveTargetID(GameState *attacker, GameState *all_players[], int total_pla
 // Cycle target mode selection
 void cycleTargetMode(GameState *player);
 
+// Cycle manual target selection
+void cycleManualTarget(GameState *attacker, GameState *all_players[], int total_players);
+
 #endif
