@@ -1,6 +1,6 @@
 #include "lib/libhtttp/server.h"
 #include "common.h"
-#include "registration.h"
+#include "message.h"
 
 typedef struct {
     Endpoint *self;
@@ -148,5 +148,38 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
 int closeLobby(LibhtttpServer *serverPtr)
 {
     // TODO Implement close
+    return 0;
+}
+
+int listenForClientMsg(LibhtttpServer *serverPtr, unsigned char **returnBuffer)
+{
+    Server *thisServer = serverPtr;
+
+    Message *returnMsg = NULL;
+
+    if (receiveMessage(thisServer->clientList->socks->tcp, &returnMsg) < 0)
+    {
+        printf("listenForClientMsg: failed to receive message\n");
+        return -1;
+    }
+
+    *returnBuffer = malloc(returnMsg->length);
+    if (*returnBuffer == NULL)
+    {
+        perror("malloc");
+        // Free memory allocated for message
+        // TODO: Move me to a function/goto so you don't copy and paste this?
+        free(returnMsg->content);
+        free(returnMsg);
+        return -1;
+    }
+
+    memcpy(*returnBuffer, returnMsg->content, returnMsg->length);
+
+    // Free memory allocated for message
+    free(returnMsg->content);
+    free(returnMsg);
+
+    printf("listenForClientMsg: received message\n");
     return 0;
 }

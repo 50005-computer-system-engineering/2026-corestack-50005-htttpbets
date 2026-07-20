@@ -1,6 +1,6 @@
 #include "lib/libhtttp/client.h"
 #include "common.h"
-#include "registration.h"
+#include "message.h"
 
 // private functions
 int connectOnTCP(Sockets *socks, char *serverIp)
@@ -67,6 +67,42 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
     //     return -1;
     // }
     return 0;
+}
+
+// message functions
+int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *content)
+{
+    Endpoint *thisClient = clientPtr;
+
+    // build message
+    Message msg = {
+        .sourceId = thisClient->id,
+        .length = length,
+        .content = malloc(length)
+    };
+    if (msg.content == NULL)
+    {
+        perror("sendAsClient malloc");
+        return -1;
+    }
+    
+    // add content to message
+    memcpy(msg.content, content, length);
+
+    // send via socket
+    if (sendMessage(thisClient->socks->tcp, msg) < 0)
+    {
+        printf("sendAsClient: sending has failed\n");
+        goto fail;
+    }
+
+    printf("sendAsClient: message has been sent\n");
+
+    return 0;
+
+    fail:
+    free(msg.content);
+    return -1;
 }
 
 // pending functions - message sending, receiving, lobby leaving

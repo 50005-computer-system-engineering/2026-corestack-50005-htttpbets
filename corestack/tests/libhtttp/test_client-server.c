@@ -35,7 +35,16 @@ int main(void)
         }
         printf("server: successfully accepted 1 client\n");
 
-        
+        unsigned char *buffer = NULL;
+        if (listenForClientMsg(server, &buffer) < 0)
+        {
+            printf("server: could not read message\n");
+            return -1;
+        }
+
+        printf("server: received message %s\n", buffer);
+
+        return 0;
     }
 
     // client
@@ -51,6 +60,14 @@ int main(void)
         if (joinLobby(client, "127.0.0.1") < 0)
         {
             printf("client: could not join lobby\n");
+            exit(-1);
+        }
+        sleep(1);
+        uint32_t msgLen = 11;
+        unsigned char *msgContent = (unsigned char *)"gamer word";
+        if (sendAsClient(client, msgLen, msgContent) < 0)
+        {
+            printf("client: could not send message\n");
             exit(-1);
         }
         printf("client: joined lobby without issue\n");
