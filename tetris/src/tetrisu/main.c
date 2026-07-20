@@ -82,17 +82,17 @@ int main()
     // Network Initialization (stopgap version)
     if (createClient(&network_client) < 0) // Failed
     {
-        printf("[tetrisd] Failed to create network client.\n");
+        printf("[tetrisu] Failed to create network client.\n");
         network_client = NULL;
     }
     else if (joinLobby(network_client, LOCAL_HOST) < 0)
     {
-        printf("[tetrisd] Failed to join lobby.\n");
+        printf("[tetrisu] Failed to join lobby.\n");
         network_client = NULL;
     }
     else
     {
-        printf("[tetrisd] Connected to lobby successfully!\n");
+        printf("[tetrisu] Connected to lobby successfully!\n");
     }
     sleep(5); // Brief delay to read connection status
 
