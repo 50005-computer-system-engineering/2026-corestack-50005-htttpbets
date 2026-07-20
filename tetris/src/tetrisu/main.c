@@ -12,6 +12,13 @@
 #include "lib/libtetrisbrain/hold.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
+#include "lib/libhtttp/client.h"
+
+// Networking purposes
+#define LOCAL_HOST "127.0.0.1"
+
+// Global network client
+LibhtttpClient *network_client = NULL;
 
 // Process gravity and lock delay intervals
 static void updateGameTimers(GameState *player, GameState *lobby[], int total_players)
@@ -69,6 +76,26 @@ static void updateGameTimers(GameState *player, GameState *lobby[], int total_pl
 // --- MAIN GAME LOOP ---
 int main()
 {
+    // Clear terminal screen
+    printf("\e[1;1H\e[2J");
+    fflush(stdout);
+    // Network Initialization (stopgap version)
+    if (createClient(&network_client) < 0) // Failed
+    {
+        printf("[tetrisd] Failed to create network client.\n");
+        network_client = NULL;
+    }
+    else if (joinLobby(network_client, LOCAL_HOST) < 0)
+    {
+        printf("[tetrisd] Failed to join lobby.\n");
+        network_client = NULL;
+    }
+    else
+    {
+        printf("[tetrisd] Connected to lobby successfully!\n");
+    }
+    sleep(5); // Brief delay to read connection status
+
     // Clear terminal screen
     // Set up the terminal for the game
     enableRawMode();

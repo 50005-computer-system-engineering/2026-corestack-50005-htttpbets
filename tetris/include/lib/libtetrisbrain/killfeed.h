@@ -5,11 +5,11 @@
 #define KILL_FEED_MAX 6
 
 // A single attack log entry
-typedef struct 
+typedef struct
 {
     int source; // Attacker
     int target; // Reciever
-    int lines; // Number of lines sent
+    int lines;  // Number of lines sent
 } KillFeedEntry;
 
 // Add an attack to the kill feed
