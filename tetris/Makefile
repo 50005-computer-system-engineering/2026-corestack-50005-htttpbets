@@ -46,18 +46,23 @@ BIN_OUT    := ./build/bin
 
 # ----------------------------------------------------------------------
 # Launcher
-# Named binary in project root for easy access
-# This is a symlink into build/bin so it always reflects latest build
 # ----------------------------------------------------------------------
-TARGET       := launcher
-# ! IMPORTANT ! Main entry point
-LAUNCHER_BIN := tetrisu
+# Dynamically find available terminal emulator
+TERM_CMD := $(shell which kitty || which gnome-terminal || which xfce4-terminal || which xterm)
+# Binaries
+SERVER_BIN := tetrisd
+CLIENT_BIN := tetrisu
 
-$(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
-	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
+run-server:
+	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
 
-run: $(TARGET)
-	./$(TARGET)
+run-client:
+	${TERM_CMD} -- bash -c "${BIN_OUT}/${CLIENT_BIN}; exec bash" &
+
+run: 
+	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
+	sleep 1;
+	${TERM_CMD} -- bash -c "${BIN_OUT}/${CLIENT_BIN}; exec bash" &
 
 # ----------------------------------------------------------------------
 # Compiler Flags
@@ -213,7 +218,7 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # Top-Level Targets
 # ----------------------------------------------------------------------
 # 'all' is ran by default when make is ran with no arguments
-.PHONY: all init run unit integration test clean
+.PHONY: all init run run-server run-client clean
 
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS) $(TARGET)
