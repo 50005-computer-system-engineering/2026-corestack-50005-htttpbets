@@ -107,18 +107,33 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
 int freeList(ClientLinkedList **listToFree)
 {
     // check for empty list
-    *list = *listToFree;
-    if (*list->head == NULL)
+    ClientLinkedList *list = *listToFree;
+    if (list->head == NULL)
     {
-        printf("[clientll getFromList()] list is empty, freeing pointer\n");
-        free(*list)
-        return 0;
+        printf("[clientll freeList()] list is empty, freeing pointer\n");
+        goto freeing;
     }
     // loop through and free individual endpoints (also closing the socks)
-    ClientNode *nextUp = NULL
+    ClientNode *current = NULL;
+    ClientNode *next = list->head;
     do
     {
-        // TODO actually close
-    } while (nextUp != NULL)
+        // initialise loop
+        current = next;
+        // if (current->next != NULL)
+        // {
+        next = current->next;
+        // }
+        printf("[clientll freeList()] removing ClientNode for client %u\n", current->client.id);
+        // free current ClientNode
+        free(current);
+        current = NULL;
+    // continue if there is still a next node
+    } while (next != NULL);
+    printf("[clientll freeList()] all ClientNodes freed\n");
+    // free ClientLinkedList struct
+    freeing:
+    free(list);
+    list = NULL;
     return 0;
 }
