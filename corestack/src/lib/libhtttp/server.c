@@ -76,7 +76,7 @@ int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 
     // add all client fd to polled fds
     struct pollfd *currentFd = fds;
-    for (ClientNode *currentClient = serverPtr->clients->head; currentClient->next != NULL; currentClient = currentClient->next)
+    for (ClientNode *currentClient = serverPtr->clients->head; currentClient != NULL; currentClient = currentClient->next)
     {
         currentFd->fd = currentClient->client.socks->tcp;
         currentFd->events = POLLIN;

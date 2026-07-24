@@ -37,28 +37,29 @@ int main(void)
         printf("server: successfully accepted 2 clients\n");
 
         unsigned char *buffer = NULL;
-        uint32_t source = 0;
+        uint32_t source1 = 0;
+        uint32_t source2 = 0;
 
-        if (listenForClientMsg(server, &source, &buffer) < 0)
+        if (listenForClientMsg(server, &source1, &buffer) < 0)
         {
             printf("server: could not read message\n");
             return -1;
         }
-        printf("server: received first message from client %u : %s\n", source, buffer);
+        printf("server: received first message from client %u : %s\n", source1, buffer);
         free(buffer);
         buffer = NULL;
 
-        if (listenForClientMsg(server, &source, &buffer) < 0)
+        if (listenForClientMsg(server, &source2, &buffer) < 0)
         {
             printf("server: could not read message\n");
             return -1;
         }
-        printf("server: received second message from client %u : %s\n", source, buffer);
+        printf("server: received second message from client %u : %s\n", source2, buffer);
         free(buffer);
         buffer = NULL;
 
         wait(NULL);
-
+        printf("test complete\n");
         return 0;
     }
 
@@ -105,18 +106,14 @@ int main(void)
         printf("client1: sent message\n");
 
         sleep(5);
-        msgLen = 12;
-        msgContent = (unsigned char *)"racist hurt";
+        msgLen = 11;
+        msgContent = (unsigned char *)"gamer word";
         if (sendAsClient(client2, msgLen, msgContent) < 0)
         {
             printf("client2: could not send message\n");
             exit(-1);
         }
         printf("client2: sent message\n");
-
-
-
-
 
         exit(0);
     }
