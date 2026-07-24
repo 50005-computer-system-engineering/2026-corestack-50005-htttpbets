@@ -1,7 +1,9 @@
 #include "bag.h"
 #include <stdlib.h>
 
-// Helper method to shuffle arrays
+// Fisher-Yates Shuffle
+// Iterate through the array backwards, for each position i it picks a random index j btwn 0 and i
+// Then swaps the elements => ensures uniform shuffling
 void shuffleArray(int *array, int size)
 {
     for (int i = size - 1; i > 0; i--)
@@ -21,21 +23,21 @@ void refillBag(GameState *state)
         state->bag[i] = state->bag[i + 7]; // Copy last 7 pieces and add to the first 7 slots
     }
 
-    int new_bag[7] = {1, 2, 3, 4, 5, 6, 7};
-    shuffleArray(new_bag, 7);
+    int new_bag[7] = {1, 2, 3, 4, 5, 6, 7}; // Create new array representing the 7 shapes
+    shuffleArray(new_bag, 7);               // Uniform shuffle
     for (int i = 0; i < 7; i++)
     {
         state->bag[i + 7] = new_bag[i]; // Generate new 7 pieces and put to the back 7 slots
     }
 
-    state->bag_index = 0; // Reset bag index
+    state->bag_index = 0; // Reset bag index to pull from front of array
 }
 
 // Spawns a new piece
 void spawnNewPiece(GameState *state)
 {
     // Draw next piece from the bag
-    state->current.type = state->bag[state->bag_index];
+    state->current.type = state->bag[state->bag_index]; // bag_index keeps track of where we are in the bag
     state->bag_index++;
 
     // Only shuffle when bag is empty
