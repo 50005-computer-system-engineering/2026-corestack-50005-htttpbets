@@ -36,14 +36,26 @@ int main(void)
         }
         printf("server: successfully accepted 2 clients\n");
 
-        // unsigned char *buffer = NULL;
-        // if (listenForClientMsg(server, &buffer) < 0)
-        // {
-        //     printf("server: could not read message\n");
-        //     return -1;
-        // }
+        unsigned char *buffer = NULL;
+        uint32_t source = 0;
 
-        // printf("server: received message %s\n", buffer);
+        if (listenForClientMsg(server, &source, &buffer) < 0)
+        {
+            printf("server: could not read message\n");
+            return -1;
+        }
+        printf("server: received first message from client %u : %s\n", source, buffer);
+        free(buffer);
+        buffer = NULL;
+
+        if (listenForClientMsg(server, &source, &buffer) < 0)
+        {
+            printf("server: could not read message\n");
+            return -1;
+        }
+        printf("server: received second message from client %u : %s\n", source, buffer);
+        free(buffer);
+        buffer = NULL;
 
         wait(NULL);
 
@@ -66,14 +78,6 @@ int main(void)
             printf("client1: could not join lobby\n");
             exit(-1);
         }
-        // sleep(5);
-        // uint32_t msgLen = 11;
-        // unsigned char *msgContent = (unsigned char *)"gamer word";
-        // if (sendAsClient(client, msgLen, msgContent) < 0)
-        // {
-        //     printf("client1: could not send message\n");
-        //     exit(-1);
-        // }
         printf("client1: joined lobby without issue\n");
 
         // second client
@@ -89,6 +93,30 @@ int main(void)
             exit(-1);
         }
         printf("client2: joined lobby without issue\n");
+
+        sleep(5);
+        uint32_t msgLen = 11;
+        unsigned char *msgContent = (unsigned char *)"gamer word";
+        if (sendAsClient(client1, msgLen, msgContent) < 0)
+        {
+            printf("client1: could not send message\n");
+            exit(-1);
+        }
+        printf("client1: sent message\n");
+
+        sleep(5);
+        msgLen = 12;
+        msgContent = (unsigned char *)"racist hurt";
+        if (sendAsClient(client2, msgLen, msgContent) < 0)
+        {
+            printf("client2: could not send message\n");
+            exit(-1);
+        }
+        printf("client2: sent message\n");
+
+
+
+
 
         exit(0);
     }

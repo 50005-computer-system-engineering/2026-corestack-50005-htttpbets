@@ -1,3 +1,5 @@
+#include <sys/poll.h>
+
 #include "lib/libhtttp/server.h"
 #include "common.h"
 #include "message.h"
@@ -51,6 +53,41 @@ int acceptOnTCP(Server *serverPtr)
     }
     printf("[server acceptOnTCP()] server accepted new TCP client\n");
     return newClientFd;
+}
+
+int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
+{
+    printf("[server getFdSetTCP()] getting a pollfd struct from server\n");
+
+    // check if empty
+    if (serverPtr->clients == NULL || serverPtr->clients->head == NULL)
+    {
+        printf("[server getFdSetTCP()] no clients connected to server\n");
+        return -1;
+    }
+
+    // initialise struct
+    struct pollfd *fds = malloc(sizeof(struct pollfd) * serverPtr->clients->count);
+    if (fds == NULL)
+    {
+        perror("server malloc");
+        return -1;
+    }
+
+    // add all client fd to polled fds
+    struct pollfd *currentFd = fds;
+    for (ClientNode *currentClient = serverPtr->clients->head; currentClient->next != NULL; currentClient = currentClient->next)
+    {
+        currentFd->fd = currentClient->client.socks->tcp;
+        currentFd->events = POLLIN;
+        currentFd->revents = 0;
+        currentFd++;
+    }
+
+    *clientFds = fds;
+
+    printf("[server getFdSetTCP()] added all clients to set\n");
+    return 0;
 }
 
 // public functions
@@ -174,13 +211,39 @@ int closeLobby(LibhtttpServer *serverPtr)
     return 0;
 }
 
-int listenForClientMsg(LibhtttpServer *serverPtr, unsigned char **returnBuffer)
+int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned char **returnBuffer)
 {
     Server *thisServer = serverPtr;
-
     Message *returnMsg = NULL;
 
-    if (receiveMessage(thisServer->clients->head->client.socks->tcp, &returnMsg) < 0)
+    // listening for multiple clients
+    struct pollfd *clientFds;
+    if (getFdSetTCP(thisServer, &clientFds) < 0)
+    {
+        printf("[server listenForClientMsg()] could not make a list of client socket fds\n");
+        return -1;
+    }
+    int readyToRead = poll(clientFds, thisServer->clients->count, 3 * 60 * 1000);
+    if (readyToRead <= 0)
+    {
+        printf("[server listenForClientMsg()] no message from any client within timeout period\n");
+        return -1;
+    }
+    
+    int temporarySoltuion = 0;  // TODO handle multiple clients
+    for (int i=0; i < thisServer->clients->count || readyToRead != 0; i++)
+    {
+        if (clientFds[i].revents == POLLIN)
+        {
+            temporarySoltuion = clientFds[i].fd;
+            readyToRead--;
+            break;  // TODO handle multiple clients
+        }
+    }
+    free(clientFds);
+
+    // receive and return
+    if (receiveMessage(temporarySoltuion, &returnMsg) < 0)
     {
         printf("[server listenForClientMsg()] failed to receive message\n");
         return -1;
@@ -197,6 +260,7 @@ int listenForClientMsg(LibhtttpServer *serverPtr, unsigned char **returnBuffer)
         return -1;
     }
 
+    *sourceId = returnMsg->sourceId;
     memcpy(*returnBuffer, returnMsg->content, returnMsg->length);
 
     // Free memory allocated for message
