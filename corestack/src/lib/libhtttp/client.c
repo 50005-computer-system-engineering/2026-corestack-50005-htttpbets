@@ -61,11 +61,11 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
         return -1;
     }
 
-    // if (registerWithServer(thisClient))
-    // {
-    //     printf("libhtttp/client joinLobby: failed to register\n");
-    //     return -1;
-    // }
+    if (registerWithServer(thisClient))
+    {
+        printf("libhtttp/client joinLobby: failed to register\n");
+        return -1;
+    }
     return 0;
 }
 
