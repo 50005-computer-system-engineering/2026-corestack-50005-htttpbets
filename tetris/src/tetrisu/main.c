@@ -79,7 +79,8 @@ int main()
     // Clear terminal screen
     printf("\e[1;1H\e[2J");
     fflush(stdout);
-    // Network Initialization (stopgap version)
+
+    // Network Initialization
     if (createClient(&network_client) < 0) // Failed
     {
         printf("[tetrisu] Failed to create network client.\n");
