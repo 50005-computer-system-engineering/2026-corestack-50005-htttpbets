@@ -165,10 +165,21 @@ void drawBoard(GameState *state)
     // Dashboard
     // Convert targeting enum back to clear text strings
     const char *mode_strings[] = {"MANUAL", "RANDOM", "KILL-OUT"};
-    printf("----------------------\n");
-    printf("Score: %d  |  Lines: %d\n | T-Spins: %d\n", state->score, state->lines_cleared, state->t_spins);
-    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [T] Change Targeting Mode\n   [R] Swap Targets\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit\n");
+    //Header & Primary Game Stats
+    printf("<!>====================<!>\n");
+    printf(" Lvl: %-2d   Score: %-5d\n", state->level, state->score);
+    printf(" Lines: %-3d  T-Spins: %-2d\n", state->lines_cleared, state->t_spins);
+    // Active Target Status
     printf(" Target: P%d (%s)\n", state->target_player_id, mode_strings[state->target_mode]);
+    printf("--------------------------\n");
+    // Controls Legend
+    printf(" Controls:\n");
+    printf("   [Left/Right] Move     [Down] Soft Drop\n");
+    printf("   [Up / X] Rotate CW    [Z] Rotate CCW\n");
+    printf("   [Space] Hard Drop     [H] Hold Piece\n");
+    printf("   [T] Cycle Target      [R] Swap Target\n");
+    printf("   [Q] Quit Game\n");
+    //Render Killfeed & Flush Buffer
     drawKillFeed();
     fflush(stdout); // Force print
 }
