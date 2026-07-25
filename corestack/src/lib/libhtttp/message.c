@@ -14,7 +14,7 @@ int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length)
     *returnBuf = malloc(length);
     if (*returnBuf == NULL)
     {
-        perror("readBytes malloc");
+        perror("[readBytes()] malloc");
         return -1;
     }
 
@@ -26,7 +26,7 @@ int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length)
         ssize_t n = recv(sockfd, *returnBuf + bytesReceived, (size_t)remaining, 0);
         if (n <= 0)
         {
-            perror("readBytes recv");
+            perror("[readBytes()] recv");
             free(*returnBuf);
             *returnBuf = NULL;
             return -1;
@@ -56,10 +56,10 @@ int registerNewClient(Endpoint *newClient)
 {
     if (newClient == NULL) 
     {
-        printf("libhtttp/registration.h registerNewClient: invalid newClient ptr passed\n");
+        LOG_E("[registerNewClient()] invalid newClient ptr passed");
     }
 
-    printf("libhtttp/registration.h registerNewClient: registering client with id %u\n", newClient->id);
+    LOG_I("[registerNewClient()] registering client with id %u\n", newClient->id);
 
     unsigned char *buffer = NULL;
 
@@ -67,12 +67,12 @@ int registerNewClient(Endpoint *newClient)
     buffer = malloc(NONCE_LEN);
     if (buffer == NULL)
     {
-        perror("libhtttp/registration.h malloc");
+        perror("[registerNewClient()] malloc");
         return -1;
     }
     if (readBytes(newClient->socks->tcp, &buffer, NONCE_LEN) < 0)
     {
-        printf("libhtttp/registration.h registerNewClient: failed to read NONCE\n");
+        LOG_E("[registerNewClient()] failed to read NONCE");
         return -1;
     }
     memcpy(newClient->token, buffer, NONCE_LEN);
@@ -84,17 +84,17 @@ int registerNewClient(Endpoint *newClient)
     buffer = malloc(sizeof(uint32_t));
     if (buffer == NULL)
     {
-        perror("libhtttp/registration.h malloc");
+        perror("[registerNewClient()] malloc");
         return -1;
     }
     uint32_t idBytes = htonl(newClient->id);
     if (sendBytes(newClient->socks->tcp, (unsigned char *)&idBytes, sizeof(uint32_t)) < 0)
     {
-        printf("libhtttp/registration.h registerNewClient: failed to send source ID\n");
+        LOG_E("[registerNewClient()] failed to send source ID");
         return -1;
     }
 
-    printf("libhtttp/registration.h registerNewClient: registration complete\n");
+    LOG_I("[registerNewClient()] registration complete");
 
     return 0;
 }
@@ -109,13 +109,13 @@ int registerWithServer(Endpoint *myClient)
     // buffer = generateNonce();
     if (buffer == NULL)
     {
-        perror("libhtttp/registration.h malloc");
+        perror("[registerWithServer()] malloc");
         return -1;
     }
 
     if (sendBytes(myClient->socks->tcp, buffer, NONCE_LEN) < 0)
     {
-        printf("libhtttp/registration.h registerNewClient: failed to send NONCE\n");
+        LOG_E("[registerWithServer()] failed to send NONCE");
         return -1;
     }
     free(buffer);
@@ -126,12 +126,12 @@ int registerWithServer(Endpoint *myClient)
     buffer = malloc(sizeof(uint32_t));
     if (buffer == NULL)
     {
-        perror("libhtttp/registration.h malloc");
+        perror("[registerWithServer()] malloc");
         return -1;
     }
     if (readBytes(myClient->socks->tcp, &buffer, sizeof(uint32_t)) < 0)
     {
-        printf("readMessage: failed to read sourceId\n");
+        LOG_E("[registerWithServer()] failed to read sourceId");
         return -1;
     } 
     uint32_t sourceBytes;
@@ -150,18 +150,21 @@ int registerWithServer(Endpoint *myClient)
 int receiveMessage(int sockfd, Message **returnPtr)
 {
     Message *returnMsg = calloc(1, sizeof(Message));
+
+    LOG_I("[receiveMessage()] preparing to receive message");
+
     if (returnMsg == NULL)
     {
-        perror("readBytes malloc");
+        perror("[receiveMessage()] malloc");
         goto fail;
     }
 
     // read Message header bytes
-    printf("receiveMessage: allocated memory for Message, listening for header...\n");
+    LOG_D("[receiveMessage()] allocated memory for Message, listening for header...");
     unsigned char *buffer = NULL;
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        printf("readMessage: failed to read sourceId\n");
+        LOG_E("[receiveMessage()] failed to read sourceId\n");
         goto fail;
     } 
     uint32_t sourceBytes;
@@ -172,7 +175,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
 
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        printf("readMessage: failed to read length\n");
+        LOG_E("[receiveMessage()] failed to read length");
         goto fail;
     } 
     uint32_t lenBytes;
@@ -182,10 +185,10 @@ int receiveMessage(int sockfd, Message **returnPtr)
     buffer = NULL;
 
     // listen for message considering the header
-    printf("receiveMessage: now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
+    LOG_D("[receiveMessage()] now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
     if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
     {
-        printf("readMessage: failed to read message\n");
+        LOG_E("[receiveMessage()] failed to read message");
         goto fail;
     }
     // returnMsg->content = malloc(returnMsg->length);
@@ -220,12 +223,12 @@ fail:
 
 int sendMessage(int sockfd, const Message completeMsg)
 {
-    printf("sendMessage: sending message with the header:\n\tsourceId: %u\n\tlength: %u\n", completeMsg.sourceId, completeMsg.length);
+    LOG_I("[sendMessage()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
     uint32_t sourceId = htonl(completeMsg.sourceId);
     sendBytes(sockfd, (const unsigned char *)&sourceId, sizeof(uint32_t));
     uint32_t length = htonl(completeMsg.length);
     sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
     sendBytes(sockfd, completeMsg.content, completeMsg.length);
-    printf("sendMessage: message sending probably worked\n");
+    LOG_I("[sendMessage()] pushed all bytes though socket");
     return 0;
 }

@@ -29,7 +29,9 @@ int main(void)
         }
         printf("server: successfully created server pointer\n");
         
-        if (openLobby(server, 2) < 0)
+        uint32_t *clientIdArray;
+        uint32_t size = 2;
+        if (openLobby(server, &size, &clientIdArray) < 0)
         {
             printf("server: could not open lobby\n");
             return -1;

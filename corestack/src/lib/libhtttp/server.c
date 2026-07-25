@@ -16,7 +16,7 @@ int listenOnTCP(Server *serverPtr)
     // Check if sockets have valid fd 
     if (checkSockets(*(serverPtr->self->socks)) < 0)
     {
-        printf("[server listenOnTCP()] sockets in Sockets invalid\n");
+        LOG_E("[listenOnTCP()] sockets in Sockets invalid");
         return -1;
     }
 
@@ -38,31 +38,31 @@ int listenOnTCP(Server *serverPtr)
         perror("listenOnTCP listen");
         return -1;
     }
-    printf("[server listenOnTCP()]: server now listening for TCP connections on port %d\n", PORT_TCP);
+    LOG_I("[listenOnTCP()]: server now listening for TCP connections on port %d", PORT_TCP);
     return 0;
 }
 
 int acceptOnTCP(Server *serverPtr)
 {
-    printf("[server acceptOnTCP()] server now accepting a TCP client...\n");
+    LOG_I("[acceptOnTCP()] server now accepting a TCP client...");
     int newClientFd = accept(serverPtr->self->socks->tcp, NULL, NULL);
     if (newClientFd < 0)
     {
         perror("acceptOnTCP accept");
         return -1;
     }
-    printf("[server acceptOnTCP()] server accepted new TCP client\n");
+    LOG_I("[acceptOnTCP()] server accepted new TCP client");
     return newClientFd;
 }
 
 int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 {
-    printf("[server getFdSetTCP()] getting a pollfd struct from server\n");
+    LOG_I("[getFdSetTCP()] getting a pollfd struct from server");
 
     // check if empty
     if (serverPtr->clients == NULL || serverPtr->clients->head == NULL)
     {
-        printf("[server getFdSetTCP()] no clients connected to server\n");
+        LOG_E("[getFdSetTCP()] no clients connected to server");
         return -1;
     }
 
@@ -86,7 +86,7 @@ int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 
     *clientFds = fds;
 
-    printf("[server getFdSetTCP()] added all clients to set\n");
+    LOG_I("[getFdSetTCP()] added all clients to set");
     return 0;
 }
 
@@ -101,11 +101,11 @@ int createServer(LibhtttpServer **serverPtr)
     }
     if (createEndpoint(&newServer->self) < 0)
     {
-        printf("[server createServer()] endpoint creation failed\n");
+        LOG_E("[createServer()] endpoint creation failed");
         goto fail;
     }
     newServer->clients = NULL;
-    printf("[server createServer()] new server created with sockets created\n");
+    LOG_I("[createServer()] new server created with sockets created");
     *serverPtr = newServer;
     return 0;
 
@@ -115,29 +115,29 @@ int createServer(LibhtttpServer **serverPtr)
     return -1;
 }
 
-int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
+int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds)
 {
     // check parameters
     if (serverPtr == NULL)
     {
-        printf("[server openLobby()] serverPtr has no server allocated\n");
+        LOG_E("[openLobby()] serverPtr has no server allocated");
         return -1;
     }
-    if (lobbySize < 1)
+    if (*lobbySize < 1)
     {
-        printf("[server openLobby()] lobbySize is required to be at least 1\n");
+        LOG_E("[openLobby()] lobbySize is required to be at least 1");
         return -1;
     }
 
     // allocate space for client array
-    printf("[server openLobby()] opening server lobby for clients...\n");
+    LOG_I("[openLobby()] opening server lobby for clients...");
     Server *thisServer = serverPtr;
     if (thisServer->clients != NULL)
     {
         // free and make a new array
         if (freeList(&thisServer->clients) < 0)
         {
-            printf("[server openLobby()] could not free list for new lobby\n");
+            LOG_E("[openLobby()] could not free list for new lobby");
             return -1;
         }
         thisServer->clients = NULL;
@@ -148,28 +148,28 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         perror("server malloc");
         return -1;
     }
-    printf("[server openLobby()] memory allocated for client linked list\n");
+    LOG_I("[openLobby()] memory allocated for client linked list");
 
     // start listening until lobbySize of clients connect to server
     if (listenOnTCP(thisServer) < 0)
     {
-        printf("[server openLobby()] failed to bind port for listening\n");
+        LOG_E("[openLobby()] failed to bind port for listening");
         return -1;
     }
-    printf("[server openLobby()] bound port for listening\n");
+    LOG_I("[openLobby()] bound port for listening");
 
     // start accepting clients for TCP connections
     uint8_t slot = 1;   // ID 0 is reserved for server
-    while (thisServer->clients->count < lobbySize && slot != UINT32_MAX)
+    while (thisServer->clients->count < *lobbySize && slot != UINT32_MAX)
     {
         // blocks until client connects
         int clientFd = acceptOnTCP(thisServer);
         if (clientFd < 0)
         {
-            printf("[server openLobby()] accept failed to find client, skipping loop iteration...\n");
+            LOG_E("[openLobby()] accept failed to find client, skipping loop iteration...");
             continue;
         }
-        printf("[server openLobby()] accept succses, adding new client to slot %u/%u...\n", slot, lobbySize);
+        LOG_I("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
         
         // creating client endpoint of newly connected client
         Endpoint newClient = {
@@ -180,14 +180,14 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         newClient.socks->tcp = clientFd;
         if (registerNewClient(&newClient) < 0)
         {
-            printf("[server openLobby()] failed to register new client\n");
+            LOG_E("[openLobby()] failed to register new client");
             goto cleanup;
         }
         
         // add completed new client to the clients list
         if (addToList(thisServer->clients, &newClient))
         {
-            printf("[server openLobby()] failed to add client to new list\n");
+            LOG_E("[openLobby()] failed to add client to new list");
             goto cleanup;
         }
 
@@ -201,7 +201,16 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         continue;
     } // TODO implement halting lobby joining
 
-    printf("[server openLobby()] Lobby opening complete\n");
+    // return a list of players
+    *lobbySize = thisServer->clients->count;
+    if (getIdArray(thisServer->clients, clientIds) < 0)
+    {
+        LOG_E("[openLobby()] failed to write list of client ids");
+        return -1;
+    }
+    LOG_I("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
+
+    LOG_I("[openLobby()] Lobby opening complete");
     return 0;
 }
 
@@ -220,13 +229,13 @@ int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned c
     struct pollfd *clientFds;
     if (getFdSetTCP(thisServer, &clientFds) < 0)
     {
-        printf("[server listenForClientMsg()] could not make a list of client socket fds\n");
+        LOG_E("[listenForClientMsg()] could not make a list of client socket fds");
         return -1;
     }
     int readyToRead = poll(clientFds, thisServer->clients->count, 3 * 60 * 1000);
     if (readyToRead <= 0)
     {
-        printf("[server listenForClientMsg()] no message from any client within timeout period\n");
+        LOG_E("[listenForClientMsg()] no message from any client within timeout period");
         return -1;
     }
     
@@ -245,7 +254,7 @@ int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned c
     // receive and return
     if (receiveMessage(temporarySoltuion, &returnMsg) < 0)
     {
-        printf("[server listenForClientMsg()] failed to receive message\n");
+        LOG_E("[listenForClientMsg()] failed to receive message");
         return -1;
     }
 
@@ -267,6 +276,6 @@ int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned c
     free(returnMsg->content);
     free(returnMsg);
 
-    printf("[server listenForClientMsg()] received message\n");
+    LOG_I("[listenForClientMsg()] received message");
     return 0;
 }

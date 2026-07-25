@@ -10,17 +10,21 @@
 #include <sys/socket.h>
 #include <string.h>
 
+#include "liblog.h"
+
 // known ports
 #define PORT_TCP 6700
-#define PORT_UDP 6767
+#define PORT_UDP_DIRECT 6701
+#define PORT_UDP_BROAD 6702
 
 // important values
 #define NONCE_LEN 8
 
 // common structs throughout
 typedef struct {
-    int tcp;     // member (tcp socket fd)
-    int udp;     // member (udp socket fd)
+    int tcp;            // important singlecast
+    int udpDirect;      // unimportant singlecast
+    int udpBroad;       // broadcasts
 } Sockets;
 
 typedef struct {
