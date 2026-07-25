@@ -4,6 +4,6 @@
 #include "lib/libtetrisbrain/state.h"
 
 // Process all pending terminal inputs
-void processInputs(GameState *lobby[], int total_players);
+void processInputs(GameState *state);
 
 #endif

@@ -29,7 +29,7 @@ int main(void)
 
     // Empty buffer to store
     unsigned char *buffer = NULL;
-    uint32_t source_id;
+    uint32_t source_id = 0;
 
     // Continuous listening loop
     while (listenForClientMsg(server, &source_id, &buffer) == 0)
@@ -43,7 +43,8 @@ int main(void)
         uint32_t real_lines = ntohl(incoming_attack->lines);
 
         // Logging
-        printf(" <!> EVENT ROUTED: Network Client %u (In-Game P%u) sent %u lines to P%u!\n", source_id, real_source, real_lines, real_target);
+        printf(" <!> EVENT ROUTED: libhtttp Client %u (In-Game P%u) attacked P%u with %u lines!\n", source_id, real_source, real_target, real_lines);
+        printf("-> [Server] Holding garbage for Target P%u (Broadcast pending future update)\n\n", real_target);
         
         // Free and clear buffer
         free(buffer);

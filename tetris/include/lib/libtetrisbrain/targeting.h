@@ -4,7 +4,7 @@
 #include "state.h"
 
 // Resolve and return correct target ID based on attacker's mode
-int resolveTargetID(GameState *attacker, GameState *all_players[], int total_players);
+uint32_t resolveTargetID(GameState *attacker, GameState *all_players[], int total_players);
 
 // Cycle target mode selection
 void cycleTargetMode(GameState *player);

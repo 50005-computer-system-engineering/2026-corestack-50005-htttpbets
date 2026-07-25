@@ -6,7 +6,6 @@
 #include "lib/libtetrisbrain/state.h"
 
 // Renders the board and active piece to the terminal
-// void drawBoard(GameState *state);
-void drawBothBoards(GameState *p1, GameState *p2);
+void drawBoard(GameState *state);
 
 #endif

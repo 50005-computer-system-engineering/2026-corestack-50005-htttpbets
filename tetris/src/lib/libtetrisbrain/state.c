@@ -7,7 +7,6 @@
 
 // Initialise gamestates
 GameState gamestate_p1;
-GameState gamestate_p2;
 
 // Function call to start the game
 void startGame(GameState *state)
@@ -32,9 +31,9 @@ void startGame(GameState *state)
     // Initialize the 14-bag for preview pieces
     int bag1[7] = {1, 2, 3, 4, 5, 6, 7};
     int bag2[7] = {1, 2, 3, 4, 5, 6, 7};
-    shuffleArray(bag1, 7); 
+    shuffleArray(bag1, 7);
     shuffleArray(bag2, 7);
-    for (int i = 0; i < 7; i++) 
+    for (int i = 0; i < 7; i++)
     {
         state->bag[i] = bag1[i];
     }
