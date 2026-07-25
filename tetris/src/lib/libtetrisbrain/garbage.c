@@ -55,18 +55,20 @@ int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
     // No lines cleared = 0 damage
     if (lines_cleared == 0)
     {
+        state->combo = -1; // Reset combo counter
         return 0;
     }
 
     // Counter
-    int garbage = 0;
+    int base_garbage = 0;
+    bool is_difficult_clear = is_t_spin || (lines_cleared == 4);
 
     // T spins deal more garbage (2x multiplier)
     if (is_t_spin)
     {
         if (lines_cleared > 0)
         {
-            garbage = lines_cleared * 2;
+            base_garbage = lines_cleared * 2;
         }
     }
     else
@@ -74,17 +76,47 @@ int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
         // Normal clears, regular multiplier
         if (lines_cleared == 2)
         {
-            garbage = 1;
+            base_garbage = 1;
         }
         else if (lines_cleared == 3)
         {
-            garbage = 3;
+            base_garbage = 3;
         }
         else if (lines_cleared == 4)
         {
-            garbage = 4;
+            base_garbage = 4;
         }
     }
 
-    return garbage;
+    // Specific clears have specific bonuses
+    if (is_difficult_clear)
+    {
+        if (state->b2b)
+        {
+            base_garbage += 1;
+        }
+        state->b2b = true; // Maintain status
+    }
+    else
+    {
+        state->b2b = false; // Reset counter
+    }
+
+    // Guideline Combo Bonus to follow
+    int combo_bonus = 0;
+    if (state->combo > 0)
+    {
+        // Guideline Combo Table
+        static const int combo_table[] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5};
+        if (state->combo < 12)
+        {
+            combo_bonus = combo_table[state->combo];
+        }
+        else
+        {
+            combo_bonus = 5; // Capped for long combos
+        }
+    }
+
+    return base_garbage + combo_bonus;
 }

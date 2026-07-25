@@ -169,6 +169,26 @@ void drawBoard(GameState *state)
     printf("<!>====================<!>\n");
     printf(" Lvl: %-2d   Score: %-5d\n", state->level, state->score);
     printf(" Lines: %-3d  T-Spins: %-2d\n", state->lines_cleared, state->t_spins);
+    // Combo & B2B Indicators
+    printf(" Status: ");
+    // B2B Indicator
+    if (state->b2b)
+    {
+        printf("\e[1;33m[B2B]\e[0m ");
+    }
+    else
+    {
+        printf("[---] ");
+    }
+    // Combo Counter
+    if (state->combo > 0)
+    {
+        printf("\e[1;32m%d COMBO!\e[0m\n", state->combo);
+    }
+    else
+    {
+        printf("0 Combo\n");
+    }
     // Active Target Status
     printf(" Target: P%d (%s)\n", state->target_player_id, mode_strings[state->target_mode]);
     printf("--------------------------\n");

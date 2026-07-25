@@ -37,6 +37,8 @@ typedef struct
     uint32_t outgoing_garbage;
     int score;
     int lines_cleared;
+    int combo;
+    bool b2b;
     int level;
     int game_over;
 } GameState;

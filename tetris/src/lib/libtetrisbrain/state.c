@@ -24,6 +24,8 @@ void startGame(GameState *state)
     state->score = 0;
     state->game_over = 0;
     state->lines_cleared = 0;
+    state->combo = -1;
+    state->b2b = false;
     state->level = 1;
     state->pending_garbage = 0;
     state->outgoing_garbage = 0;

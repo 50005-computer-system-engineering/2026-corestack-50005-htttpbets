@@ -32,34 +32,105 @@ int getRotationIndex(int x, int y, Rotation rot)
     }
 }
 
+// Helper to identify rotation transition index (0 to 7)
+static int getTransitionIndex(Rotation currentRot, Rotation nextRot)
+{
+    if (currentRot == ROT_0 && nextRot == ROT_1)
+    {
+        return 0; // 0 -> 90  (CW)
+    }
+    if (currentRot == ROT_1 && nextRot == ROT_0)
+    {
+        return 1; // 90 -> 0  (CCW)
+    }
+    if (currentRot == ROT_1 && nextRot == ROT_2)
+    {
+        return 2; // 90 -> 180 (CW)
+    }
+    if (currentRot == ROT_2 && nextRot == ROT_1)
+    {
+        return 3; // 180 -> 90 (CCW)
+    }
+    if (currentRot == ROT_2 && nextRot == ROT_3)
+    {
+        return 4; // 180 -> 270 (CW)
+    }
+    if (currentRot == ROT_3 && nextRot == ROT_2)
+    {
+        return 5; // 270 -> 180 (CCW)
+    }
+    if (currentRot == ROT_3 && nextRot == ROT_0)
+    {
+        return 6; // 270 -> 0   (CW)
+    }
+    if (currentRot == ROT_0 && nextRot == ROT_3)
+    {
+        return 7; // 0 -> 270   (CCW)
+    }
+    return 0;
+}
+
 // Wall kick helper function
 bool testRotate(GameState *state, int nextRot)
 {
-    // { X offset, Y offset }; set of 5 coordinate offsets
-    // Rotate in place => Shift left by 1 cell => Shift right by 1 cell => Shift up by 1 cell => Shift up by 2 cells
-    int kicks[5][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, -2}};
+    // JLSTZ Kick Offsets (8 transitions x 5 tests x 2 coords {X, Y})
+    static const int kicks_jlstz[8][5][2] = {
+        {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}},
+        {{0, 0}, {1, 0}, {1, 1}, {0, -2}, {1, -2}},
+        {{0, 0}, {1, 0}, {1, 1}, {0, -2}, {1, -2}},
+        {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}},
+        {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},
+        {{0, 0}, {-1, 0}, {-1, 1}, {0, -2}, {-1, -2}},
+        {{0, 0}, {-1, 0}, {-1, 1}, {0, -2}, {-1, -2}},
+        {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}}};
+
+    // I-Piece Kick Offsets
+    static const int kicks_i[8][5][2] = {
+        {{0, 0}, {-2, 0}, {1, 0}, {-2, 1}, {1, -2}},
+        {{0, 0}, {2, 0}, {-1, 0}, {2, -1}, {-1, 2}},
+        {{0, 0}, {-1, 0}, {2, 0}, {-1, -2}, {2, 1}},
+        {{0, 0}, {1, 0}, {-2, 0}, {1, 2}, {-2, -1}},
+        {{0, 0}, {2, 0}, {-1, 0}, {2, -1}, {-1, 2}},
+        {{0, 0}, {-2, 0}, {1, 0}, {-2, 1}, {1, -2}},
+        {{0, 0}, {1, 0}, {-2, 0}, {1, 2}, {-2, -1}},
+        {{0, 0}, {-1, 0}, {2, 0}, {-1, -2}, {2, 1}}};
+
+    int transIndex = getTransitionIndex(state->current.rot, nextRot);
+    PieceType type = state->current.type;
 
     for (int i = 0; i < 5; i++)
     {
-        // Add offset to current coordinates for both x and y coords
-        int nx = state->current.x + kicks[i][0];
-        int ny = state->current.y + kicks[i][1];
-
-        // Only rotate if the rotated position is valid
-        if (isValidPos(state, state->current.type, nextRot, nx, ny))
+        int offsetX, offsetY;
+        // Select correct table
+        if (type == 1) // I-Piece
         {
-            // Apply the new coordinates and rotation
+            offsetX = kicks_i[transIndex][i][0];
+            offsetY = kicks_i[transIndex][i][1];
+        }
+        else if (type == 2) // O-Piece
+        {
+            offsetX = 0;
+            offsetY = 0;
+        }
+        else // J, L, S, Z, T Pieces
+        {
+            offsetX = kicks_jlstz[transIndex][i][0];
+            offsetY = kicks_jlstz[transIndex][i][1];
+        }
+
+        int nx = state->current.x + offsetX;
+        int ny = state->current.y + offsetY;
+
+        if (isValidPos(state, type, nextRot, nx, ny))
+        {
             state->current.x = nx;
             state->current.y = ny;
             state->current.rot = nextRot;
-            // For t-spin detection
             state->last_action_rotation = true;
-
             return true;
         }
     }
-    // All 5 fail => rotation rejected
-    return false;
+    return false; // All 5 SRS kick tests failed
 }
 
 // Rotate clockwise logic
@@ -198,7 +269,7 @@ int clearLines(GameState *state)
     {
         state->lines_cleared += linesCleared;
         state->level = (state->lines_cleared / 10) + 1; // Basic level progression
-        state->score += linesCleared * 100; // Basic placeholder scoring
+        state->score += linesCleared * 100;             // Basic placeholder scoring
     }
     // Update cleared count
     return linesCleared;
