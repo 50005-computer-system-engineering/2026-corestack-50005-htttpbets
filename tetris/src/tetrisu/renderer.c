@@ -167,7 +167,7 @@ void drawBoard(GameState *state)
     const char *mode_strings[] = {"MANUAL", "RANDOM", "KILL-OUT"};
     printf("----------------------\n");
     printf("Score: %d  |  Lines: %d\n | T-Spins: %d\n", state->score, state->lines_cleared, state->t_spins);
-    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [T] Change Targeting Mode\n   [R] Swap Targets\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit");
+    printf("   [Left | Right] Move\n  [Down] Soft Drop\n  [Up | X] Rotate CW\n  [Z] Rotate CCW\n   [T] Change Targeting Mode\n   [R] Swap Targets\n   [Space] Hard Drop\n  [H] Hold\n  [Q] Quit\n");
     printf(" Target: P%d (%s)\n", state->target_player_id, mode_strings[state->target_mode]);
     drawKillFeed();
     fflush(stdout); // Force print
