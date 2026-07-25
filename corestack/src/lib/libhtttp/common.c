@@ -6,13 +6,19 @@ int checkSockets(Sockets socks)
     int tcpActive = socks.tcp > 0 ? 1 : 0;
     if (tcpActive == 0)
     {
-        printf("checkSockets: missing TCP socket\n");
+        printf("[common checkSockets()] missing TCP socket\n");
         return 0;
     }
-    int udpActive = socks.udp > 0 ? 1 : 0;
-    if (udpActive == 0)
+    int udpDirectActive = socks.udpDirect > 0 ? 1 : 0;
+    if (udpDirectActive == 0)
     {
-        printf("checkSockets: missing UDP socket\n");
+        printf("[checkSockets()] missing UDP direct socket\n");
+        return 0;
+    }
+    int udpBroadActive = socks.udpBroad > 0 ? 1 : 0;
+    if (udpBroadActive == 0)
+    {
+        printf("[checkSockets()] missing UDP broadcast socket\n");
         return 0;
     }
     return 1;
@@ -23,14 +29,16 @@ int closeSockets(Sockets *socks)
 {
     if (checkSockets(*socks) == 0)
     {
-        printf("closeSockets: sockets not created, no need to close\n");
+        printf("[common closeSockets()] sockets not created, no need to close\n");
         return -1;
     }
     close(socks->tcp);
     socks->tcp = -1;
-    close(socks->udp);
-    socks->udp = -1;
-    printf("closeSockets: closed sockets\n");
+    close(socks->udpDirect);
+    socks->udpDirect = -1;
+    close(socks->udpBroad);
+    socks->udpBroad = -1;
+    printf("[common closeSockets()] closed sockets\n");
     return 0;
 }
 
@@ -42,19 +50,30 @@ int createSockets(Sockets **socks)
     newSocks->tcp = socket(AF_INET, SOCK_STREAM, 0);
     if (newSocks->tcp < 0)
     {
-        perror("createSockets socket");
+        perror("[common createSockets()] socket");
         goto fail;
     }
 
-    // create udp socket descriptor
-    newSocks->udp = socket(AF_INET, SOCK_DGRAM, 0);
-    if (newSocks->udp < 0)
+    // create udp direct socket descriptor
+    newSocks->udpDirect = socket(AF_INET, SOCK_DGRAM, 0);
+    if (newSocks->udpDirect < 0)
     {
-        perror("socket");
+        perror("[common createSockets()] socket");
+        close(newSocks->tcp);
         goto fail;
     }
 
-    printf("createSockets: socket file descriptors created\n");
+    // create udp broadcast socket descriptor
+    newSocks->udpBroad = socket(AF_INET, SOCK_DGRAM, 0);
+    if (newSocks->udpBroad < 0)
+    {
+        perror("[common createSockets()] socket");
+        close(newSocks->tcp);
+        close(newSocks->udpDirect);
+        goto fail;
+    }
+
+    printf("[common createSockets()] socket file descriptors created\n");
     *socks = newSocks;
     return 0;
     fail:
@@ -69,7 +88,7 @@ int createEndpoint(Endpoint **endpt)
     Endpoint *newEndpt = malloc(sizeof(Endpoint));
     if (newEndpt == NULL)
     {
-        perror("createEndpoint malloc");
+        perror("[common createEndpoint()] malloc");
         return -1;
     }
 
