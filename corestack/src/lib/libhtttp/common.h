@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <string.h>
 
+#include "liblog.h"
+
 // known ports
 #define PORT_TCP 6700
 #define PORT_UDP_DIRECT 6701

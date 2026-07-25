@@ -6,19 +6,19 @@ int checkSockets(Sockets socks)
     int tcpActive = socks.tcp > 0 ? 1 : 0;
     if (tcpActive == 0)
     {
-        printf("[common checkSockets()] missing TCP socket\n");
+        LOG_E("[checkSockets()] missing TCP socket");
         return 0;
     }
     int udpDirectActive = socks.udpDirect > 0 ? 1 : 0;
     if (udpDirectActive == 0)
     {
-        printf("[checkSockets()] missing UDP direct socket\n");
+        LOG_E("[checkSockets()] missing UDP direct socket");
         return 0;
     }
     int udpBroadActive = socks.udpBroad > 0 ? 1 : 0;
     if (udpBroadActive == 0)
     {
-        printf("[checkSockets()] missing UDP broadcast socket\n");
+        LOG_E("[checkSockets()] missing UDP broadcast socket");
         return 0;
     }
     return 1;
@@ -27,9 +27,10 @@ int checkSockets(Sockets socks)
 // closes both socket fd
 int closeSockets(Sockets *socks)
 {
+    LOG_I("[closeSockets()] closing sockets...");
     if (checkSockets(*socks) == 0)
     {
-        printf("[common closeSockets()] sockets not created, no need to close\n");
+        LOG_E("[closeSockets()] sockets not created, no need to close");
         return -1;
     }
     close(socks->tcp);
@@ -38,13 +39,14 @@ int closeSockets(Sockets *socks)
     socks->udpDirect = -1;
     close(socks->udpBroad);
     socks->udpBroad = -1;
-    printf("[common closeSockets()] closed sockets\n");
+    LOG_I("[closeSockets()] closed sockets successfully");
     return 0;
 }
 
 // sets up socket fd for both
 int createSockets(Sockets **socks)
 {
+    LOG_I("[createSockets()] creating sockets...");
     // Create tcp socket descriptor 
     Sockets *newSocks = malloc(sizeof(Sockets)); 
     newSocks->tcp = socket(AF_INET, SOCK_STREAM, 0);
@@ -73,7 +75,7 @@ int createSockets(Sockets **socks)
         goto fail;
     }
 
-    printf("[common createSockets()] socket file descriptors created\n");
+    LOG_I("[createSockets()] socket file descriptors created");
     *socks = newSocks;
     return 0;
     fail:
@@ -85,6 +87,7 @@ int createSockets(Sockets **socks)
 // creates a new endpoint with sockets set up
 int createEndpoint(Endpoint **endpt)
 {
+    LOG_I("[createEndpoint()] creating Endpoint...");
     Endpoint *newEndpt = malloc(sizeof(Endpoint));
     if (newEndpt == NULL)
     {
@@ -99,13 +102,14 @@ int createEndpoint(Endpoint **endpt)
     // create new sockets
     if (createSockets(&newEndpt->socks) < 0)
     {
-        printf("createEndpoint: could not create sockets for endpoint\n");
+        LOG_E("[createEndpoint()] could not create sockets for endpoint");
         goto fail;
     }
 
     *endpt = newEndpt;
     return 0;
 
+    LOG_I("[createEndpoint()] endpoint created successfully");
     fail:
     free(newEndpt);
     return -1;
@@ -118,7 +122,7 @@ int closeEnpoint(Endpoint **endpt)
     // close sockets
     if (closeSockets(closingEndpt->socks) < 0)
     {
-        printf("closeEndpoint: could not close sockets\n");
+        LOG_E("[closeEndpoint()] could not close sockets");
         return -1;
     } 
     free(closingEndpt->socks);
@@ -127,6 +131,8 @@ int closeEnpoint(Endpoint **endpt)
     // free struct memeory
     free(closingEndpt);
     closingEndpt = NULL;
+    
+    LOG_I("[closeEndpoint()] endpoint closed successfully");
     
     return 0;
 }

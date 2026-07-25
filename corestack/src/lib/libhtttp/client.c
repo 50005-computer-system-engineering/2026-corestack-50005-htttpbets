@@ -5,7 +5,7 @@
 // private functions
 int connectOnTCP(Sockets *socks, char *serverIp)
 {
-    printf("connectToServer: Attempting connection to server at %s:%d...\n", serverIp, PORT_TCP);
+    LOG_I("[connectToServer()] Attempting connection to server at %s:%d...", serverIp, PORT_TCP);
     // sockaddr_in of server to connect to
     struct sockaddr_in serverAddr = {
         .sin_family = AF_INET,
@@ -13,16 +13,16 @@ int connectOnTCP(Sockets *socks, char *serverIp)
     };
     if (inet_pton(AF_INET, serverIp, &serverAddr.sin_addr) < 0) 
     {
-        perror("connectToServer inet_pton");
+        perror("[client connectToServer()] inet_pton");
         return -1;
     }
     int serverFd = connect(socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
     if (serverFd < 0) 
     {
-        perror("connectToServer connect");
+        perror("[client connectToServer()] connect");
         return -1;
     }
-    printf("connectToServer: connection to server success\n");
+    LOG_I("[client connectToServer()] connection to server success");
     return serverFd;
 }
 
@@ -35,11 +35,11 @@ int createClient(LibhtttpClient **clientPtr)
     // create endpoint
     if (createEndpoint(&newClient) < 0)
     {
-        printf("client: could not create endpoint struct for client\n");
+        LOG_E("client: could not create endpoint struct for client");
         return -1;
     }
 
-    printf("libhtttp/client createClient: new client created\n");
+    LOG_I("[createClient()] new client created");
     *clientPtr = newClient;
     return 0;
 }
@@ -49,23 +49,25 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 {
     Endpoint *thisClient = clientPtr;
 
+    LOG_I("[client joinLobby()] attempting connection to lobby located at IP %s", ipAddress);
     if (createSockets(&thisClient->socks) < 0)
     {
-        printf("libhtttp/client createClient: socket creation failed\n");
+        LOG_E("libhtttp/client createClient: socket creation failed");
         return -1;
     }
 
     if (connectOnTCP(thisClient->socks, ipAddress) < 0)
     {
-        printf("libhtttp/client joinLobby: failed to connect to server at IP\n");
+        LOG_E("libhtttp/client joinLobby: failed to connect to server at IP");
         return -1;
     }
 
-    if (registerWithServer(thisClient))
+    if (registerWithServer(thisClient) < 0)
     {
-        printf("libhtttp/client joinLobby: failed to register\n");
+        LOG_E("[joinLobby()] failed to register new client");
         return -1;
     }
+    LOG_I("[joinLobby()] lobby joining complete");
     return 0;
 }
 
@@ -92,11 +94,11 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
     // send via socket
     if (sendMessage(thisClient->socks->tcp, msg) < 0)
     {
-        printf("sendAsClient: sending has failed\n");
+        LOG_E("[sendAsClient()] sending has failed");
         goto fail;
     }
 
-    printf("sendAsClient: message has been sent\n");
+    LOG_I("[sendAsClient()] message has been sent");
 
     return 0;
 
