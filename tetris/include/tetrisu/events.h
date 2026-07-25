@@ -1,5 +1,3 @@
-/* FOR EVENT BUS; PAYLOADS AND EVENTS */
-
 #ifndef TETRISU_EVENTS_H
 #define TETRISU_EVENTS_H
 
@@ -20,7 +18,7 @@ typedef struct
     uint32_t lines;         // How much damage
 } AttackPayload;
 
-// Test Network Routing
+// Network Routing
 void on_attack_generated(void *args);
 
 #endif

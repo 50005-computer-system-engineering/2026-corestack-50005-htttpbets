@@ -32,17 +32,18 @@ void cycleManualTarget(GameState *attacker, GameState *all_players[], int total_
     }
 }
 
-// Resolve and return correct target ID based on attacker's mode
+// Resolve and return correct target ID based on attacker's target mode
 uint32_t resolveTargetID(GameState *attacker, GameState *all_players[], int total_players)
 {
     switch (attacker->target_mode)
     {
     case TARGET_RANDOM:
     {
-        uint32_t candidates[total_players];
+        uint32_t candidates[total_players]; // To hold valid target IDs
         int count = 0;
         for (int i = 0; i < total_players; i++)
         {
+            // Add all living opponents into candidates array
             if (all_players[i]->player_id != attacker->player_id && !all_players[i]->game_over)
             {
                 candidates[count++] = all_players[i]->player_id;
@@ -52,9 +53,9 @@ uint32_t resolveTargetID(GameState *attacker, GameState *all_players[], int tota
         {
             return attacker->player_id;
         }
-        return candidates[rand() % count];
+        return candidates[rand() % count]; // Select random candidate
     }
-    case TARGET_KO:
+    case TARGET_KO: // Search all active oponents to find who is closest to losing
         uint32_t target_id = attacker->player_id; // Fallback if no target id found
         uint32_t highest_garbage = 0;
         bool found_target = false;

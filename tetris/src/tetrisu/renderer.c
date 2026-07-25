@@ -13,8 +13,8 @@ void drawBoard(GameState *state)
     printf("                       \n");
 
     // For ghost piece
-    int ghostY = state->current.y;
-    while (isValidPos(state, state->current.type, state->current.rot, state->current.x, ghostY + 1))
+    int ghostY = state->current.y; // Start at active position
+    while (isValidPos(state, state->current.type, state->current.rot, state->current.x, ghostY + 1)) // Simulate gravity until returns false
     {
         ghostY++;
     }
@@ -30,11 +30,11 @@ void drawBoard(GameState *state)
             bool isActivePieceHere = false;
             bool isGhostPieceHere = false;
 
-            // Check if we are in the piece's 4x4 gridspace
+            // Check if coordinate (x, y) sits inside active piece 4x4 bounding box
             if (x >= state->current.x && x < state->current.x + 4 &&
                 y >= state->current.y && y < state->current.y + 4)
             {
-                // Translate the global board coordinate back to a local coordinates
+                // Translate the global board coordinates back to local coordinates
                 int px = x - state->current.x;
                 int py = y - state->current.y;
 
@@ -66,15 +66,15 @@ void drawBoard(GameState *state)
             }
             else if (state->board.cells[y][x] == 8)
             {
-                printf("><");
+                printf("><"); // Garbage Block
             }
             else if (state->board.cells[y][x] != 0)
             {
                 printf("##"); // Middle Layer: Locked blocks
             }
-            else if (isGhostPieceHere) // Ghost Piece
+            else if (isGhostPieceHere)
             {
-                printf("::");
+                printf("::"); // Ghost Piece
             }
             else
             {
@@ -82,7 +82,7 @@ void drawBoard(GameState *state)
             }
         }
 
-        // Draw the right wall
+        // Draw the right wall for pending garbage meter
         printf("<|> ");
         if (BOARD_HEIGHT - y <= state->pending_garbage)
         {

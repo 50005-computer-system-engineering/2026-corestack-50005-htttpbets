@@ -5,9 +5,10 @@
 #include "lib/libtetrisbrain/killfeed.h"
 #include "lib/libhtttp/client.h"
 
+// Instantiate libhtttp
 extern LibhtttpClient *network_client;
 
-// Test Network Routing
+// Network Routing
 void on_attack_generated(void *args)
 {
     // Arm the payload
@@ -25,7 +26,7 @@ void on_attack_generated(void *args)
         net_payload.target_player = htonl(attack->target_player);
         net_payload.lines = htonl(attack->lines);
 
-        // Send converted struct
+        // Send converted struct; net_payload casted to raw bytes and transmit size of attackpayload bytes
         sendAsClient(network_client, sizeof(AttackPayload), (unsigned char *)&net_payload);
     }
 }

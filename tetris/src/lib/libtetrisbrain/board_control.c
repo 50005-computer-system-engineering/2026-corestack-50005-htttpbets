@@ -2,7 +2,8 @@
 
 #pragma region Piece Control
 const int tetrominoes[7][16] = {
-    // 7 pieces, 4X4 bounding box = 16 individual cells
+    // Read-only 2D array => 7 pieces, 4x4 grid flattened into 1D list of numbers (16)
+    // 1: solid piece, 0: empty space
     {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}, // I
     {0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0}, // O
     {0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0}, // T
@@ -15,16 +16,16 @@ const int tetrominoes[7][16] = {
 // Convert 2D (x,y) coordinates into 1D index for array
 int getRotationIndex(int x, int y, Rotation rot)
 {
+    // Determine rotation state
     switch (rot)
     {
-    // Rotating the 4x4 grid
-    case ROT_0:
+    case ROT_0: // 0 degrees
         return x + (y * 4);
-    case ROT_1:
+    case ROT_1: // 90 degrees CW
         return 12 + y - (x * 4);
-    case ROT_2:
+    case ROT_2: // 180 degrees
         return 15 - (y * 4) - x;
-    case ROT_3:
+    case ROT_3: // 270 degrees CCW
         return 3 - y + (x * 4);
     default:
         return 0;
@@ -34,28 +35,31 @@ int getRotationIndex(int x, int y, Rotation rot)
 // Wall kick helper function
 bool testRotate(GameState *state, int nextRot)
 {
-    // { X offset, Y offset }
+    // { X offset, Y offset }; set of 5 coordinate offsets
+    // Rotate in place => Shift left by 1 cell => Shift right by 1 cell => Shift up by 1 cell => Shift up by 2 cells
     int kicks[5][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, -2}};
 
     for (int i = 0; i < 5; i++)
     {
-        // Add offset to current coordinates
+        // Add offset to current coordinates for both x and y coords
         int nx = state->current.x + kicks[i][0];
         int ny = state->current.y + kicks[i][1];
 
+        // Only rotate if the rotated position is valid
         if (isValidPos(state, state->current.type, nextRot, nx, ny))
         {
             // Apply the new coordinates and rotation
             state->current.x = nx;
             state->current.y = ny;
             state->current.rot = nextRot;
-
             // For t-spin detection
             state->last_action_rotation = true;
+
             return true;
         }
     }
-    return false; // Kicking failed, piece cannot rotate
+    // All 5 fail => rotation rejected
+    return false;
 }
 
 // Rotate clockwise logic
@@ -86,12 +90,11 @@ bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int po
     {
         for (int py = 0; py < 4; py++)
         {
-            int cellIndex = getRotationIndex(px, py, rot); // Fetch exact 1D index for current rotation
-            // If this part of the 4x4 box is empty, skip it
-            if (tetrominoes[shapeIndex][cellIndex] == 0)
+            int cellIndex = getRotationIndex(px, py, rot); // Get exact 1D index for current rotation
+            if (tetrominoes[shapeIndex][cellIndex] == 0)   // If this part of the 4x4 box is empty, do nothing
                 continue;
 
-            // Global Positions
+            // Convert local 4x4 grid to global x / y positions
             int boardX = posX + px;
             int boardY = posY + py;
 
@@ -101,12 +104,9 @@ bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int po
                 return false;
             }
             // Block Collision Check
-            if (boardY >= 0)
+            if (boardY >= 0 && state->board.cells[boardY][boardX] != 0)
             {
-                if (state->board.cells[boardY][boardX] != 0)
-                {
-                    return false;
-                }
+                return false;
             }
         }
     }
@@ -133,11 +133,12 @@ void lockPiece(GameState *state)
                 int boardX = state->current.x + px;
                 int boardY = state->current.y + py;
 
-                // Save final position onto the board
+                // Save final position onto the board (within bounds)
                 if (boardY >= 0 && boardY < BOARD_HEIGHT)
                 {
                     if (boardX >= 0 && boardX < BOARD_WIDTH)
                     {
+                        // Lock piece permanently onto the board grid
                         state->board.cells[boardY][boardX] = state->current.type;
                     }
                 }
@@ -146,47 +147,49 @@ void lockPiece(GameState *state)
     }
 }
 
-// Tetris !
+// Clear lines
 int clearLines(GameState *state)
 {
     // Collective counter for later use
     int linesCleared = 0;
 
     // Once line is cleared, drop above row
-    for (int y = BOARD_HEIGHT - 1; y >= 0; y--)
+    for (int y = BOARD_HEIGHT - 1; y >= 0; y--) // Check from bottom row up to row 0
     {
         // Checking if row is complete
         bool isFull = true;
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
+            // Empty space detected
             if (state->board.cells[y][x] == 0)
             {
                 isFull = false;
                 break;
             }
         }
-
+        // No empty space detected
         if (isFull)
         {
-            linesCleared++;
+            linesCleared++; // Increment counter
 
             // Shift everything above this row down by 1
-            for (int yy = y; yy > 0; yy--)
+            for (int yy = y; yy > 0; yy--) // Loop through all rows from cleared row up to row 1
             {
-                for (int xx = 0; xx < BOARD_WIDTH; xx++)
+                for (int xx = 0; xx < BOARD_WIDTH; xx++) // Loop across x axis
                 {
+                    // Shift content of one row above into current row
                     state->board.cells[yy][xx] = state->board.cells[yy - 1][xx];
                 }
             }
 
-            // Clear the very top row to 0
-            for (int xx = 0; xx < BOARD_WIDTH; xx++)
+            // Clear top row to 0
+            for (int xx = 0; xx < BOARD_WIDTH; xx++) // Loop across x axis
             {
-                state->board.cells[0][xx] = 0;
+                state->board.cells[0][xx] = 0; // Clear entire row
             }
 
             // Check again if newly formed line is full
-            y++;
+            y++; // Offset to check same row again
         }
     }
 
@@ -196,7 +199,7 @@ int clearLines(GameState *state)
         state->lines_cleared += linesCleared;
         state->score += linesCleared * 100; // Basic placeholder scoring
     }
-
+    // Update cleared count
     return linesCleared;
 }
 #pragma endregion

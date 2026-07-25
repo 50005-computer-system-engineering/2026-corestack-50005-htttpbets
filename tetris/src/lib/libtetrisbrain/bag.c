@@ -1,9 +1,7 @@
 #include "bag.h"
 #include <stdlib.h>
 
-// Fisher-Yates Shuffle
-// Iterate through the array backwards, for each position i it picks a random index j btwn 0 and i
-// Then swaps the elements => ensures uniform shuffling
+// Fisher-Yates Algorithm Helper
 void shuffleArray(int *array, int size)
 {
     for (int i = size - 1; i > 0; i--)
@@ -20,32 +18,36 @@ void refillBag(GameState *state)
 {
     for (int i = 0; i < 7; i++)
     {
-        state->bag[i] = state->bag[i + 7]; // Copy last 7 pieces and add to the first 7 slots
+        state->bag[i] = state->bag[i + 7]; // Copy last 7 pieces and replace the first 7 pieces
     }
 
-    int new_bag[7] = {1, 2, 3, 4, 5, 6, 7}; // Create new array representing the 7 shapes
-    shuffleArray(new_bag, 7);               // Uniform shuffle
+    int new_bag[7] = {1, 2, 3, 4, 5, 6, 7}; // Generate new bag with the 7 pieces
+    shuffleArray(new_bag, 7);               // Uniform shuffle using FYA
     for (int i = 0; i < 7; i++)
     {
-        state->bag[i + 7] = new_bag[i]; // Generate new 7 pieces and put to the back 7 slots
+        state->bag[i + 7] = new_bag[i]; // Add the new 7 pieces into the bag
     }
 
-    state->bag_index = 0; // Reset bag index to pull from front of array
+    state->bag_index = 0; // Reset pointer to track from start again
 }
 
 // Spawns a new piece
 void spawnNewPiece(GameState *state)
 {
-    // Draw next piece from the bag
-    state->current.type = state->bag[state->bag_index]; // bag_index keeps track of where we are in the bag
+    // Draw next piece from the bag then advance the pointer
+    // state->bag_index to specify index
+    // state->bag to select specified piece at specified index
+    // state->current.type to assign piece based on index and type
+    state->current.type = state->bag[state->bag_index];
     state->bag_index++;
 
-    // Only shuffle when bag is empty
+    // Top up the bag with new pieces once 7th piece is taken from the bag
     if (state->bag_index >= 7)
     {
         refillBag(state);
     }
 
+    // Set spawn variables
     state->current.rot = ROT_0;               // Default rotation
     state->current.x = (BOARD_WIDTH / 2) - 2; // Centered horizontally
     state->current.y = -2;                    // Top of the board (nudged it above to allow for top out collision checks)

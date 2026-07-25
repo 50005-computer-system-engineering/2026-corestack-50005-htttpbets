@@ -13,7 +13,7 @@ void holdPiece(GameState *state)
     // If not holding anything, store the piece and spawn a new one
     if (state->held_type == 0)
     {
-        state->held_type = state->current.type;
+        state->held_type = state->current.type; // Copy shape ID into hold slot
         spawnNewPiece(state);
     }
     else // Swap pieces
@@ -22,7 +22,7 @@ void holdPiece(GameState *state)
         state->current.type = state->held_type;
         state->held_type = temp;
 
-        // Reset piece to spawn at top of board
+        // Reset to spawn at top of board
         state->current.y = -2;
         state->current.x = BOARD_WIDTH / 2 - 2;
         state->current.rot = 0;

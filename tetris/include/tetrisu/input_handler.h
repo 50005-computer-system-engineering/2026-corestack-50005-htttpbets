@@ -3,7 +3,7 @@
 
 #include "lib/libtetrisbrain/state.h"
 
-// Process all pending terminal inputs
+// Process all terminal inputs
 void processInputs(GameState *state);
 
 #endif

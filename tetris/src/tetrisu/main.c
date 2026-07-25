@@ -56,7 +56,6 @@ static void updateGameTimers(GameState *state)
                 event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
                 state->outgoing_garbage = 0; // Reset after sending
             }
-
             // Reset env variables
             state->lock_timer = 0;
             state->gravity_timer = 0;

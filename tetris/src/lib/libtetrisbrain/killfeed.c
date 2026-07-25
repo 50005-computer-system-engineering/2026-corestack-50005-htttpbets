@@ -3,31 +3,36 @@
 #include "killfeed.h"
 
 // Internal State
-static KillFeedEntry feed[KILL_FEED_MAX];
+static KillFeedEntry feed[KILL_FEED_MAX]; // Fixed size array of entries
 // Circular Buffer
-static int feed_head = 0;  // Starting index
-static int feed_count = 0; // Counter for entries currently stored
+static int feed_head = 0;  // Starting index where the new event will be written
+static int feed_count = 0; // Counter to track how many active entries stored in the feed
 
 // Public Functions
 void addKillFeed(uint32_t source, uint32_t target, uint32_t lines)
 {
+    // Write attacker ID, target ID and attack line count into array slot at the feed head
     feed[feed_head].source_player = source;
     feed[feed_head].target_player = target;
     feed[feed_head].lines = lines;
 
-    feed_head = (feed_head + 1) % KILL_FEED_MAX; // Modulo Arithmetic
+    // Modulo Arithmetic to move feed head to the next slot
+    // Wraps around back to 0 if buffer is full to overwrite the oldest entry
+    feed_head = (feed_head + 1) % KILL_FEED_MAX;
+    // Increment counter until max
     if (feed_count < KILL_FEED_MAX)
     {
         feed_count++;
     }
 }
 
+// Print banner visuals
 void drawKillFeed(void)
 {
     printf("                                           \n");
     printf("\n  <!> BATTLE LOG <!>\n");
     printf("  =========================================\n");
-    // From oldest to newest
+    // Iterate from oldest to newest
     for (int i = 0; i < feed_count; i++)
     {
         // Go to oldest entry, print to newest entry
@@ -36,7 +41,7 @@ void drawKillFeed(void)
         printf("  \e[36mPlayer %u\e[0m sent \e[31m%u lines\e[0m to \e[33mPlayer %u\e[0m!\n", entry->source_player, entry->lines, entry->target_player);
     }
 
-    // Padding so the terminal does not move around
+    // Padding the terminal
     for (int i = feed_count; i < KILL_FEED_MAX; i++)
     {
         printf("                                           \n");

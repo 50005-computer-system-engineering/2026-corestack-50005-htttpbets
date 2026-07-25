@@ -41,7 +41,7 @@ typedef struct
     int game_over;
 } GameState;
 
-// Spawn game state(s)
+// Establish game state
 extern GameState gamestate_p1;
 
 // Function call to start the game

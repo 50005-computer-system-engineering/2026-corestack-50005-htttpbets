@@ -1,5 +1,6 @@
 #ifndef TETRISBRAIN_MOVEMENT_H
 #define TETRISBRAIN_MOVEMENT_H
+
 #include <stdbool.h>
 #include "state.h"
 

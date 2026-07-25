@@ -19,10 +19,10 @@ int main(void)
     }
     printf("[tetrisd] Server created successfully! Waiting for connections...\n");
 
-    // Create lobby
+    // Create lobby and assign player IDs
     uint32_t lobbySize = LOBBY_SIZE;
     uint32_t *clientIds = NULL;
-    if (openLobby(server, &lobbySize, &clientIds) < 0)
+    if (openLobby(server, &lobbySize, &clientIds) < 0) // Blocking server call, waits until lobby is filled
     {
         printf("[tetrisd] Could not create lobby!\n");
         return -1;
@@ -43,9 +43,9 @@ int main(void)
     {
         if (clientIds[i] > maxId) maxId = clientIds[i];
     }
-    uint32_t *heldGarbage = calloc(maxId + 1, sizeof(uint32_t));
-    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool));
-    if (heldGarbage == NULL || isValidPlayer == NULL)
+    uint32_t *heldGarbage = calloc(maxId + 1, sizeof(uint32_t)); // Store pending garbage accumulated for each player ID
+    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool)); // To check if target player ID is connected
+    if (heldGarbage == NULL || isValidPlayer == NULL) // Failed
     {
         printf("[tetrisd] Failed to allocate player tracking!\n");
         free(clientIds);
@@ -55,9 +55,9 @@ int main(void)
     }
     for (uint32_t i = 0; i < lobbySize; i++)
     {
-        isValidPlayer[clientIds[i]] = true;
+        isValidPlayer[clientIds[i]] = true; // Mark connected player IDs as valid
     }
-    free(clientIds);
+    free(clientIds); // Clean up once lookup mask is populated
 
     // Signal listening for events
     printf("[tetrisd] Both clients connected! Awaiting events...\n");
@@ -66,7 +66,7 @@ int main(void)
     unsigned char *buffer = NULL;
     uint32_t source_id = 0;
 
-    // Continuous listening loop
+    // Continuous listening loop; blocking
     while (listenForClientMsg(server, &source_id, &buffer) == 0)
     {
         // Cast the raw byte buffer back into our struct
@@ -80,12 +80,12 @@ int main(void)
         // Logging
         printf(" <!> EVENT ROUTED: libhtttp Client %u (In-Game P%u) attacked P%u with %u lines!\n", source_id, real_source, real_target, real_lines);
 
-        if (real_target <= maxId && isValidPlayer[real_target])
+        if (real_target <= maxId && isValidPlayer[real_target]) // Validates that target player ID exists and actively connected
         {
-            heldGarbage[real_target] += real_lines;
+            heldGarbage[real_target] += real_lines; // Add incoming garbage into the target's server side garbage queue
             printf("-> [Server] Holding garbage for Target P%u: %u lines total (Broadcast pending future update)\n\n", real_target, heldGarbage[real_target]);
         }
-        else
+        else // Target disconnected or DNE; logs warning and discards
         {
             printf("-> [Server] WARNING: target P%u is not a connected player, discarding %u lines\n\n", real_target, real_lines);
         }
@@ -95,7 +95,7 @@ int main(void)
         buffer = NULL;
     }
 
-    // Clean
+    // Clean up
     free(heldGarbage);
     free(isValidPlayer);
 

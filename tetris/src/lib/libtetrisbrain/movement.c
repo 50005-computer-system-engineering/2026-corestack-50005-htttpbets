@@ -34,14 +34,13 @@ bool softDrop(GameState *state)
     return false;
 }
 
-int hardDrop(GameState *state)
+bool hardDrop(GameState *state)
 {
-    int rows = 0;
     while (isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1))
     {
         state->current.y++;
         state->last_action_rotation = false;
-        rows++;
+        return true;
     }
-    return rows;
+    return false;
 }
