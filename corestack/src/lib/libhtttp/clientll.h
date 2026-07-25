@@ -19,6 +19,7 @@ typedef struct {
 int addToList(ClientLinkedList *list, Endpoint *client);
 int removeFromList(ClientLinkedList *list, uint32_t id);
 int getFromList(ClientLinkedList *list, Endpoint **client, uint32_t id);
+int getIdArray(ClientLinkedList *list, uint32_t **ids);
 int freeList(ClientLinkedList **listToFree);
 
 #endif

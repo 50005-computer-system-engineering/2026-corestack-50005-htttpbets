@@ -80,6 +80,7 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
         printf("[clientll getFromList()] list is empty, nothing to remove\n");
         return -1;
     }
+
     // check every next node until new 
     ClientNode *checking = NULL;
     checking = list->head;
@@ -101,6 +102,29 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
     found:
     *returnClient = &checking->client;
     printf("[clientll getFromList()] client assigned to return buffer\n");
+    return 0;
+}
+
+int getIdArray(ClientLinkedList *list, uint32_t **ids)
+{
+    // check for empty list
+    printf("[clientll getIdArray()] creating id array from client linked list...\n");
+    if (list->head == NULL)
+    {
+        printf("[clientll getIdArray()] list is empty, nothing to remove\n");
+        return -1;
+    }
+    // allocate space
+    *ids = malloc(sizeof(uint32_t) * list->count);
+    // iterate until NULL
+    uint32_t *currentId = *ids;
+    ClientNode *currentNode = list->head;
+    do {
+        *currentId = currentNode->client.id;
+        currentNode = currentNode->next;
+        currentId++;
+    } while(currentNode != NULL);
+    printf("[clientll getIdArray()] id array creation complete\n");
     return 0;
 }
 

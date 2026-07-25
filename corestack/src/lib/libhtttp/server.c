@@ -115,7 +115,7 @@ int createServer(LibhtttpServer **serverPtr)
     return -1;
 }
 
-int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
+int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds)
 {
     // check parameters
     if (serverPtr == NULL)
@@ -123,7 +123,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         printf("[server openLobby()] serverPtr has no server allocated\n");
         return -1;
     }
-    if (lobbySize < 1)
+    if (*lobbySize < 1)
     {
         printf("[server openLobby()] lobbySize is required to be at least 1\n");
         return -1;
@@ -160,7 +160,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
 
     // start accepting clients for TCP connections
     uint8_t slot = 1;   // ID 0 is reserved for server
-    while (thisServer->clients->count < lobbySize && slot != UINT32_MAX)
+    while (thisServer->clients->count < *lobbySize && slot != UINT32_MAX)
     {
         // blocks until client connects
         int clientFd = acceptOnTCP(thisServer);
@@ -169,7 +169,7 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
             printf("[server openLobby()] accept failed to find client, skipping loop iteration...\n");
             continue;
         }
-        printf("[server openLobby()] accept succses, adding new client to slot %u/%u...\n", slot, lobbySize);
+        printf("[server openLobby()] accept succses, adding new client to slot %u/%u...\n", slot, *lobbySize);
         
         // creating client endpoint of newly connected client
         Endpoint newClient = {
@@ -200,6 +200,14 @@ int openLobby(LibhtttpServer *serverPtr, uint8_t lobbySize)
         // stack variable, cleared automatically I think
         continue;
     } // TODO implement halting lobby joining
+
+    // return a list of players
+    *lobbySize = thisServer->clients->count;
+    if (getIdArray(thisServer->clients, clientIds) < 0)
+    {
+        printf("[server openLobby()] failed to write list of client ids\n");
+        return -1;
+    }
 
     printf("[server openLobby()] Lobby opening complete\n");
     return 0;
