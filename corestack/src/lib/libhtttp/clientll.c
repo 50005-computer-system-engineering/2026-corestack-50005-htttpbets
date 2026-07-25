@@ -5,14 +5,14 @@ int addToList(ClientLinkedList *list, Endpoint *client)
     // list might be full (unlikely)
     if (list->count == UINT32_MAX)
     {
-        printf("[clientll addToList()] list is somehow full, failed to add\n");
+        LOG_E("[addToList()] list is somehow full, failed to add");
         return -1;
     }
     ClientNode *slot = NULL;
     // case where list is empty
     if (list->head == NULL)
     {
-        printf("[clientll addToList()] list is empty, creating new head\n");
+        LOG_D("[addToList()] list is empty, creating new head");
         list->head = malloc(sizeof(ClientNode));
         // new client node with new client
         slot = list->head;
@@ -20,7 +20,7 @@ int addToList(ClientLinkedList *list, Endpoint *client)
     // case where list is populated
     else
     {
-        printf("[clientll addToList()] list is populated, finding next available slot\n");
+        LOG_D("[addToList()] list is populated, finding next available slot");
         // find next available slot
         ClientNode *lastSlot = list->head;
         while (lastSlot->next != NULL)
@@ -35,16 +35,16 @@ int addToList(ClientLinkedList *list, Endpoint *client)
     slot->client = *client;
     list->count++;
     // update 
-    printf("[clientll addToList()] new client added to list, list now has %u clients\n", list->count);
+    LOG_I("[clientll addToList()] new client added to list, list now has %u clients", list->count);
     return 0;
 }
 
 int removeFromList(ClientLinkedList *list, uint32_t id)
 {
-    // check for emply list
+    // check for empty list
     if (list->head == NULL)
     {
-        printf("[clientll removeFromList()] list is empty, nothing to remove\n");
+        LOG_E("[removeFromList()] list is empty, nothing to remove");
         return -1;
     }
     // check every next node until new 
@@ -62,10 +62,10 @@ int removeFromList(ClientLinkedList *list, uint32_t id)
             goto removal;
         }
     }
-    printf("[clientll removeFromList()] id could not be matched in list\n");
+    LOG_E("[removeFromList()] id could not be matched in list");
     return -1;
     removal:
-        printf("[clientll removeFromList()] matching client found\n");
+        LOG_I("[removeFromList()] matching client found");
         ClientNode *removedNode = checking->next;
         checking->next = checking->next->next;
         free(removedNode);
@@ -77,7 +77,7 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
     // check for emply list
     if (list->head == NULL)
     {
-        printf("[clientll getFromList()] list is empty, nothing to remove\n");
+        LOG_E("[getFromList()] list is empty, nothing to remove");
         return -1;
     }
 
@@ -89,29 +89,29 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
         // match id
         if (checking->client.id == id)
         {
-            printf("[clientll getFromList()] id matched, breaking search\n");
+            LOG_E("[getFromList()] id matched, breaking search");
             goto found;
         }
         checking = checking->next;
     }
-    printf("[clientll getFromList()] id could not be matched in list\n");
+    LOG_E("[getFromList()] id could not be matched in list");
     *returnClient = malloc(sizeof(1));
     return -1;
 
     // return struct through pointer
     found:
     *returnClient = &checking->client;
-    printf("[clientll getFromList()] client assigned to return buffer\n");
+    LOG_I("[getFromList()] client assigned to return buffer");
     return 0;
 }
 
 int getIdArray(ClientLinkedList *list, uint32_t **ids)
 {
     // check for empty list
-    printf("[clientll getIdArray()] creating id array from client linked list...\n");
+    LOG_I("[getIdArray()] creating id array from client linked list...");
     if (list->head == NULL)
     {
-        printf("[clientll getIdArray()] list is empty, nothing to remove\n");
+        LOG_E("[getIdArray()] list is empty, nothing to remove");
         return -1;
     }
     // allocate space
@@ -124,7 +124,7 @@ int getIdArray(ClientLinkedList *list, uint32_t **ids)
         currentNode = currentNode->next;
         currentId++;
     } while(currentNode != NULL);
-    printf("[clientll getIdArray()] id array creation complete\n");
+    LOG_I("[getIdArray()] id array creation complete");
     return 0;
 }
 
@@ -134,7 +134,7 @@ int freeList(ClientLinkedList **listToFree)
     ClientLinkedList *list = *listToFree;
     if (list->head == NULL)
     {
-        printf("[clientll freeList()] list is empty, freeing pointer\n");
+        LOG_E("[freeList()] list is empty, freeing pointer");
         goto freeing;
     }
     // loop through and free individual endpoints (also closing the socks)
@@ -148,16 +148,18 @@ int freeList(ClientLinkedList **listToFree)
         // {
         next = current->next;
         // }
-        printf("[clientll freeList()] removing ClientNode for client %u\n", current->client.id);
+        LOG_D("[freeList()] removing ClientNode for client %u", current->client.id);
         // free current ClientNode
         free(current);
         current = NULL;
     // continue if there is still a next node
     } while (next != NULL);
-    printf("[clientll freeList()] all ClientNodes freed\n");
+    LOG_D("[freeList()] all ClientNodes freed, ready to free list");
     // free ClientLinkedList struct
     freeing:
     free(list);
     list = NULL;
+    LOG_I("[freeList()] list has been freed");
+
     return 0;
 }
