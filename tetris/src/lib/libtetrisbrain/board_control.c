@@ -197,6 +197,7 @@ int clearLines(GameState *state)
     if (linesCleared > 0)
     {
         state->lines_cleared += linesCleared;
+        state->level = (state->lines_cleared / 10) + 1; // Basic level progression
         state->score += linesCleared * 100; // Basic placeholder scoring
     }
     // Update cleared count
