@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <arpa/inet.h>
 #include "lib/libhtttp/server.h"
 #include "tetrisu/events.h"
+
+#define LOBBY_SIZE 2
 
 int main(void)
 {
@@ -17,12 +20,44 @@ int main(void)
     printf("[tetrisd] Server created successfully! Waiting for connections...\n");
 
     // Create lobby
-    if (openLobby(server, 2) < 0)
+    uint32_t lobbySize = LOBBY_SIZE;
+    uint32_t *clientIds = NULL;
+    if (openLobby(server, &lobbySize, &clientIds) < 0)
     {
         printf("[tetrisd] Could not create lobby!\n");
         return -1;
     }
-    printf("[tetrisd] Lobby created successfully!\n");
+    printf("[tetrisd] Lobby created successfully! %u player(s) connected:", lobbySize);
+    // Print all layers for tracking purposes
+    for (uint32_t i = 0; i < lobbySize; i++)
+    {
+        printf(" P%u", clientIds[i]);
+    }
+    printf("\n");
+
+    // Per-player garbage accumulator based on player IDs
+    // lookup table to mark which IDs are connected
+    // player - 0 is for the server, not a valid target
+    uint32_t maxId = 0;
+    for (uint32_t i = 0; i < lobbySize; i++)
+    {
+        if (clientIds[i] > maxId) maxId = clientIds[i];
+    }
+    uint32_t *heldGarbage = calloc(maxId + 1, sizeof(uint32_t));
+    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool));
+    if (heldGarbage == NULL || isValidPlayer == NULL)
+    {
+        printf("[tetrisd] Failed to allocate player tracking!\n");
+        free(clientIds);
+        free(heldGarbage);
+        free(isValidPlayer);
+        return -1;
+    }
+    for (uint32_t i = 0; i < lobbySize; i++)
+    {
+        isValidPlayer[clientIds[i]] = true;
+    }
+    free(clientIds);
 
     // Signal listening for events
     printf("[tetrisd] Both clients connected! Awaiting events...\n");
@@ -44,12 +79,25 @@ int main(void)
 
         // Logging
         printf(" <!> EVENT ROUTED: libhtttp Client %u (In-Game P%u) attacked P%u with %u lines!\n", source_id, real_source, real_target, real_lines);
-        printf("-> [Server] Holding garbage for Target P%u (Broadcast pending future update)\n\n", real_target);
+
+        if (real_target <= maxId && isValidPlayer[real_target])
+        {
+            heldGarbage[real_target] += real_lines;
+            printf("-> [Server] Holding garbage for Target P%u: %u lines total (Broadcast pending future update)\n\n", real_target, heldGarbage[real_target]);
+        }
+        else
+        {
+            printf("-> [Server] WARNING: target P%u is not a connected player, discarding %u lines\n\n", real_target, real_lines);
+        }
         
         // Free and clear buffer
         free(buffer);
         buffer = NULL;
     }
+
+    // Clean
+    free(heldGarbage);
+    free(isValidPlayer);
 
     printf("[tetrisd] Client disconnected or error occurred. Shutting down.\n");
     return 0;
