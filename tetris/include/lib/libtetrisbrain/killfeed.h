@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Max entries in the kill feed
-#define KILL_FEED_MAX 6
+#define KILL_FEED_MAX 4
 
 // A single attack log entry
 typedef struct

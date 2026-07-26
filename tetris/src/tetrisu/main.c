@@ -77,6 +77,9 @@ static void updateGameTimers(GameState *state)
 // --- MAIN GAME LOOP ---
 int main()
 {
+    // PATCH FIX FOR FLICKERING TERMINAL
+    setvbuf(stdout, NULL, _IOFBF, 16384);
+
     // Clear terminal screen
     printf("\e[1;1H\e[2J");
     fflush(stdout);
