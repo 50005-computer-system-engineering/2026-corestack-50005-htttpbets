@@ -2,7 +2,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #define MIN_MAP_WIDTH 10
+#define EMPTY_CHANCE 20 // % chance for empty tiles remain empty
+#define WALL_CHANCE 20 // % chance for empty tiles to be walls
 
 int map_size = MIN_MAP_WIDTH;
 TileType** map;
@@ -110,9 +113,9 @@ void map_generate(int num_players) {
         for (int j = 0; j < map_size; ++j) {
             if ((int)map[i][j] == -1) {
                 int rng = rand() % 100;
-                if (rng < 20)
+                if (rng < EMPTY_CHANCE)
                     map[i][j] = EMPTY;
-                else if (rng < 40)
+                else if (rng < EMPTY_CHANCE + WALL_CHANCE)
                     map[i][j] = WALL;
                 else
                     map[i][j] = BREAKABLE;
