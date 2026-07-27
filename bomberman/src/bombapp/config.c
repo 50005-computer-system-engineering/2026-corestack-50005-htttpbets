@@ -10,12 +10,14 @@ const Config CONFIG = {
         .MOVE_DOWN = KEY_S,
         .MOVE_LEFT = KEY_A,
         .MOVE_RIGHT = KEY_D,
+        .SPRINT = KEY_LEFT_SHIFT,
         .BOMB = KEY_SPACE,
         .EXIT = KEY_ESCAPE
     },
 
     .PHYSICS = {
-        .PLAYER_SPEED = 300.0f
+        .PLAYER_SPEED = 400.0f,
+        .PLAYER_SPRINT_SPEED = 650.0f
     },
     
     .ASSETS = {

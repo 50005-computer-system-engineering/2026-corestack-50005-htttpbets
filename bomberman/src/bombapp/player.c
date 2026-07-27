@@ -14,6 +14,8 @@ Spritesheet* curr_sprite;
 Spritesheet stand_sprites[4]; // Follows direction index
 Spritesheet walk_sprites[4];
 
+float active_speed;
+
 void on_move_performing(void *args) {
     MoveEventArgs *a = (MoveEventArgs *)args;
 
@@ -23,8 +25,8 @@ void on_move_performing(void *args) {
 
     // Update position
     // Note that up is negative, hence -=
-    player_position.x += moveVec.x * CONFIG.PHYSICS.PLAYER_SPEED * GetFrameTime();
-    player_position.y -= moveVec.y * CONFIG.PHYSICS.PLAYER_SPEED * GetFrameTime();
+    player_position.x += moveVec.x * active_speed * GetFrameTime();
+    player_position.y -= moveVec.y * active_speed * GetFrameTime();
 
     // Update direction
     if (a->y > 0) // Up (highest prio)
@@ -47,6 +49,11 @@ void on_move_released(void *args) {
     curr_sprite = &stand_sprites[direction];
 }
 
+void on_sprint_toggled(void *args) {
+    SprintEventArgs *a = (SprintEventArgs *)args;
+    active_speed = a->toggled ? CONFIG.PHYSICS.PLAYER_SPRINT_SPEED : CONFIG.PHYSICS.PLAYER_SPEED;
+}
+
 void player_init() {
     // Init Spritesheets
     for (int i = 0; i < 4; i++) {
@@ -57,10 +64,12 @@ void player_init() {
     // Initial sprite is facing down
     curr_sprite = &stand_sprites[1];
     direction = 1;
+    active_speed = CONFIG.PHYSICS.PLAYER_SPEED;
 
     // Listen for input
     event_bus_listen(EVENT_INPUT_MOVE_PERFORMING, on_move_performing);
     event_bus_listen(EVENT_INPUT_MOVE_RELEASED, on_move_released);
+    event_bus_listen(EVENT_INPUT_SPRINT_CHANGED, on_sprint_toggled);
 }
 
 void player_update() {

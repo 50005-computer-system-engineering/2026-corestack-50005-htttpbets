@@ -9,6 +9,7 @@ typedef struct {
     const int MOVE_DOWN;
     const int MOVE_LEFT;
     const int MOVE_RIGHT;
+    const int SPRINT;
     const int BOMB;
     const int EXIT;
 } Keybindings;
@@ -22,6 +23,8 @@ typedef struct {
 
 typedef struct {
     const float PLAYER_SPEED;
+    const float PLAYER_SPRINT_SPEED;
+    const float TILE_SIZE;
 } Physics;
 
 typedef struct {
