@@ -6,15 +6,19 @@
 #include "input.h"
 #include "player.h"
 #include "audio.h"
-#include "lib/libbombbrain/map.h"
+#include "tiles.h"
 
 void initalise() {
     // Initialise event bus
     event_bus_init(EVENT_COUNT);
 
+    // Init map
+    tiles_init();
+
     // Initialise player
     player_init();
 
+    // Init Camera after player
     camera_init(player_getpos());
 
     // Initialise audio
@@ -23,7 +27,6 @@ void initalise() {
     // Start playing battle music
     play_bgm(BGM_BATTLE);
 
-    map_generate(4);
 }
 
 void update_loop() {
@@ -42,16 +45,15 @@ void update_loop() {
 
 void draw_loop() {
     BeginDrawing();
-    ClearBackground(DARKGREEN);
+    ClearBackground(SKYBLUE);
 
     // World-Space Renders
     BeginMode2D(camera);
-        DrawText("Hello, World!", 190, 200, 20, BLACK);
+        tiles_draw();
         player_draw();
     EndMode2D();
 
     // Static UI Renders
-
     EndDrawing();
 }
 
@@ -59,13 +61,14 @@ void cleanup() {
     // Free event bus
     event_bus_free();
 
+    // Free map
+    tiles_cleanup();
+
     // Free player
     player_cleanup();
 
     // Free bgm & sfx
     audio_cleanup();
-
-    map_free();
 }
 
 
@@ -75,12 +78,12 @@ int main() {
     ChangeDirectory(GetApplicationDirectory()); 
     
     // TODO: Uncomment during final release for fullscreen mode
-    // SetConfigFlags(FLAG_FULLSCREEN_MODE);
-    // InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
-    // SetExitKey(KEY_NULL); // Prevent exit via escape key
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
+    SetExitKey(KEY_NULL); // Prevent exit via escape key
     
     // Windowed mode for debugging purposes
-    InitWindow(600, 400, "Bombs Away! \U0001F4A3");
+    //InitWindow(600, 400, "Bombs Away! \U0001F4A3");
     SetTargetFPS(60);
 
     initalise();

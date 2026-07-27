@@ -16,6 +16,7 @@ const Config CONFIG = {
     },
 
     .PHYSICS = {
+        .TILE_SIZE = 120.0f,
         .PLAYER_SPEED = 400.0f,
         .PLAYER_SPRINT_SPEED = 650.0f
     },
@@ -63,6 +64,13 @@ const Config CONFIG = {
             .path = "../../assets/sprites/Bomber_Win.png",
             .cols = 12, .rows = 1, .scale = player_scale, .fps = player_fps, .should_loop = true
         },
+
+        .TILE_EMPTY = "../../assets/tiles/Tile_Grass.png",
+        .TILE_BREAKABLE = "../../assets/tiles/Tile_Breakable.png",
+        .TILE_WALL = "../../assets/tiles/Tile_Unbreakable.png",
+        .TILE_BOMB = "../../assets/tiles/Bomb.png",
+        .TILE_POWERUP_BOMB = "../../assets/tiles/Powerup_Bomb.png",
+        .TILE_POWERUP_FIRE = "../../assets/tiles/Powerup_Fire.png",
     },
 
     .SETTINGS = {

@@ -128,8 +128,6 @@ void map_generate(int num_players) {
             }
         }
     }
-
-    map_debugprint();
 }
 
 void map_free() {
