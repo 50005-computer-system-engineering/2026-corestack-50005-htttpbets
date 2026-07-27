@@ -2,10 +2,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h> 
 
 #define MIN_MAP_WIDTH 10
 #define EMPTY_CHANCE 20 // % chance for empty tiles remain empty
-#define WALL_CHANCE 20 // % chance for empty tiles to be walls
+#define WALL_CHANCE 30 // % chance for empty tiles to be walls
 
 int map_size = MIN_MAP_WIDTH;
 TileType** map;
@@ -108,14 +109,19 @@ void map_generate(int num_players) {
     free(spawns);
 
     // (4) Assign random tiles for remaining spaces
-    // 20% Empty, 20% Indestructible, 60% Breakable
+    // 20% Empty, 30% Indestructible, 50% Breakable
+    srand(time(NULL)); // Seed random number generator
     for (int i = 0; i < map_size; ++i) {
         for (int j = 0; j < map_size; ++j) {
             if ((int)map[i][j] == -1) {
                 int rng = rand() % 100;
                 if (rng < EMPTY_CHANCE)
                     map[i][j] = EMPTY;
-                else if (rng < EMPTY_CHANCE + WALL_CHANCE)
+                // Spawning wall: We don't want to "block in" players, 
+                // so prevent walls from spawning directly next to border
+                else if (rng < EMPTY_CHANCE + WALL_CHANCE 
+                    && i > 1 && i < inner_size - 1
+                    && j > 1 && j < inner_size - 1)
                     map[i][j] = WALL;
                 else
                     map[i][j] = BREAKABLE;
