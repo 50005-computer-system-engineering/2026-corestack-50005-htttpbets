@@ -4,6 +4,7 @@
 #include "events.h"
 #include "input.h"
 #include "player.h"
+#include "audio.h"
 
 void initalise() {
     // Initialise event bus
@@ -11,9 +12,18 @@ void initalise() {
 
     // Initialise player
     player_init();
+
+    // Initialise audio
+    audio_init();
+
+    // Start playing battle music
+    play_bgm(BGM_BATTLE);
 }
 
 void update_loop() {
+    // Update audio
+    audio_update();
+
     // Update input
     input_update();
 
@@ -37,6 +47,9 @@ void cleanup() {
 
     // Free player
     player_cleanup();
+
+    // Free bgm & sfx
+    audio_cleanup();
 }
 
 

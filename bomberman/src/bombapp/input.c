@@ -4,6 +4,7 @@
 #include "config.h"
 #include "input.h"
 #include "events.h"
+#include "audio.h"
 
 void input_update(void) {
     // If either movement keys are pressed, we want to broadcast movement state
@@ -27,8 +28,10 @@ void input_update(void) {
     }
 
     // Bomb Placement
-    if (IsKeyPressed(CONFIG.KEYS.BOMB))
+    if (IsKeyPressed(CONFIG.KEYS.BOMB)) {
         event_bus_trigger(EVENT_INPUT_BOMB_PRESSED, NULL);
+        play_sound(SFX_PLACEBOMB);
+    }
 
     // Exit Pressed
     // TODO: Gate for Host vs Client

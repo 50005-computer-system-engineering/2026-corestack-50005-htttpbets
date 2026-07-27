@@ -13,6 +13,7 @@ typedef struct {
     const int EXIT;
 } Keybindings;
 
+// Asset paths
 typedef struct {
     const SpritesheetAsset PLAYER_STAND[4]; // Up, Down, Left, Right
     const SpritesheetAsset PLAYER_WALK[4]; // Up, Down, Left, Right
@@ -24,9 +25,15 @@ typedef struct {
 } Physics;
 
 typedef struct {
+    const float MUSIC_VOLUME;
+    const float SFX_VOLUME;
+} DefaultSettings;
+
+typedef struct {
     Keybindings KEYS;
     Assets ASSETS;
     Physics PHYSICS;
+    DefaultSettings SETTINGS;
 } Config;
 
 // Single global instance

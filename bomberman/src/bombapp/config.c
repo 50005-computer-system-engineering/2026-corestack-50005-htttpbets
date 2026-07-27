@@ -17,7 +17,7 @@ const Config CONFIG = {
     .PHYSICS = {
         .PLAYER_SPEED = 300.0f
     },
-
+    
     .ASSETS = {
         .PLAYER_STAND = {
             (SpritesheetAsset){
@@ -61,5 +61,10 @@ const Config CONFIG = {
             .path = "../../assets/sprites/Bomber_Win.png",
             .cols = 12, .rows = 1, .scale = player_scale, .fps = player_fps, .should_loop = true
         },
+    },
+
+    .SETTINGS = {
+        .MUSIC_VOLUME = 0.7f,
+        .SFX_VOLUME = 1.0f
     }
 };
