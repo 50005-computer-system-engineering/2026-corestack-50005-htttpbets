@@ -3,6 +3,14 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+// Suppress GCC/Clang compiler from throwing warnings when certain functions aren't used
+// Does nothing if for some reason we're not using a compiler that supports this
+#ifdef __GNUC__
+#define IGNORE_UNUSED __attribute__((unused))
+#else
+#define IGNORE_UNUSED
+#endif
+
 // Macro version of Reference: https://www.geeksforgeeks.org/c/queue-in-c/
 // So we can get fake Generic typing :D
 // TYPE: Data Type, 
@@ -17,37 +25,37 @@ typedef struct {                                                    \
 } NAME##Queue;                                                      \
                                                                     \
 /* Function to initialize the queue */                              \
-static void NAME##_init(NAME##Queue *q) {                   \
+static IGNORE_UNUSED void NAME##_init(NAME##Queue *q) {                   \
     q->front = -1;                                                  \
     q->rear = 0;                                                    \
 }                                                                   \
                                                                     \
 /* Function to check if the queue is empty*/                        \
-static bool NAME##_empty(NAME##Queue *q) {                  \
+static IGNORE_UNUSED bool NAME##_empty(NAME##Queue *q) {                  \
     return q->front == q->rear - 1;                                 \
 }                                                                   \
                                                                     \
 /* Function to check if the queue is full */                       \
-static bool NAME##_full(NAME##Queue *q) {                   \
+static IGNORE_UNUSED bool NAME##_full(NAME##Queue *q) {                   \
     return q->rear == MAX_SIZE;                                     \
 }                                                                   \
                                                                     \
 /* Function to add an element to the queue */                       \
-static bool NAME##_enqueue(NAME##Queue *q, TYPE value) {    \
+static IGNORE_UNUSED bool NAME##_enqueue(NAME##Queue *q, TYPE value) {    \
     if (NAME##_full(q)) return false;                               \
     q->items[q->rear++] = value;                                    \
     return true;                                                    \
 }                                                                   \
                                                                     \
 /* Function to remove an element from the queue */                  \
-static bool NAME##_dequeue(NAME##Queue *q) {                \
+static IGNORE_UNUSED bool NAME##_dequeue(NAME##Queue *q) {                \
     if (NAME##_empty(q)) return false;                              \
     q->front++;                                                     \
     return true;                                                    \
 }                                                                   \
                                                                     \
 /* Function to get the element at the front of the queue */        \
-static TYPE *NAME##_peek(NAME##Queue *q) {                  \
+static IGNORE_UNUSED TYPE *NAME##_peek(NAME##Queue *q) {                  \
     if (NAME##_empty(q)) return NULL;                               \
     return &q->items[q->front + 1];                                 \
 }
