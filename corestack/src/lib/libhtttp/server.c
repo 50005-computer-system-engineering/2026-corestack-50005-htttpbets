@@ -55,6 +55,57 @@ int acceptOnTCP(Server *serverPtr)
     return newClientFd;
 }
 
+int prepareUnicastUDP(Server *serverPtr)
+{
+    LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
+
+    // Bind sockets to port 
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_BROAD),
+        .sin_addr.s_addr = INADDR_ANY // any interface address
+    };
+    if (bind(serverPtr->self->socks->udpUni, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("[prepareUnicastUDP()] bind");
+        return -1;
+    }
+    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
+
+    LOG_I("[prepareUnicastUDP()] UDP unicast port ready");
+}
+
+int prepareBroadcastUDP(Server *serverPtr)
+{
+    LOG_I("[prepareBroadcastUDP()] preparing UDP broadcast port");
+
+    // setting socket options
+    int broadcastEnabled = 1;
+    if (setsockopt(serverPtr->self->socks->udpBroad, SOL_SOCKET, SO_BROADCAST, &broadcastEnabled, sizeof(broadcastEnabled)) < 0)
+    {
+        perror("[prepareBroadcastUDP()] setsockopt");
+        return -1;
+    }
+    LOG_D("[prepareBroadcastUDP()] socket options set");
+
+    // Bind sockets to port 
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_BROAD),
+        .sin_addr.s_addr = INADDR_BROADCAST // broadcast address
+    };
+    if (bind(serverPtr->self->socks->udpBroad, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("[prepareBroadcastUDP()] bind");
+        return -1;
+    }
+    LOG_D("[prepareBroadcastUDP()] UDP socket bound to port %d", PORT_UDP_BROAD);
+
+    LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready");
+}
+
+
+
 int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 {
     LOG_I("[getFdSetTCP()] getting a pollfd struct from server");
