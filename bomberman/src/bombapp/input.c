@@ -34,10 +34,8 @@ void input_update(void) {
         event_bus_trigger(EVENT_INPUT_SPRINT_CHANGED, &(SprintEventArgs){.toggled = false});
 
     // Bomb Placement
-    if (IsKeyPressed(CONFIG.KEYS.BOMB)) {
+    if (IsKeyPressed(CONFIG.KEYS.BOMB))
         event_bus_trigger(EVENT_INPUT_BOMB_PRESSED, NULL);
-        play_sound(SFX_PLACEBOMB);
-    }
 
     // Exit Pressed
     // TODO: Gate for Host vs Client

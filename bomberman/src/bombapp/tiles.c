@@ -11,7 +11,6 @@ void tiles_init() {
     tile_textures[EMPTY] = LoadTexture(CONFIG.ASSETS.TILE_EMPTY);
     tile_textures[BREAKABLE] = LoadTexture(CONFIG.ASSETS.TILE_BREAKABLE);
     tile_textures[WALL] = LoadTexture(CONFIG.ASSETS.TILE_WALL);
-    tile_textures[BOMB] = LoadTexture(CONFIG.ASSETS.TILE_BOMB);
     tile_textures[POWERUP_FIRE] = LoadTexture(CONFIG.ASSETS.TILE_POWERUP_FIRE);
     tile_textures[POWERUP_BOMB] = LoadTexture(CONFIG.ASSETS.TILE_POWERUP_BOMB);
 
@@ -19,30 +18,34 @@ void tiles_init() {
     map_generate(10);
 }
 
+void draw_static_sprite(Texture2D texture, Vector2 pos, float size, Color tint) {
+    // Render tile
+    Rectangle source = {
+        .x = pos.x * texture.width,
+        .y = pos.y * texture.height,
+        .width = texture.width,
+        .height = texture.height
+    };
+
+    Rectangle dest = {
+        .x = pos.x * CONFIG.PHYSICS.TILE_SIZE + (CONFIG.PHYSICS.TILE_SIZE - size) * 0.5f,
+        .y = pos.y * CONFIG.PHYSICS.TILE_SIZE + (CONFIG.PHYSICS.TILE_SIZE - size) * 0.5f,
+        .width = size,
+        .height = size
+    };
+
+    DrawTexturePro(texture, source, dest, Vector2Zero(), 0.0f, tint);
+}
+
 void tiles_draw() {
     // Draw all tiles
     for (int i = 0; i < map_size; i++) {
         for (int j = 0; j < map_size; j++) {
             Texture2D texture = tile_textures[map[i][j]];
-            if (map[i][j] < BREAKABLE) // Empty / Player / -1 Tiles
+            if (map[i][j] < BREAKABLE) // Empty / Player / Bomb / -1 Tiles
                 texture = tile_textures[EMPTY];
 
-            // Render tile
-            Rectangle source = {
-                .x = i * texture.width,
-                .y = j * texture.height,
-                .width = texture.width,
-                .height = texture.height
-            };
-
-            Rectangle dest = {
-                .x = i * CONFIG.PHYSICS.TILE_SIZE,
-                .y = j * CONFIG.PHYSICS.TILE_SIZE,
-                .width = CONFIG.PHYSICS.TILE_SIZE,
-                .height = CONFIG.PHYSICS.TILE_SIZE
-            };
-
-            DrawTexturePro(texture, source, dest, Vector2Zero(), 0.0f, WHITE);
+            draw_static_sprite(texture, (Vector2){i, j}, CONFIG.PHYSICS.TILE_SIZE, WHITE);
         }
     }
 }
