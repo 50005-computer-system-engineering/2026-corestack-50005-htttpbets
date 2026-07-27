@@ -104,8 +104,6 @@ int prepareBroadcastUDP(Server *serverPtr)
     LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready");
 }
 
-
-
 int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 {
     LOG_I("[getFdSetTCP()] getting a pollfd struct from server");
@@ -157,6 +155,23 @@ int createServer(LibhtttpServer **serverPtr)
     }
     newServer->clients = NULL;
     LOG_I("[createServer()] new server created with sockets created");
+
+    // start listening until lobbySize of clients connect to server
+    if (listenOnTCP(newServer) < 0)
+    {
+        LOG_E("[openLobby()] failed to bind port for listening");
+        goto fail;
+    }
+    LOG_D("[createServer()] bound port for listening");
+
+    // setup UDP ports
+    if (prepareBroadcastUDP(newServer) < 0 || prepareUnicastUDP(newServer) < 0)
+    {
+        LOG_E("[openLobby()] failed to prepare UDP port for listening");
+        goto fail;
+    }
+    LOG_D("[createServer()] UDP ports bound and ready for messaging");
+
     *serverPtr = newServer;
     return 0;
 
@@ -168,6 +183,8 @@ int createServer(LibhtttpServer **serverPtr)
 
 int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds)
 {
+    LOG_I("[openLobby()] opening server lobby for clients...");
+
     // check parameters
     if (serverPtr == NULL)
     {
@@ -181,7 +198,6 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
     }
 
     // allocate space for client array
-    LOG_I("[openLobby()] opening server lobby for clients...");
     Server *thisServer = serverPtr;
     if (thisServer->clients != NULL)
     {
@@ -199,15 +215,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         perror("server malloc");
         return -1;
     }
-    LOG_I("[openLobby()] memory allocated for client linked list");
-
-    // start listening until lobbySize of clients connect to server
-    if (listenOnTCP(thisServer) < 0)
-    {
-        LOG_E("[openLobby()] failed to bind port for listening");
-        return -1;
-    }
-    LOG_I("[openLobby()] bound port for listening");
+    LOG_D("[openLobby()] memory allocated for client linked list");
 
     // start accepting clients for TCP connections
     uint8_t slot = 1;   // ID 0 is reserved for server
@@ -220,7 +228,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
             LOG_E("[openLobby()] accept failed to find client, skipping loop iteration...");
             continue;
         }
-        LOG_I("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
+        LOG_D("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
         
         // creating client endpoint of newly connected client
         Endpoint newClient = {
@@ -259,7 +267,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         LOG_E("[openLobby()] failed to write list of client ids");
         return -1;
     }
-    LOG_I("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
+    LOG_D("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
 
     LOG_I("[openLobby()] Lobby opening complete");
     return 0;
