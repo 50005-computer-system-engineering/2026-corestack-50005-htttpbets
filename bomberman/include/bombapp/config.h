@@ -19,6 +19,13 @@ typedef struct {
     const SpritesheetAsset PLAYER_STAND[4]; // Up, Down, Left, Right
     const SpritesheetAsset PLAYER_WALK[4]; // Up, Down, Left, Right
     const SpritesheetAsset PLAYER_WIN;
+
+    const char* TILE_EMPTY;
+    const char* TILE_BREAKABLE;
+    const char* TILE_WALL;
+    const char* TILE_BOMB;
+    const char* TILE_POWERUP_BOMB;
+    const char* TILE_POWERUP_FIRE;
 } Assets;
 
 typedef struct {

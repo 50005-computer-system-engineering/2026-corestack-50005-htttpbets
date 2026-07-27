@@ -11,6 +11,8 @@ typedef enum {
     BOMB,
     POWERUP_FIRE,
     POWERUP_BOMB,
+
+    TILETYPE_COUNT
 } TileType;
 
 extern int map_size; // Width and height of map
