@@ -156,3 +156,8 @@ void map_debugprint() {
         printf("\n"); // Next line after completing row
     }
 }
+
+bool tile_is_solid(int tile_x, int tile_y) {
+    TileType tile = map[tile_x][tile_y];
+    return tile == WALL || tile == BREAKABLE;
+}

@@ -2,51 +2,42 @@
 #include <raymath.h>
 #include "config.h"
 #include "player.h"
-#include "spritesheet.h"
 #include "config.h"
 #include "lib/libeventbus.h"
 #include "events.h"
+#include "bomberman.h"
 
-int direction = 0; // 0 = Up, 1 = Down, 2 = Left, 3 = Right
-Vector2 player_position;
-
-Spritesheet* curr_sprite;
-Spritesheet stand_sprites[4]; // Follows direction index
-Spritesheet walk_sprites[4];
-
+// Controlling Bomberman
+Bomberman* curr_bm;
 float active_speed;
 
 void on_move_performing(void *args) {
     MoveEventArgs *a = (MoveEventArgs *)args;
 
     // Normalise direction, this fixes diagonal movement being twice as fast
-    Vector2 moveVec = (Vector2){a->x, a->y};
+    // Note that up is negative, hence -=
+    Vector2 moveVec = (Vector2){a->x, -a->y};
     moveVec = Vector2Normalize(moveVec);
 
     // Update position
-    // Note that up is negative, hence -=
-    player_position.x += moveVec.x * active_speed * GetFrameTime();
-    player_position.y -= moveVec.y * active_speed * GetFrameTime();
+    move_box(&curr_bm->box, Vector2Scale(moveVec, active_speed * GetFrameTime()));
 
     // Update direction
     if (a->y > 0) // Up (highest prio)
-        direction = 0;
+        curr_bm->direction = 0;
     else if (a->y < 0) // Down
-        direction = 1;
+        curr_bm->direction = 1;
     else if (a->x < 0) // Left
-        direction = 2;
+        curr_bm->direction = 2;
     else if (a->x > 0) // Right
-        direction = 3;
+        curr_bm->direction = 3;
 
-    // Update spritesheet
-    curr_sprite = &walk_sprites[direction];
+    curr_bm->is_moving = true;
 }
 
 void on_move_released(void *args) {
     (void)args; // Unused
-
-    // Update spritesheet, retaining old direction
-    curr_sprite = &stand_sprites[direction];
+    curr_bm->is_moving = false;
 }
 
 void on_sprint_toggled(void *args) {
@@ -54,39 +45,11 @@ void on_sprint_toggled(void *args) {
     active_speed = a->toggled ? CONFIG.PHYSICS.PLAYER_SPRINT_SPEED : CONFIG.PHYSICS.PLAYER_SPEED;
 }
 
-void player_init() {
-    // Init Spritesheets
-    for (int i = 0; i < 4; i++) {
-        spritesheet_init(&stand_sprites[i], CONFIG.ASSETS.PLAYER_STAND[i]);
-        spritesheet_init(&walk_sprites[i], CONFIG.ASSETS.PLAYER_WALK[i]);
-    }
-
-    // Initial sprite is facing down
-    curr_sprite = &stand_sprites[1];
-    direction = 1;
-    active_speed = CONFIG.PHYSICS.PLAYER_SPEED;
+void player_init(Bomberman* bm) {
+    curr_bm = bm;
 
     // Listen for input
     event_bus_listen(EVENT_INPUT_MOVE_PERFORMING, on_move_performing);
     event_bus_listen(EVENT_INPUT_MOVE_RELEASED, on_move_released);
     event_bus_listen(EVENT_INPUT_SPRINT_CHANGED, on_sprint_toggled);
-}
-
-void player_update() {
-    spritesheet_update(curr_sprite);
-}
-
-void player_draw() {
-    spritesheet_draw(curr_sprite, player_position, 0, WHITE);
-}
-
-void player_cleanup() {
-    for (int i = 0; i < 4; i++) {
-        spritesheet_free(&stand_sprites[i]);
-        spritesheet_free(&walk_sprites[i]);
-    }
-}
-
-Vector2 player_getpos() {
-    return Vector2Add(player_position, (Vector2) { curr_sprite->tile_width * 0.5f, curr_sprite->tile_height * 0.5f });
 }

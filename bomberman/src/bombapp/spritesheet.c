@@ -1,4 +1,5 @@
 #include "spritesheet.h"
+#include "config.h"
 #include <raylib.h>
 
 void spritesheet_init(Spritesheet *s, const SpritesheetAsset asset) {
@@ -39,7 +40,7 @@ void spritesheet_update(Spritesheet *s) {
     }
 }
 
-void spritesheet_draw(Spritesheet *s, Vector2 position, float rotation, Color tint) {
+void spritesheet_draw(Spritesheet *s, Vector2 position, Vector2 origin_scale, float rotation, Color tint) {
     int col = s->curr_frame % s->columns;
     int row = s->curr_frame / s->columns;
  
@@ -50,19 +51,19 @@ void spritesheet_draw(Spritesheet *s, Vector2 position, float rotation, Color ti
         .width  = s->tile_width,
         .height = s->tile_height
     };
- 
+
     // Dest: where + how on actual screen to draw (world position)
     Rectangle dest = {
-        .x      = position.x,
-        .y      = position.y,
+        .x      = position.x * CONFIG.PHYSICS.TILE_SIZE,
+        .y      = position.y * CONFIG.PHYSICS.TILE_SIZE,
         .width  = s->tile_width* s->scale,
         .height = s->tile_height * s->scale,
     };
  
     // Center point of tile
     Vector2 origin = {
-        .x = s->tile_width* 0.5f,
-        .y = s->tile_height * 0.5f
+        .x = s->tile_width * origin_scale.x,
+        .y = s->tile_height * origin_scale.y
     };
  
     // Finally, draw the texture
