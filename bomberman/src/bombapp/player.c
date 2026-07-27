@@ -77,3 +77,7 @@ void player_cleanup() {
         spritesheet_free(&walk_sprites[i]);
     }
 }
+
+Vector2 player_getpos() {
+    return Vector2Add(player_position, (Vector2) { curr_sprite->tile_width * 0.5f, curr_sprite->tile_height * 0.5f });
+}

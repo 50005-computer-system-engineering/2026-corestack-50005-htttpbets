@@ -6,4 +6,5 @@ void player_init(void);
 void player_update(void);
 void player_draw(void);
 void player_cleanup(void);
+Vector2 player_getpos(void);
 #endif

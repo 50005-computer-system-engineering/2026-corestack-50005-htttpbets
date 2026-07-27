@@ -1,6 +1,7 @@
 #include <raylib.h>
 
 #include "lib/libeventbus.h"
+#include "camera.h"
 #include "events.h"
 #include "input.h"
 #include "player.h"
@@ -12,6 +13,8 @@ void initalise() {
 
     // Initialise player
     player_init();
+
+    camera_init(player_getpos());
 
     // Initialise audio
     audio_init();
@@ -29,15 +32,23 @@ void update_loop() {
 
     // Update player state
     player_update();
+
+    // Update camera after player movement
+    camera_update(player_getpos());
 }
 
 void draw_loop() {
     BeginDrawing();
-
     ClearBackground(DARKGREEN);
-    DrawText("Hello, World!", 190, 200, 20, BLACK);
-    
-    player_draw();
+
+    // World-Space Renders
+    BeginMode2D(camera);
+        DrawText("Hello, World!", 190, 200, 20, BLACK);
+        player_draw();
+    EndMode2D();
+
+    // Static UI Renders
+
     EndDrawing();
 }
 
