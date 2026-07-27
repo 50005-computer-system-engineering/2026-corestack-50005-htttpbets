@@ -32,6 +32,7 @@ typedef struct {
     const float PLAYER_SPEED;
     const float PLAYER_SPRINT_SPEED;
     const float TILE_SIZE;
+    const float PICKUP_SIZE;
 } Physics;
 
 typedef struct {

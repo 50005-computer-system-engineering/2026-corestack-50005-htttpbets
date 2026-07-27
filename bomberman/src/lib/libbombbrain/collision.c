@@ -30,9 +30,9 @@ void move_box(BoundBox *box, Vector2 moveAmt) {
         box->position.y = new_pos.y;
 }
 
-TileType get_tile_at_box(BoundBox *box) {
+Vector2 get_center_box(BoundBox *box) {
     // Position + Center of sprite
     int grid_x = (int)floorf(box->position.x + box->size.x * 0.5f);
     int grid_y = (int)floorf(box->position.y + box->size.y * 0.5f);
-    return map[grid_x][grid_y];
+    return (Vector2){grid_x, grid_y};
 }

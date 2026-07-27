@@ -6,6 +6,8 @@
 #include "lib/libeventbus.h"
 #include "events.h"
 #include "bomberman.h"
+#include "audio.h"
+#include "lib/libbombbrain/bomb_control.h"
 
 // Controlling Bomberman
 Bomberman* curr_bm;
@@ -45,6 +47,15 @@ void on_sprint_toggled(void *args) {
     active_speed = a->toggled ? CONFIG.PHYSICS.PLAYER_SPRINT_SPEED : CONFIG.PHYSICS.PLAYER_SPEED;
 }
 
+void on_bomb_pressed(void *args) {
+    (void)args; // Unused
+
+    // TODO: Move me to bombd
+    Vector2 pos = get_center_box(&curr_bm->box);
+    if (place_bomb(pos))
+        play_sound(SFX_PLACEBOMB);
+}
+
 void player_init(Bomberman* bm) {
     curr_bm = bm;
 
@@ -52,4 +63,5 @@ void player_init(Bomberman* bm) {
     event_bus_listen(EVENT_INPUT_MOVE_PERFORMING, on_move_performing);
     event_bus_listen(EVENT_INPUT_MOVE_RELEASED, on_move_released);
     event_bus_listen(EVENT_INPUT_SPRINT_CHANGED, on_sprint_toggled);
+    event_bus_listen(EVENT_INPUT_BOMB_PRESSED, on_bomb_pressed);
 }

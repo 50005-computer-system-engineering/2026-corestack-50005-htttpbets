@@ -8,6 +8,7 @@
 #include "audio.h"
 #include "tiles.h"
 #include "bomberman.h"
+#include "bomb_render.h"
 
 // TODO: Dynamically spawn and assign me!
 Bomberman player_bm;
@@ -27,6 +28,9 @@ void initalise() {
     // Init Camera after player
     camera_init(player_bm.box.position);
 
+    // Init Bombs
+    bombs_init();
+
     // Initialise audio
     audio_init();
 
@@ -38,6 +42,9 @@ void initalise() {
 void update_loop() {
     // Update audio
     audio_update();
+
+    // Update bombs
+    bombs_tick();
 
     // Update input
     input_update();
@@ -56,6 +63,7 @@ void draw_loop() {
     // World-Space Renders
     BeginMode2D(camera);
         tiles_draw();
+        bombs_draw();
         bomberman_draw(&player_bm);
     EndMode2D();
 
@@ -69,6 +77,9 @@ void cleanup() {
 
     // Free map
     tiles_cleanup();
+
+    // Free bombs
+    bombs_cleanup();
 
     // Free player
     bomberman_cleanup();

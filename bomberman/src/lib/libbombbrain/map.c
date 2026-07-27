@@ -97,7 +97,6 @@ void map_generate(int num_players) {
     int (*spawns)[2] = malloc(num_players * sizeof(int[2]));
     calc_player_spawns(num_players, inner_size, spawns);
     for (int i = 0; i < num_players; i++) {
-        printf("Spawn: %d %d\n", spawns[i][0], spawns[i][1]);
         map[spawns[i][0]][spawns[i][1]] = PLAYER;
         
         // Create '+' shape of empty spots around player, unless at border
