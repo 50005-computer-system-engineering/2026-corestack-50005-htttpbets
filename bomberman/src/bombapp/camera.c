@@ -3,7 +3,6 @@
 #include "lib/libbombbrain/map.h"
 #include <raylib.h>
 #include <raymath.h>
-#include <stdio.h>
 
 // Number of tiles to offset from actual border of map, so we can see the outside a little
 #define NUM_OUTSIDE_TILES 1
@@ -15,7 +14,7 @@ Vector2 min_pos, max_pos;
 void camera_init(Vector2 targetPos) {
     screen_size = (Vector2){GetScreenWidth(), GetScreenHeight()};
     camera = (Camera2D) { 
-        .target = targetPos,
+        .target = Vector2Scale(targetPos, CONFIG.PHYSICS.TILE_SIZE),
         .offset = Vector2Scale(screen_size, 0.5f),
         .rotation = 0.0f,
         .zoom = 1.0f
@@ -27,7 +26,7 @@ void camera_init(Vector2 targetPos) {
 }
 
 void camera_update(Vector2 targetPos) {
-    camera.target = targetPos;
+    camera.target = Vector2Scale(targetPos, CONFIG.PHYSICS.TILE_SIZE);
     camera.offset = Vector2Scale(screen_size, 0.5f);
     Vector2 map_min = GetWorldToScreen2D(min_pos, camera);
     Vector2 map_max = GetWorldToScreen2D(max_pos, camera);

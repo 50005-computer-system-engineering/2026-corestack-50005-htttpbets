@@ -17,8 +17,8 @@ const Config CONFIG = {
 
     .PHYSICS = {
         .TILE_SIZE = 120.0f,
-        .PLAYER_SPEED = 400.0f,
-        .PLAYER_SPRINT_SPEED = 650.0f
+        .PLAYER_SPEED = 3.0f,
+        .PLAYER_SPRINT_SPEED = 5.5f
     },
     
     .ASSETS = {

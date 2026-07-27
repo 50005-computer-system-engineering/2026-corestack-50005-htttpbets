@@ -21,4 +21,5 @@ extern TileType** map; // 2D Array of tiles
 void map_generate(int num_players);
 void map_free();
 void map_debugprint();
+bool tile_is_solid(int tile_x, int tile_y);
 #endif
