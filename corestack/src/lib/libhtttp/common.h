@@ -23,7 +23,7 @@
 // common structs throughout
 typedef struct {
     int tcp;            // important singlecast
-    int udpDirect;      // unimportant singlecast
+    int udpUni;      // unimportant singlecast
     int udpBroad;       // broadcasts
 } Sockets;
 
