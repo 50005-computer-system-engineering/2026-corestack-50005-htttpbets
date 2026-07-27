@@ -6,6 +6,7 @@
 #include "input.h"
 #include "player.h"
 #include "audio.h"
+#include "lib/libbombbrain/map.h"
 
 void initalise() {
     // Initialise event bus
@@ -21,6 +22,8 @@ void initalise() {
 
     // Start playing battle music
     play_bgm(BGM_BATTLE);
+
+    map_generate(4);
 }
 
 void update_loop() {
@@ -61,6 +64,8 @@ void cleanup() {
 
     // Free bgm & sfx
     audio_cleanup();
+
+    map_free();
 }
 
 
