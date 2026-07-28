@@ -73,6 +73,8 @@ int prepareUnicastUDP(Server *serverPtr)
     LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
 
     LOG_I("[prepareUnicastUDP()] UDP unicast port ready");
+
+    return 0;
 }
 
 int prepareBroadcastUDP(Server *serverPtr)
@@ -102,6 +104,8 @@ int prepareBroadcastUDP(Server *serverPtr)
     LOG_D("[prepareBroadcastUDP()] UDP socket bound to port %d", PORT_UDP_BROAD);
 
     LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready");
+
+    return 0;
 }
 
 int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
