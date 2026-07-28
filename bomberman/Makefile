@@ -176,7 +176,7 @@ FLAT_LIB_NAMES := $(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/%.c,%,$(FLAT_LIB_SRCS))
 # Converts every library name into a -l flag, stripping 'lib' prefix (eg: libtest -> -ltest)
 LOCAL_LDLIBS := $(patsubst lib%,-l%,$(LIB_NAMES))
 # Assigns final set of -l flags to LDLIBS, including corestack libraries
-LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS)
+LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS) -lm
 
 # Final container of all libraries, empty for now
 ALL_LIB_ARCHIVES :=
