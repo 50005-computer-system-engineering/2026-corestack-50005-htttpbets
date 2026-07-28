@@ -3,6 +3,10 @@
 #include <raylib.h>
 #include "utils/queue.h"
 
+
+#define BOMB_TIMER 1.0f
+#define EXPLODE_LIFETIME 0.5f
+
 typedef struct {
     Vector2 position;
     int spread; // Spread in each direction (1 by default, a '+' shape)

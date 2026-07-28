@@ -8,12 +8,14 @@
 Texture2D texture_bomb;
 Texture2D texture_explode_core;
 Texture2D texture_explode_mid;
+Texture2D texture_explode_cap;
 
 void bombs_init() {
     // Load all textures
     texture_bomb = LoadTexture(CONFIG.ASSETS.TILE_BOMB);
     texture_explode_core = LoadTexture(CONFIG.ASSETS.TILE_EXPLODE_CORE);
     texture_explode_mid = LoadTexture(CONFIG.ASSETS.TILE_EXPLODE_MID);
+    texture_explode_cap = LoadTexture(CONFIG.ASSETS.TILE_EXPLODE_CAP);
     init_bombs();
 }
 
@@ -26,12 +28,13 @@ void bombs_draw() {
     // Draw all bombs
     for (int i = bombs_queue.front + 1; i < bombs_queue.rear; i++) {
         BombInfo *bomb = &bombs_queue.items[i];
+        float red_tint = (bomb->timer / BOMB_TIMER) * 255.0f; // Progress from 255 to 0 over BOMB_TIMER
         draw_static_sprite(
             texture_bomb, 
             bomb->position,
             CONFIG.PHYSICS.PICKUP_SIZE, 
             0.0f,
-            WHITE
+            (Color){255, red_tint, red_tint, 255}
         );
     }
 
@@ -73,7 +76,7 @@ void bombs_draw() {
             }
             for (int spread = 0; spread < explosion->spread_amt[dir]; spread++) {
                 draw_static_sprite(
-                    texture_explode_mid, 
+                    spread == explosion->spread_amt[dir] -1 ? texture_explode_cap : texture_explode_mid, 
                     Vector2Add(explosion->center, spread_vec),
                     CONFIG.PHYSICS.TILE_SIZE, 
                     rotation,
