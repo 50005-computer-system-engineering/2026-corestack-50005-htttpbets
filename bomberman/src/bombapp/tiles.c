@@ -49,10 +49,13 @@ void tiles_draw() {
     for (int i = 0; i < map_size; i++) {
         for (int j = 0; j < map_size; j++) {
             Texture2D texture = tile_textures[map[i][j]];
-            if (map[i][j] < BREAKABLE) // Empty / Player / Bomb / -1 Tiles
+            if (map[i][j] < BREAKABLE) // Empty / Player / Bomb / Powerup / -1 Tiles
                 texture = tile_textures[EMPTY];
 
             draw_static_sprite(texture, (Vector2){i, j}, CONFIG.PHYSICS.TILE_SIZE, 0.0f, WHITE);
+            
+            if (map[i][j] == POWERUP_FIRE || map[i][j] == POWERUP_BOMB)
+                draw_static_sprite(tile_textures[map[i][j]], (Vector2){i, j}, CONFIG.PHYSICS.PICKUP_SIZE, 0.0f, WHITE);
         }
     }
 }

@@ -3,12 +3,16 @@
 #include <raylib.h>
 #include "lib/libbombbrain/collision.h"
 #include "spritesheet.h"
+#include "lib/libbombbrain/inventory.h"
 
 typedef struct {
     int direction;
     bool is_moving;
     Spritesheet* curr_sprite;
     BoundBox box;
+
+    // Inventory
+    InventoryStock inventory;
 } Bomberman;
 
 void bomberman_init(void);

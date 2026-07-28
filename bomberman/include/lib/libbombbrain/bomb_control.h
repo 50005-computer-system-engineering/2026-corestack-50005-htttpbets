@@ -2,7 +2,7 @@
 #define BOMB_CONTROL_H
 #include <raylib.h>
 #include "utils/queue.h"
-
+#include "inventory.h"
 
 #define BOMB_TIMER 1.0f
 #define EXPLODE_LIFETIME 0.5f
@@ -32,5 +32,5 @@ void tick_bombs(float delta_time);
 void tick_explosions(float delta_time);
 
 // Validate and place bomb, returns true if successfully placed
-bool place_bomb(Vector2 pos, int spread);
+bool place_bomb(Vector2 pos, InventoryStock* stock);
 #endif

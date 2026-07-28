@@ -3,15 +3,15 @@
 #include <stdlib.h>
 #include "lib/libeventbus.h"
 #include "events.h"
+#include "powerup_control.h"
 
 BombsQueue bombs_queue;
 ExplodesQueue explodes_queue;
 
 void handle_spread(int x, int y, ExplosionInfo* explosion) {
-    // TODO
-    // TileType tile = map[x][y];
-    // if (tile == BREAKABLE)
-    //     try_spawn_powerup(x, y);
+    TileType tile = map[x][y];
+    if (tile == BREAKABLE)
+        randomise_powerup(x, y);
 
     map[x][y] = EXPLOSION;
     explosion->spread_positions[explosion->spread_positions_size] = (Vector2){x, y};
@@ -90,7 +90,7 @@ void tick_bombs(float delta_time) {
     }
 }
 
-bool place_bomb(Vector2 pos, int spread) {
+bool place_bomb(Vector2 pos, InventoryStock* stock) {
     // Check if bomb can be placed
     // (1) Check for empty tile
     TileType tile = map[(int)pos.x][(int)pos.y];
@@ -98,12 +98,16 @@ bool place_bomb(Vector2 pos, int spread) {
         return false;
 
     // (2) Check if we still have bombs
-    // TODO
+    if (stock->remaining_bombs <= 0)
+        return false;
 
     // (3) Place bomb
     map[(int)pos.x][(int)pos.y] = BOMB;
-    BombInfo new_bomb = (BombInfo){pos, spread, BOMB_TIMER};
+    BombInfo new_bomb = (BombInfo){pos, stock->num_fires, BOMB_TIMER};
     Bombs_enqueue(&bombs_queue, new_bomb);
+    
+    // (4) Update inventory
+    consume_bomb(stock);
 
     return true;
 }
@@ -122,7 +126,8 @@ void tick_explosions(float delta_time) {
             for (int i = 0; i < explosion->spread_positions_size; i++) {
                 map[(int)explosion->spread_positions[i].x][(int)explosion->spread_positions[i].y] = EMPTY;
             }
-
+            
+            spawn_pending_powerups(explosion);
             Explodes_dequeue(&explodes_queue);
         }
     }
