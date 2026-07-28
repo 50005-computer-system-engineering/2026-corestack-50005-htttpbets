@@ -11,6 +11,9 @@ typedef enum {
 
     EVENT_INPUT_SPRINT_CHANGED,
 
+    // Events
+    EVENT_BOMB_EXPLODED,
+
     // Final Count
     EVENT_COUNT
 } Event;
@@ -31,4 +34,9 @@ typedef struct {
     bool toggled;
 } SprintEventArgs;
 #pragma endregion Input Arguments
+
+typedef struct {
+    int x;
+    int y;
+} TileEventArgs;
 #endif

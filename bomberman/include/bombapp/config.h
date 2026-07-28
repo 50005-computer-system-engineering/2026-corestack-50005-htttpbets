@@ -26,6 +26,10 @@ typedef struct {
     const char* TILE_BOMB;
     const char* TILE_POWERUP_BOMB;
     const char* TILE_POWERUP_FIRE;
+
+    const char* TILE_EXPLODE_CORE;
+    const char* TILE_EXPLODE_MID;
+    const char* TILE_EXPLODE_CAP;
 } Assets;
 
 typedef struct {
