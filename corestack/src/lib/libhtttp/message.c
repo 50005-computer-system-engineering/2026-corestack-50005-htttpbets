@@ -232,3 +232,81 @@ int sendMessage(int sockfd, const Message completeMsg)
     LOG_I("[sendMessage()] pushed all bytes though socket");
     return 0;
 }
+
+int receiveBroadcast(int sockfd, Message **returnPtr)
+{
+    LOG_I("[receiveBroadcast()] preparing to receive broadcast...");
+
+    // receiving message
+    int flagsSet = 0;
+    unsigned char *messageBytes = malloc(UINT16_MAX);
+    {
+        LOG_E("[sendBroadcast()] malloc for message bytes failed");
+        perror("[sendBroadcast()] malloc");
+        return -1;
+    }
+    if (recvfrom(sockfd, messageBytes, UINT16_MAX, flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
+    {
+        LOG_E("[receiveBroadcast()] could not receive the broadcast");
+        perror("[receiveBroadcast()] recvfrom");
+        return -1;
+    }
+    LOG_D("[receiveBroadcast()] received raw message bytes");
+
+    // fit bytes into message message struct
+    Message *returnMsg = calloc(1, sizeof(Message));
+    returnMsg->sourceId = *messageBytes;
+    returnMsg->length = *(messageBytes+sizeof(returnMsg->length));
+    returnMsg->content = malloc(returnMsg->length);
+    memcpy(returnMsg->content, messageBytes+sizeof(returnMsg->sourceId)+sizeof(returnMsg->length), returnMsg->length);
+
+    LOG_D("[receiveBroadcast()] received broadcast with following message:\n\tsource: %u\n\tlength: %u", returnMsg->sourceId, returnMsg->length);
+
+    LOG_I("[receiveBroadcast()] broadcast has been received");
+    *returnPtr = returnMsg;
+
+    return 0;
+}
+
+int sendBroadcast(int sockfd, const Message completeMsg)
+{
+    LOG_I("[sendBroadcast()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+    
+    // preparing parameters for sendto()
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_BROAD),
+        .sin_addr.s_addr = INADDR_BROADCAST // broadcast address
+    };
+    int flagsSet = 0;
+    socklen_t addrLen = sizeof(addr);
+    
+    // prepare message as raw bytes
+    size_t msgLen = sizeof(completeMsg.sourceId) + sizeof(completeMsg.length) + completeMsg.length;
+    unsigned char *messageBytes = malloc(msgLen);
+    if (messageBytes == NULL)
+    {
+        LOG_E("[sendBroadcast()] malloc for message bytes failed");
+        perror("[sendBroadcast()] malloc");
+        return -1;
+    }
+    memcpy(messageBytes, &completeMsg.sourceId, sizeof(completeMsg.sourceId));
+    memcpy(messageBytes + sizeof(completeMsg.sourceId), &completeMsg.length, sizeof(completeMsg.length));
+    memcpy(messageBytes + sizeof(completeMsg.sourceId) + sizeof(completeMsg.length), &completeMsg.content ,completeMsg.length);
+    LOG_D("[sendBroadcast()] copied Message into raw bytes");
+
+    // send the entire message over broadcast port
+    if (sendto(sockfd, messageBytes, msgLen, flagsSet, (struct sockaddr *)&addr, addrLen) < 0)
+    {
+        LOG_E("[sendBroadcast()] broadcast failed to send");
+        perror("[sendBroadcast()] sendto");
+        return -1;
+    }
+
+    // cleanup
+    free(messageBytes);
+    messageBytes = NULL;
+
+    LOG_I("[sendBroadcast()] broadcast has been send");
+    return -1;
+}
