@@ -62,7 +62,7 @@ int prepareUnicastUDP(Server *serverPtr)
     // Bind sockets to port 
     struct sockaddr_in serverAddr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT_UDP_BROAD),
+        .sin_port = htons(PORT_UDP_UNI),
         .sin_addr.s_addr = INADDR_ANY // any interface address
     };
     if (bind(serverPtr->self->socks->udpUni, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
@@ -72,7 +72,7 @@ int prepareUnicastUDP(Server *serverPtr)
     }
     LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
 
-    LOG_I("[prepareUnicastUDP()] UDP unicast port ready");
+    LOG_I("[prepareUnicastUDP()] UDP unicast port ready to receive");
 
     return 0;
 }
@@ -90,20 +90,7 @@ int prepareBroadcastUDP(Server *serverPtr)
     }
     LOG_D("[prepareBroadcastUDP()] socket options set");
 
-    // Bind sockets to port 
-    struct sockaddr_in serverAddr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(PORT_UDP_BROAD),
-        .sin_addr.s_addr = INADDR_BROADCAST // broadcast address
-    };
-    if (bind(serverPtr->self->socks->udpBroad, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-    {
-        perror("[prepareBroadcastUDP()] bind");
-        return -1;
-    }
-    LOG_D("[prepareBroadcastUDP()] UDP socket bound to port %d", PORT_UDP_BROAD);
-
-    LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready");
+    LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready for transmission");
 
     return 0;
 }
@@ -340,5 +327,32 @@ int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned c
     free(returnMsg);
 
     LOG_I("[listenForClientMsg()] received message");
+    return 0;
+}
+
+int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content)
+{
+    LOG_I("[sendBroadcastToClients()] sending broadcast to cliets...");
+
+    // cast to private server struct
+    Server *thisServer = serverPtr;
+
+    // prepare the complete message
+    Message completeMsg = {
+        .sourceId = thisServer->self->id,
+        .length = length,
+        .content = content
+    };
+    LOG_D("[sendBroadcastToClients()] sending broadcast with header:\n\tsource: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+
+    // send as broadcast
+    if (sendBroadcast(thisServer->self->socks->udpBroad, completeMsg))
+    {
+        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        return -1;
+    }
+
+    LOG_I("[sendBroadcastToClients()] broadcast has been sent");
+
     return 0;
 }

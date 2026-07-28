@@ -239,15 +239,17 @@ int receiveBroadcast(int sockfd, Message **returnPtr)
 
     // receiving message
     int flagsSet = 0;
-    unsigned char *messageBytes = malloc(UINT16_MAX);
+    unsigned char *messageBytes = malloc(4096); // TODO fix the message size problem
+    if (messageBytes == NULL)
     {
-        LOG_E("[sendBroadcast()] malloc for message bytes failed");
-        perror("[sendBroadcast()] malloc");
+        perror("[receiveBroadcast()] malloc");
         return -1;
     }
-    if (recvfrom(sockfd, messageBytes, UINT16_MAX, flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
+
+    LOG_D("[receiveBroadcast()] waiting for bytes");
+
+    if (recvfrom(sockfd, messageBytes, 4096, flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
     {
-        LOG_E("[receiveBroadcast()] could not receive the broadcast");
         perror("[receiveBroadcast()] recvfrom");
         return -1;
     }
@@ -286,19 +288,17 @@ int sendBroadcast(int sockfd, const Message completeMsg)
     unsigned char *messageBytes = malloc(msgLen);
     if (messageBytes == NULL)
     {
-        LOG_E("[sendBroadcast()] malloc for message bytes failed");
         perror("[sendBroadcast()] malloc");
         return -1;
     }
     memcpy(messageBytes, &completeMsg.sourceId, sizeof(completeMsg.sourceId));
     memcpy(messageBytes + sizeof(completeMsg.sourceId), &completeMsg.length, sizeof(completeMsg.length));
-    memcpy(messageBytes + sizeof(completeMsg.sourceId) + sizeof(completeMsg.length), &completeMsg.content ,completeMsg.length);
+    memcpy(messageBytes + sizeof(completeMsg.sourceId) + sizeof(completeMsg.length), completeMsg.content, completeMsg.length);
     LOG_D("[sendBroadcast()] copied Message into raw bytes");
 
     // send the entire message over broadcast port
     if (sendto(sockfd, messageBytes, msgLen, flagsSet, (struct sockaddr *)&addr, addrLen) < 0)
     {
-        LOG_E("[sendBroadcast()] broadcast failed to send");
         perror("[sendBroadcast()] sendto");
         return -1;
     }
@@ -307,6 +307,6 @@ int sendBroadcast(int sockfd, const Message completeMsg)
     free(messageBytes);
     messageBytes = NULL;
 
-    LOG_I("[sendBroadcast()] broadcast has been send");
-    return -1;
+    LOG_I("[sendBroadcast()] broadcast has been sent");
+    return 0;
 }

@@ -26,6 +26,32 @@ int connectOnTCP(Sockets *socks, char *serverIp)
     return serverFd;
 }
 
+int prepareUDP(Sockets *socks, char *serverIp)
+{
+    LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
+
+    // set socket options
+    int opt = 1;
+    setsockopt(socks->udpBroad, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+
+    // Bind sockets to port 
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_BROAD),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+    if (bind(socks->udpBroad, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("[prepareUnicastUDP()] bind");
+        return -1;
+    }
+    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
+
+    LOG_I("[prepareUnicastUDP()] UDP unicast port ready");
+
+    return 0;
+}
+
 // public functions
 // allows developers to create a libhtttp client in application
 int createClient(LibhtttpClient **clientPtr)
@@ -64,9 +90,16 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 
     if (registerWithServer(thisClient) < 0)
     {
-        LOG_E("[joinLobby()] failed to register new client");
+        LOG_E("[joinLobby()] failed to register with server");
         return -1;
     }
+
+    if (prepareUDP(thisClient->socks, ipAddress) < 0)
+    {
+        LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
+        return -1;
+    }
+
     LOG_I("[joinLobby()] lobby joining complete");
     return 0;
 }
@@ -84,7 +117,7 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
     };
     if (msg.content == NULL)
     {
-        perror("sendAsClient malloc");
+        perror("[sendAsClient()] malloc");
         return -1;
     }
     
@@ -105,6 +138,28 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
     fail:
     free(msg.content);
     return -1;
+}
+
+int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBuffer)
+{
+    Endpoint *thisClient = clientPtr;
+
+    // block until broadcast received
+    Message *returnMsg;  
+    if (receiveBroadcast(thisClient->socks->udpBroad, &returnMsg) < 0)
+    {
+        LOG_E("[receiveBroadcastAsClient()] Failed to receive broadcast");
+        return -1;
+    }
+    
+    // copy message content to return buffer
+    memcpy(*returnBuffer, returnMsg->content, (size_t)returnMsg->length);
+
+    // free function's pointers
+    free(returnMsg);
+    returnMsg = NULL;
+
+    return 0;
 }
 
 // pending functions - message sending, receiving, lobby leaving

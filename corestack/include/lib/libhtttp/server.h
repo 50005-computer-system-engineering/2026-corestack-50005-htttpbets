@@ -10,5 +10,6 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
 int closeLobby(LibhtttpServer *serverPtr);
 
 int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned char **returnMsg);
+int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content);
 
 #endif
