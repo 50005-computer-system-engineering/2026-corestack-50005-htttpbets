@@ -2,6 +2,7 @@
 #include <raymath.h>
 #include "bomb_render.h"
 #include "lib/libbombbrain/bomb_control.h"
+#include "lib/libbombbrain/powerup_control.h"
 #include "config.h"
 #include "tiles.h"
 
@@ -17,6 +18,7 @@ void bombs_init() {
     texture_explode_mid = LoadTexture(CONFIG.ASSETS.TILE_EXPLODE_MID);
     texture_explode_cap = LoadTexture(CONFIG.ASSETS.TILE_EXPLODE_CAP);
     init_bombs();
+    powerup_init();
 }
 
 void bombs_tick() {
@@ -89,4 +91,5 @@ void bombs_draw() {
 
 void bombs_cleanup() {
     UnloadTexture(texture_bomb);
+    powerup_free();
 }

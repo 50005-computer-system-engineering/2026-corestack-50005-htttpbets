@@ -8,10 +8,11 @@ typedef enum {
     PLAYER,
     BOMB,
     EXPLOSION,
-    BREAKABLE,
-    WALL,
     POWERUP_FIRE,
     POWERUP_BOMB,
+
+    BREAKABLE,
+    WALL,
 
     TILETYPE_COUNT
 } TileType;
