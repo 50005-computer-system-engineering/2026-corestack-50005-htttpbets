@@ -79,7 +79,7 @@ void bombs_draw() {
             for (int spread = 0; spread < explosion->spread_amt[dir]; spread++) {
                 draw_static_sprite(
                     spread == explosion->spread_amt[dir] -1 ? texture_explode_cap : texture_explode_mid, 
-                    Vector2Add(explosion->center, spread_vec),
+                    Vector2Add(explosion->center, Vector2Scale(spread_vec, spread + 1)),
                     CONFIG.PHYSICS.TILE_SIZE, 
                     rotation,
                     WHITE
