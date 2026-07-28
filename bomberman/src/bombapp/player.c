@@ -8,6 +8,7 @@
 #include "bomberman.h"
 #include "audio.h"
 #include "lib/libbombbrain/bomb_control.h"
+#include "lib/libbombbrain/map.h"
 
 // Controlling Bomberman
 Bomberman* curr_bm;
@@ -33,6 +34,37 @@ void on_move_performing(void *args) {
         curr_bm->direction = 2;
     else if (a->x > 0) // Right
         curr_bm->direction = 3;
+
+    // TODO: Move me to libbombbrain
+    // Check for special collisions after moving
+    Vector4 tiles = get_all_overlapping_tiles(curr_bm->box.position.x, curr_bm->box.position.y, curr_bm->box.size);
+    // Loop through all overlapping tiles
+    for (int ty = tiles.z; ty < tiles.w; ty++) {
+        for (int tx = tiles.x; tx < tiles.y; tx++) {
+            TileType tile = map[tx][ty];
+            switch (tile) {
+                case EXPLOSION:
+                    // Die :(
+                    break;
+
+                case POWERUP_FIRE: // Consume Powerup
+                    map[tx][ty] = EMPTY;
+                    curr_bm->inventory.num_fires++;
+                    play_sound(SFX_POWERUP_FIRE);
+                    break;
+
+                case POWERUP_BOMB: // Consume Powerup
+                    map[tx][ty] = EMPTY;
+                    curr_bm->inventory.num_bombs++;
+                    curr_bm->inventory.remaining_bombs++;
+                    play_sound(SFX_POWERUP_BOMB);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+    }
 
     curr_bm->is_moving = true;
 }

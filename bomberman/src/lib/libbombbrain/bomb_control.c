@@ -29,8 +29,7 @@ void trigger_explosion(BombInfo bomb) {
     // Calculate spread for each dir, ensure not blocked by corners or walls
     int x = (int)bomb.position.x;
     int y = (int)bomb.position.y;
-    explosion.spread_positions = (Vector2*)malloc(bomb.spread * sizeof(Vector2));
-
+    explosion.spread_positions = (Vector2*)malloc(4 * bomb.spread * sizeof(Vector2));
     // Up
     for (int i = 1; i <= bomb.spread; i++) {
         if (y - i <= 0 || map[x][y - i] == WALL) 
@@ -82,7 +81,8 @@ void tick_bombs(float delta_time) {
         if (bomb->timer <= 0) {
             // Remove bomb from map
             map[(int)bomb->position.x][(int)bomb->position.y] = EMPTY;
-            Bombs_dequeue(&bombs_queue);
+            bombs_queue.items[i] = bombs_queue.items[--bombs_queue.rear];
+            i--;
 
             // Trigger explosion!
             trigger_explosion(*bomb);
@@ -116,6 +116,7 @@ void tick_explosions(float delta_time) {
     if (Explodes_empty(&explodes_queue))
         return;
 
+    // Loop through all active explosions
     for (int i = explodes_queue.front + 1; i < explodes_queue.rear; i++) {
         ExplosionInfo *explosion = &explodes_queue.items[i];
         explosion->timer -= delta_time;
@@ -123,12 +124,14 @@ void tick_explosions(float delta_time) {
         // Remove explosion after time is up
         if (explosion->timer <= 0) {
             map[(int)explosion->center.x][(int)explosion->center.y] = EMPTY;
-            for (int i = 0; i < explosion->spread_positions_size; i++) {
-                map[(int)explosion->spread_positions[i].x][(int)explosion->spread_positions[i].y] = EMPTY;
-            }
+            for (int j = 0; j < explosion->spread_positions_size; j++)
+                map[(int)explosion->spread_positions[j].x][(int)explosion->spread_positions[j].y] = EMPTY;
             
             spawn_pending_powerups(explosion);
-            Explodes_dequeue(&explodes_queue);
+            free(explosion->spread_positions);
+            explosion->spread_positions = NULL;
+            explodes_queue.items[i] = explodes_queue.items[--explodes_queue.rear];
+            i--;
         }
     }
 }
