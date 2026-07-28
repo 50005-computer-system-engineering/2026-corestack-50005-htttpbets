@@ -4,10 +4,6 @@
 #include "lib/libeventbus.h"
 #include "events.h"
 
-#define BOMB_TIMER 1.0f
-#define EXPLODE_LIFETIME 0.5f
-#define POWERUP
-
 BombsQueue bombs_queue;
 ExplodesQueue explodes_queue;
 
