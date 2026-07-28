@@ -176,7 +176,7 @@ FLAT_LIB_NAMES := $(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/%.c,%,$(FLAT_LIB_SRCS))
 # Converts every library name into a -l flag, stripping 'lib' prefix (eg: libtest -> -ltest)
 LOCAL_LDLIBS := $(patsubst lib%,-l%,$(LIB_NAMES))
 # Assigns final set of -l flags to LDLIBS, including corestack libraries
-LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS) -lm
+LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS) -lm -lcmocka
 
 # Final container of all libraries, empty for now
 ALL_LIB_ARCHIVES :=
@@ -328,20 +328,19 @@ init:
 TESTS_DIR := ./tests
 UNIT_DIR  := $(TESTS_DIR)/unit
 INT_DIR   := $(TESTS_DIR)/integration
-UNITY_DIR := $(TESTS_DIR)/unity
 UNIT_BIN  := $(UNIT_DIR)/bin
 
 UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
 UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
 
 # Tests never link raylib — test game logic through libbombbrain directly.
-TEST_CFLAGS  := $(CFLAGS) -I$(UNITY_DIR)
+TEST_CFLAGS  := $(CFLAGS) $(_EXTRA_CFLAGS)
 TEST_LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB) -lpthread
 TEST_LDLIBS  := $(LDLIBS)
 
-$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
+$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $(UNIT_BIN)
-	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
+	$(CC) $(TEST_CFLAGS) $< -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
 
 unit: $(UNIT_BINS)
 	@echo "==> Running bomberman unit tests"

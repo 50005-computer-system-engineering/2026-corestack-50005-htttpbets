@@ -1,6 +1,5 @@
-#include "collision.h"
 #include "map.h"
-#include <raymath.h>
+#include "collision.h"
 
 Vector4 get_all_overlapping_tiles(float x, float y, Vector2 size) {
     int left = (int)floorf(x);
