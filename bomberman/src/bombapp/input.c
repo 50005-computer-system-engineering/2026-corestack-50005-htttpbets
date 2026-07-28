@@ -4,7 +4,6 @@
 #include "config.h"
 #include "input.h"
 #include "events.h"
-#include "audio.h"
 
 void input_update(void) {
     // If either movement keys are pressed, we want to broadcast movement state

@@ -52,7 +52,7 @@ void on_bomb_pressed(void *args) {
 
     // TODO: Move me to bombd
     Vector2 pos = get_center_box(&curr_bm->box);
-    if (place_bomb(pos))
+    if (place_bomb(pos, 1))
         play_sound(SFX_PLACEBOMB);
 }
 

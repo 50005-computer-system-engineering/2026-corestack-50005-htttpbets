@@ -18,7 +18,7 @@ void tiles_init() {
     map_generate(10);
 }
 
-void draw_static_sprite(Texture2D texture, Vector2 pos, float size, Color tint) {
+void draw_static_sprite(Texture2D texture, Vector2 pos, float size, float rotation, Color tint) {
     // Render tile
     Rectangle source = {
         .x = pos.x * texture.width,
@@ -34,7 +34,14 @@ void draw_static_sprite(Texture2D texture, Vector2 pos, float size, Color tint) 
         .height = size
     };
 
-    DrawTexturePro(texture, source, dest, Vector2Zero(), 0.0f, tint);
+    Vector2 origin = Vector2Zero();
+    if (rotation != 0.0f) {
+        origin = (Vector2){texture.width * 0.5f, texture.height * 0.5f};
+        dest.x += texture.width * 0.5f;
+        dest.y += texture.height * 0.5f;
+    }
+
+    DrawTexturePro(texture, source, dest, origin, rotation, tint);
 }
 
 void tiles_draw() {
@@ -45,7 +52,7 @@ void tiles_draw() {
             if (map[i][j] < BREAKABLE) // Empty / Player / Bomb / -1 Tiles
                 texture = tile_textures[EMPTY];
 
-            draw_static_sprite(texture, (Vector2){i, j}, CONFIG.PHYSICS.TILE_SIZE, WHITE);
+            draw_static_sprite(texture, (Vector2){i, j}, CONFIG.PHYSICS.TILE_SIZE, 0.0f, WHITE);
         }
     }
 }

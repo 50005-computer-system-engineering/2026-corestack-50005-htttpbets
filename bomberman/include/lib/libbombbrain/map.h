@@ -7,6 +7,7 @@ typedef enum {
     EMPTY = 0,
     PLAYER,
     BOMB,
+    EXPLOSION,
     BREAKABLE,
     WALL,
     POWERUP_FIRE,

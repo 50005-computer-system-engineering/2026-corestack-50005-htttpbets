@@ -72,6 +72,10 @@ const Config CONFIG = {
         .TILE_BOMB = "../../assets/tiles/Bomb.png",
         .TILE_POWERUP_BOMB = "../../assets/tiles/Powerup_Bomb.png",
         .TILE_POWERUP_FIRE = "../../assets/tiles/Powerup_Fire.png",
+
+        .TILE_EXPLODE_CORE = "../../assets/tiles/Explode_Core.png",
+        .TILE_EXPLODE_MID = "../../assets/tiles/Explode_Mid.png",
+        .TILE_EXPLODE_CAP = "../../assets/tiles/Explode_Cap.png",
     },
 
     .SETTINGS = {
