@@ -21,7 +21,6 @@ void initalise() {
     tiles_init();
 
     // Initialise player
-    bomberman_init();
     player_bm = bomberman_create_default((Vector2) {1, 1});
     player_init(&player_bm);
 
@@ -64,10 +63,11 @@ void draw_loop() {
     BeginMode2D(camera);
         tiles_draw();
         bombs_draw();
-        bomberman_draw(&player_bm);
+        bomberman_draw(&player_bm, WHITE);
     EndMode2D();
 
     // Static UI Renders
+    DrawText(TextFormat("Bombs: %i/%i | Fire: %i", player_bm.inventory.remaining_bombs, player_bm.inventory.num_bombs, player_bm.inventory.num_fires), 40, 40, 40, BLACK);
     EndDrawing();
 }
 
@@ -82,7 +82,7 @@ void cleanup() {
     bombs_cleanup();
 
     // Free player
-    bomberman_cleanup();
+    bomberman_cleanup(&player_bm);
 
     // Free bgm & sfx
     audio_cleanup();
@@ -95,12 +95,12 @@ int main() {
     ChangeDirectory(GetApplicationDirectory()); 
     
     // TODO: Uncomment during final release for fullscreen mode
-    // SetConfigFlags(FLAG_FULLSCREEN_MODE);
-    // InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
-    // SetExitKey(KEY_NULL); // Prevent exit via escape key
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
+    SetExitKey(KEY_NULL); // Prevent exit via escape key
     
     // Windowed mode for debugging purposes
-    InitWindow(1200, 675, "Bombs Away! \U0001F4A3");
+    //InitWindow(1200, 675, "Bombs Away! \U0001F4A3");
     SetTargetFPS(60);
 
     initalise();

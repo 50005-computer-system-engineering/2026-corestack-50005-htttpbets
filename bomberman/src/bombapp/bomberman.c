@@ -3,31 +3,25 @@
 #include "config.h"
 #include "bomberman.h"
 #include "spritesheet.h"
-#include "config.h"
 #include "lib/libbombbrain/inventory.h"
 
-// Cached loaded spritesheets
-Spritesheet stand_sprites[4]; // Follows direction index
-Spritesheet walk_sprites[4];
-
-void bomberman_init() {
-    // Init Spritesheets
-    for (int i = 0; i < 4; i++) {
-        spritesheet_init(&stand_sprites[i], CONFIG.ASSETS.PLAYER_STAND[i]);
-        spritesheet_init(&walk_sprites[i], CONFIG.ASSETS.PLAYER_WALK[i]);
-    }
-}
 
 Bomberman bomberman_create_default(Vector2 position) {
     Bomberman bomberman = {0};
 
+    // Init Spritesheets
+    for (int i = 0; i < 4; i++) {
+        spritesheet_init(&bomberman.stand_sprites[i], CONFIG.ASSETS.PLAYER_STAND[i]);
+        spritesheet_init(&bomberman.walk_sprites[i], CONFIG.ASSETS.PLAYER_WALK[i]);
+    }
+
     // Initial sprite is facing down
-    bomberman.curr_sprite = &stand_sprites[1];
+    bomberman.curr_sprite = &bomberman.stand_sprites[1];
     bomberman.direction = 1;
     bomberman.is_moving = false;
 
     // Spawn in center of tile, at position
-    bomberman.box.position = Vector2Add(position , (Vector2){0.5f, 0.5f});
+    bomberman.box.position = Vector2Add(position , (Vector2){0.35f, 0.1f});
     bomberman.box.size = (Vector2){0.42f, 0.85f};
 
     // Powerups
@@ -39,12 +33,12 @@ Bomberman bomberman_create_default(Vector2 position) {
 }
 
 void bomberman_update(Bomberman* bm) {
-    bm->curr_sprite = bm->is_moving ? &walk_sprites[bm->direction] : &stand_sprites[bm->direction];
+    bm->curr_sprite = bm->is_moving ? &bm->walk_sprites[bm->direction] : &bm->stand_sprites[bm->direction];
     spritesheet_update(bm->curr_sprite);
     inventory_update(&bm->inventory, GetFrameTime());
 }
 
-void bomberman_draw(Bomberman* bm) {
+void bomberman_draw(Bomberman* bm, Color tint) {
     // HITBOX
     //DrawRectangle(bm->box.position.x * CONFIG.PHYSICS.TILE_SIZE, bm->box.position.y * CONFIG.PHYSICS.TILE_SIZE, bm->box.size.x * CONFIG.PHYSICS.TILE_SIZE, bm->box.size.y * CONFIG.PHYSICS.TILE_SIZE, RED);
     spritesheet_draw(
@@ -52,13 +46,13 @@ void bomberman_draw(Bomberman* bm) {
         bm->box.position,
         (Vector2) { 0.5f, 0.2f},
         0,  
-        WHITE
+        tint
     );
 }
 
-void bomberman_cleanup() {
+void bomberman_cleanup(Bomberman* bm) {
     for (int i = 0; i < 4; i++) {
-        spritesheet_free(&stand_sprites[i]);
-        spritesheet_free(&walk_sprites[i]);
+        spritesheet_free(&bm->stand_sprites[i]);
+        spritesheet_free(&bm->walk_sprites[i]);
     }
 }
