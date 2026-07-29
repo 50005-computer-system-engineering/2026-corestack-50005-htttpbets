@@ -151,11 +151,31 @@ int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBu
         LOG_E("[receiveBroadcastAsClient()] Failed to receive broadcast");
         return -1;
     }
+
+    // Test for message validity
+    if (returnMsg == NULL || returnMsg->content == NULL || returnMsg->length == 0)
+    {
+        LOG_E("[receiveBroadcastAsClient()] received null/empty message");
+        if (returnMsg) 
+            free(returnMsg);
+        return -1;
+    }
+
+    // Malloc buffer for message content
+    *returnBuffer = malloc((size_t)returnMsg->length);
+    if (*returnBuffer == NULL)
+    {
+        perror("[receiveBroadcastAsClient()] malloc");
+        free(returnMsg->content);
+        free(returnMsg);
+        return -1;
+    }
     
     // copy message content to return buffer
     memcpy(*returnBuffer, returnMsg->content, (size_t)returnMsg->length);
 
     // free function's pointers
+    free(returnMsg->content);
     free(returnMsg);
     returnMsg = NULL;
 
