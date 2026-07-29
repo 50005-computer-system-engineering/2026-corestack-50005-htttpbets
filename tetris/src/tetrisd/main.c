@@ -41,11 +41,14 @@ int main(void)
     uint32_t maxId = 0;
     for (uint32_t i = 0; i < lobbySize; i++)
     {
-        if (clientIds[i] > maxId) maxId = clientIds[i];
+        if (clientIds[i] > maxId)
+        {
+            maxId = clientIds[i];
+        }
     }
     uint32_t *heldGarbage = calloc(maxId + 1, sizeof(uint32_t)); // Store pending garbage accumulated for each player ID
-    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool)); // To check if target player ID is connected
-    if (heldGarbage == NULL || isValidPlayer == NULL) // Failed
+    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool));       // To check if target player ID is connected
+    if (heldGarbage == NULL || isValidPlayer == NULL)            // Failed
     {
         printf("[tetrisd] Failed to allocate player tracking!\n");
         free(clientIds);
@@ -82,14 +85,22 @@ int main(void)
 
         if (real_target <= maxId && isValidPlayer[real_target]) // Validates that target player ID exists and actively connected
         {
-            heldGarbage[real_target] += real_lines; // Add incoming garbage into the target's server side garbage queue
-            printf("-> [Server] Holding garbage for Target P%u: %u lines total (Broadcast pending future update)\n\n", real_target, heldGarbage[real_target]);
+            // Prep payload to send to other client
+            AttackPayload broadcast_payload;
+            broadcast_payload.source_player = htonl(real_source);
+            broadcast_payload.target_player = htonl(real_target);
+            broadcast_payload.lines = htonl(real_lines);
+
+            // Send the payload
+            sendBroadcastToClients(server, sizeof(AttackPayload), (unsigned char *)&broadcast_payload);
+            // Logging
+            printf("-> [Server] Broadcasted %u garbage lines to Target P%u\n\n", real_lines, real_target);
         }
         else // Target disconnected or DNE; logs warning and discards
         {
-            printf("-> [Server] WARNING: target P%u is not a connected player, discarding %u lines\n\n", real_target, real_lines);
+            printf("-> [Server] WARNING: Target P%u not found. Discarding attack.\n\n", real_target);
         }
-        
+
         // Free and clear buffer
         free(buffer);
         buffer = NULL;

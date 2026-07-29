@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
 #include "lib/libeventbus.h"
 #include "config.h"
 #include "events.h"
@@ -74,6 +76,40 @@ static void updateGameTimers(GameState *state)
     }
 }
 
+// Non-blocking network check function for network client
+static void processServerMessages(GameState *state)
+{
+    // Not instantiated
+    if (network_client == NULL)
+    {
+        return;
+    }
+
+    // Empty buffer to store
+    unsigned char *net_buffer = NULL;
+
+    // Poll server for incoming socket packets (non-blocking)
+    while (receiveBroadcastAsClient(network_client, &net_buffer) == 0)
+    {
+        if (net_buffer != NULL)
+        {
+            // Cast the raw byte buffer back into our struct
+            AttackPayload *incoming = (AttackPayload *)net_buffer;
+            // Convert the network bytes back to readable integers
+            uint32_t target_id = ntohl(incoming->target_player);
+            uint32_t lines = ntohl(incoming->lines);
+
+            // Check if attack was actually meant for this player
+            if (target_id == state->player_id)
+            {
+                state->pending_garbage += lines;
+            }
+            free(net_buffer);
+            net_buffer = NULL;
+        }
+    }
+}
+
 // --- MAIN GAME LOOP ---
 int main()
 {
@@ -108,9 +144,9 @@ int main()
     fflush(stdout);
 
     startGame(&gamestate_p1);
-    gamestate_p1.player_id = 1;        // Assign player ID
-    gamestate_p1.target_player_id = 0; // Fixed player target (unknown until broadcast exists)
-    gamestate_p1.held_type = 0;        // Initialize hold 0box
+    gamestate_p1.player_id = 1;                                            // Assign player ID
+    gamestate_p1.target_player_id = (gamestate_p1.player_id == 1) ? 2 : 1; // Starting player target
+    gamestate_p1.held_type = 0;                                            // Initialize hold box
     gamestate_p1.has_held = false;
 
     // Event Bus setup
@@ -122,6 +158,9 @@ int main()
     {
         // Deal with active inputs
         processInputs(&gamestate_p1);
+
+        // Continous polling to the server for incoming garbage broadcasts
+        processServerMessages(&gamestate_p1);
 
         // Refresh internal variables
         updateGameTimers(&gamestate_p1);
