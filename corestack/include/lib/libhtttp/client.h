@@ -10,5 +10,6 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
 int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *content);
+int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBuffer);
 
 #endif

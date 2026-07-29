@@ -9,8 +9,8 @@ int checkSockets(Sockets socks)
         LOG_E("[checkSockets()] missing TCP socket");
         return 0;
     }
-    int udpDirectActive = socks.udpDirect > 0 ? 1 : 0;
-    if (udpDirectActive == 0)
+    int udpUniActive = socks.udpUni > 0 ? 1 : 0;
+    if (udpUniActive == 0)
     {
         LOG_E("[checkSockets()] missing UDP direct socket");
         return 0;
@@ -35,8 +35,8 @@ int closeSockets(Sockets *socks)
     }
     close(socks->tcp);
     socks->tcp = -1;
-    close(socks->udpDirect);
-    socks->udpDirect = -1;
+    close(socks->udpUni);
+    socks->udpUni = -1;
     close(socks->udpBroad);
     socks->udpBroad = -1;
     LOG_I("[closeSockets()] closed sockets successfully");
@@ -57,8 +57,8 @@ int createSockets(Sockets **socks)
     }
 
     // create udp direct socket descriptor
-    newSocks->udpDirect = socket(AF_INET, SOCK_DGRAM, 0);
-    if (newSocks->udpDirect < 0)
+    newSocks->udpUni = socket(AF_INET, SOCK_DGRAM, 0);
+    if (newSocks->udpUni < 0)
     {
         perror("[common createSockets()] socket");
         close(newSocks->tcp);
@@ -71,7 +71,7 @@ int createSockets(Sockets **socks)
     {
         perror("[common createSockets()] socket");
         close(newSocks->tcp);
-        close(newSocks->udpDirect);
+        close(newSocks->udpUni);
         goto fail;
     }
 

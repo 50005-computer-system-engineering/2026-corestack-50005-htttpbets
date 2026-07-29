@@ -55,6 +55,46 @@ int acceptOnTCP(Server *serverPtr)
     return newClientFd;
 }
 
+int prepareUnicastUDP(Server *serverPtr)
+{
+    LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
+
+    // Bind sockets to port 
+    struct sockaddr_in serverAddr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_UNI),
+        .sin_addr.s_addr = INADDR_ANY // any interface address
+    };
+    if (bind(serverPtr->self->socks->udpUni, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("[prepareUnicastUDP()] bind");
+        return -1;
+    }
+    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
+
+    LOG_I("[prepareUnicastUDP()] UDP unicast port ready to receive");
+
+    return 0;
+}
+
+int prepareBroadcastUDP(Server *serverPtr)
+{
+    LOG_I("[prepareBroadcastUDP()] preparing UDP broadcast port");
+
+    // setting socket options
+    int broadcastEnabled = 1;
+    if (setsockopt(serverPtr->self->socks->udpBroad, SOL_SOCKET, SO_BROADCAST, &broadcastEnabled, sizeof(broadcastEnabled)) < 0)
+    {
+        perror("[prepareBroadcastUDP()] setsockopt");
+        return -1;
+    }
+    LOG_D("[prepareBroadcastUDP()] socket options set");
+
+    LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready for transmission");
+
+    return 0;
+}
+
 int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
 {
     LOG_I("[getFdSetTCP()] getting a pollfd struct from server");
@@ -106,6 +146,23 @@ int createServer(LibhtttpServer **serverPtr)
     }
     newServer->clients = NULL;
     LOG_I("[createServer()] new server created with sockets created");
+
+    // start listening until lobbySize of clients connect to server
+    if (listenOnTCP(newServer) < 0)
+    {
+        LOG_E("[openLobby()] failed to bind port for listening");
+        goto fail;
+    }
+    LOG_D("[createServer()] bound port for listening");
+
+    // setup UDP ports
+    if (prepareBroadcastUDP(newServer) < 0 || prepareUnicastUDP(newServer) < 0)
+    {
+        LOG_E("[openLobby()] failed to prepare UDP port for listening");
+        goto fail;
+    }
+    LOG_D("[createServer()] UDP ports bound and ready for messaging");
+
     *serverPtr = newServer;
     return 0;
 
@@ -117,6 +174,8 @@ int createServer(LibhtttpServer **serverPtr)
 
 int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds)
 {
+    LOG_I("[openLobby()] opening server lobby for clients...");
+
     // check parameters
     if (serverPtr == NULL)
     {
@@ -130,7 +189,6 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
     }
 
     // allocate space for client array
-    LOG_I("[openLobby()] opening server lobby for clients...");
     Server *thisServer = serverPtr;
     if (thisServer->clients != NULL)
     {
@@ -148,15 +206,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         perror("server malloc");
         return -1;
     }
-    LOG_I("[openLobby()] memory allocated for client linked list");
-
-    // start listening until lobbySize of clients connect to server
-    if (listenOnTCP(thisServer) < 0)
-    {
-        LOG_E("[openLobby()] failed to bind port for listening");
-        return -1;
-    }
-    LOG_I("[openLobby()] bound port for listening");
+    LOG_D("[openLobby()] memory allocated for client linked list");
 
     // start accepting clients for TCP connections
     uint8_t slot = 1;   // ID 0 is reserved for server
@@ -169,7 +219,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
             LOG_E("[openLobby()] accept failed to find client, skipping loop iteration...");
             continue;
         }
-        LOG_I("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
+        LOG_D("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
         
         // creating client endpoint of newly connected client
         Endpoint newClient = {
@@ -208,7 +258,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         LOG_E("[openLobby()] failed to write list of client ids");
         return -1;
     }
-    LOG_I("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
+    LOG_D("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
 
     LOG_I("[openLobby()] Lobby opening complete");
     return 0;
@@ -277,5 +327,32 @@ int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned c
     free(returnMsg);
 
     LOG_I("[listenForClientMsg()] received message");
+    return 0;
+}
+
+int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content)
+{
+    LOG_I("[sendBroadcastToClients()] sending broadcast to cliets...");
+
+    // cast to private server struct
+    Server *thisServer = serverPtr;
+
+    // prepare the complete message
+    Message completeMsg = {
+        .sourceId = thisServer->self->id,
+        .length = length,
+        .content = content
+    };
+    LOG_D("[sendBroadcastToClients()] sending broadcast with header:\n\tsource: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+
+    // send as broadcast
+    if (sendBroadcast(thisServer->self->socks->udpBroad, completeMsg))
+    {
+        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        return -1;
+    }
+
+    LOG_I("[sendBroadcastToClients()] broadcast has been sent");
+
     return 0;
 }

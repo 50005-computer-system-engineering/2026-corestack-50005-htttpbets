@@ -14,7 +14,7 @@
 
 // known ports
 #define PORT_TCP 6700
-#define PORT_UDP_DIRECT 6701
+#define PORT_UDP_UNI 6701
 #define PORT_UDP_BROAD 6702
 
 // important values
@@ -23,7 +23,7 @@
 // common structs throughout
 typedef struct {
     int tcp;            // important singlecast
-    int udpDirect;      // unimportant singlecast
+    int udpUni;      // unimportant singlecast
     int udpBroad;       // broadcasts
 } Sockets;
 

@@ -12,7 +12,8 @@ typedef struct {
 // messaging functions
 int receiveMessage(int sockfd, Message **returnPtr);
 int sendMessage(int sockfd, Message completeMsg);
-int getMessageContent(Message completeMsg, unsigned char **buffer);
+int receiveBroadcast(int sockfd, Message **returnPtr);
+int sendBroadcast(int sockfd, Message completeMsg);
 
 // registration functions
 int registerNewClient(Endpoint *newClient);
