@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include "lib/libeventbus.h"
 #include "config.h"
@@ -21,6 +22,39 @@
 
 // Global network client
 LibhtttpClient *network_client = NULL;
+
+// TEST PATCH: BACKGROUND THREADS
+#include <pthread.h>
+
+// Dedicated background thread for receiving network broadcasts
+void *networkListenerThread(void *arg)
+{
+    GameState *state = (GameState *)arg;
+    unsigned char *net_buffer = NULL;
+
+    while (!state->game_over && network_client != NULL)
+    {
+        if (receiveBroadcastAsClient(network_client, &net_buffer) == 0)
+        {
+            if (net_buffer != NULL)
+            {
+                AttackPayload incoming;
+                memcpy(&incoming, net_buffer, sizeof(AttackPayload));
+
+                uint32_t target_id = ntohl(incoming.target_player);
+                uint32_t lines     = ntohl(incoming.lines);
+
+                if (target_id == state->player_id)
+                {
+                    state->pending_garbage += lines;
+                }
+                free(net_buffer);
+            }
+            net_buffer = NULL; // Reset pointer for the next loop
+        }
+    }
+    return NULL;
+}
 
 // Process gravity and lock delay intervals
 static void updateGameTimers(GameState *state)
@@ -153,6 +187,14 @@ int main()
     event_bus_init(EVENT_COUNT);
     event_bus_listen(EVENT_ATTACK_GENERATED, on_attack_generated);
 
+    // Launch background thread to handle blocking receiveBroadcastAsClient calls
+    pthread_t net_thread;
+    if (network_client != NULL)
+    {
+        pthread_create(&net_thread, NULL, networkListenerThread, &gamestate_p1);
+        pthread_detach(net_thread); // Runs independently in the background
+    }
+
     // --- THE GAME LOOP ---
     while (!gamestate_p1.game_over)
     {
@@ -160,7 +202,7 @@ int main()
         processInputs(&gamestate_p1);
 
         // Continous polling to the server for incoming garbage broadcasts
-        processServerMessages(&gamestate_p1);
+        //processServerMessages(&gamestate_p1);
 
         // Refresh internal variables
         updateGameTimers(&gamestate_p1);
