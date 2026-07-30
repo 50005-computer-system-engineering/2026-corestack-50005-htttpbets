@@ -15,7 +15,11 @@
 #include "lib/libtetrisbrain/hold.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
+#include "lib/libtetrisbrain/killfeed.h"
 #include "lib/libhtttp/client.h"
+
+// Logging purposes
+#include "lib/liblog.h"
 
 // Networking purposes
 #define LOCAL_HOST "127.0.0.1"
@@ -26,28 +30,35 @@ LibhtttpClient *network_client = NULL;
 // TEST PATCH: BACKGROUND THREADS
 #include <pthread.h>
 
-// Dedicated background thread for receiving network broadcasts
+// TEST PATCH: Dedicated background thread for receiving network broadcasts
 void *networkListenerThread(void *arg)
 {
     GameState *state = (GameState *)arg;
-    unsigned char *net_buffer = NULL;
+    unsigned char *net_buffer = NULL; // Empty buffer to store
 
+    // Instantiated as well as active
     while (!state->game_over && network_client != NULL)
     {
+        // Poll server for incoming socket packets (non-blocking)
         if (receiveBroadcastAsClient(network_client, &net_buffer) == 0)
         {
             if (net_buffer != NULL)
             {
-                AttackPayload incoming;
-                memcpy(&incoming, net_buffer, sizeof(AttackPayload));
-
-                uint32_t target_id = ntohl(incoming.target_player);
-                uint32_t lines     = ntohl(incoming.lines);
-
+                // Cast the raw byte buffer back into our struct
+                AttackPayload *incoming = (AttackPayload *)net_buffer;
+                // Convert the network bytes back to readable integers
+                uint32_t source_id = ntohl(incoming->source_player);
+                uint32_t target_id = ntohl(incoming->target_player);
+                uint32_t lines = ntohl(incoming->lines);
+                LOG_I("[networkListenerThread] decoded broadcast: target_id=%u, my player_id=%u", target_id, state->player_id);
+                // Check if attack was actually meant for this player
                 if (target_id == state->player_id)
                 {
                     state->pending_garbage += lines;
+                    addKillFeed(source_id, target_id, lines);
+                    LOG_I("[networkListenerThread] P%u received %u lines from P%u (pending_garbage now %u)", state->player_id, lines, source_id, state->pending_garbage);
                 }
+                // Clean up
                 free(net_buffer);
             }
             net_buffer = NULL; // Reset pointer for the next loop
@@ -78,15 +89,11 @@ static void updateGameTimers(GameState *state)
             tickGame(state);
             if (state->outgoing_garbage > 0)
             {
-                // Find target player
-                // TODO: MANUAL PATCH FIX, NEED TO CHANGE !!
-                GameState *localLobby[] = {state};
-                uint32_t current_victim = resolveTargetID(state, localLobby, 1);
                 // Pack the payload
                 AttackPayload payload =
                     {
                         .source_player = state->player_id,
-                        .target_player = current_victim,
+                        .target_player = state->target_player_id,
                         .lines = state->outgoing_garbage};
                 // Trigger Event Bus
                 event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
@@ -110,43 +117,21 @@ static void updateGameTimers(GameState *state)
     }
 }
 
-// Non-blocking network check function for network client
-static void processServerMessages(GameState *state)
-{
-    // Not instantiated
-    if (network_client == NULL)
-    {
-        return;
-    }
-
-    // Empty buffer to store
-    unsigned char *net_buffer = NULL;
-
-    // Poll server for incoming socket packets (non-blocking)
-    while (receiveBroadcastAsClient(network_client, &net_buffer) == 0)
-    {
-        if (net_buffer != NULL)
-        {
-            // Cast the raw byte buffer back into our struct
-            AttackPayload *incoming = (AttackPayload *)net_buffer;
-            // Convert the network bytes back to readable integers
-            uint32_t target_id = ntohl(incoming->target_player);
-            uint32_t lines = ntohl(incoming->lines);
-
-            // Check if attack was actually meant for this player
-            if (target_id == state->player_id)
-            {
-                state->pending_garbage += lines;
-            }
-            free(net_buffer);
-            net_buffer = NULL;
-        }
-    }
-}
-
 // --- MAIN GAME LOOP ---
-int main()
+int main(int argc, char *argv[])
 {
+    // TEST PATCH FIX FOR PLAYER_ID AND TARGET_PLAYER_ID
+    // Force dynamic ID assignment via launch argument
+    if (argc < 2)
+    {
+        printf("Usage: %s <player_id>\n", argv[0]);
+        printf("Example: %s 1\n", argv[0]);
+        return -1;
+    }
+
+    int assigned_player_id = atoi(argv[1]);
+    uint32_t lobby_size = 2;
+
     // PATCH FIX FOR FLICKERING TERMINAL
     setvbuf(stdout, NULL, _IOFBF, 16384);
 
@@ -177,11 +162,11 @@ int main()
     printf("\e[1;1H\e[2J");
     fflush(stdout);
 
-    startGame(&gamestate_p1);
-    gamestate_p1.player_id = 1;                                            // Assign player ID
-    gamestate_p1.target_player_id = (gamestate_p1.player_id == 1) ? 2 : 1; // Starting player target
-    gamestate_p1.held_type = 0;                                            // Initialize hold box
-    gamestate_p1.has_held = false;
+    startGame(&gamestate_player);
+    gamestate_player.player_id = assigned_player_id;                                   // Assign player ID
+    gamestate_player.target_player_id = (gamestate_player.player_id % lobby_size) + 1; // Starting player target
+    gamestate_player.held_type = 0;                                                    // Initialize hold box
+    gamestate_player.has_held = false;
 
     // Event Bus setup
     event_bus_init(EVENT_COUNT);
@@ -191,31 +176,28 @@ int main()
     pthread_t net_thread;
     if (network_client != NULL)
     {
-        pthread_create(&net_thread, NULL, networkListenerThread, &gamestate_p1);
+        pthread_create(&net_thread, NULL, networkListenerThread, &gamestate_player);
         pthread_detach(net_thread); // Runs independently in the background
     }
 
     // --- THE GAME LOOP ---
-    while (!gamestate_p1.game_over)
+    while (!gamestate_player.game_over)
     {
         // Deal with active inputs
-        processInputs(&gamestate_p1);
-
-        // Continous polling to the server for incoming garbage broadcasts
-        //processServerMessages(&gamestate_p1);
+        processInputs(&gamestate_player);
 
         // Refresh internal variables
-        updateGameTimers(&gamestate_p1);
+        updateGameTimers(&gamestate_player);
 
         // Render the boards
-        drawBoard(&gamestate_p1);
+        drawBoard(&gamestate_player);
 
         // Delay frames to be visible to the human eye
         usleep(DELAY_MICROSECONDS);
     }
 
     // Clean up after game ends
-    drawBoard(&gamestate_p1);
+    drawBoard(&gamestate_player);
     printf("\n\n");
     printf("<!> ====================== <!>\n");
     printf("<!>       GAME OVER!       <!>\n");
