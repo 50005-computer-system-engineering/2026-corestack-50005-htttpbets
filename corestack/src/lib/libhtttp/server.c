@@ -97,6 +97,8 @@ int prepareBroadcastUDP(Server *serverPtr)
 }
 
 // private state-based functions
+typedef void (*StateLoops)(Server *serverPtr);
+
 /* 
 IDLE state where it makes thread busy wait for admin administered state change 
 Does not take any HTTTP packets in this state
@@ -238,10 +240,10 @@ void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from 
     listenFdUDP.revents = 0;
 
     // while the GAME state is active, monitor for messages to each port
-    while (serverPtr->self->state != GAME)
+    while (serverPtr->self->state == GAME)
     {
         // poll for any tcp activity
-        int socketActivity = poll(&listenFdTCP, serverPtr->clients->count, 50);
+        int socketActivity = poll(listenFdTCP, serverPtr->clients->count, 50);
         if (socketActivity <= 0)  // timeout configured to prevent perma-blocking
         {
             continue; // skip if nothing
@@ -254,25 +256,42 @@ void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from 
         uint32_t sourceId = 0;
         for (uint32_t i=0; i < serverPtr->clients->count || socketActivity > 0; i++)
         {
-            if (clientFds[i].revents == POLLIN)
+            if (listenFdTCP[i].revents == POLLIN)
             {
-                int fd = clientFds[i].fd;
-                readyToRead--;
+                int fd = listenFdTCP[i].fd;
+                socketActivity--;
                 if (receiveMessage(fd, &msg) < 0)
                 {
                     LOG_E("[gameStateLoop()] could not read message from TCP socket fd %d", fd);
                     continue;
                 }
+                listenFdTCP[i].revents = 0;
                 LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
             }
         }
-
     }
 }
 
 void endStateCleanup(Server *serverPtr)
 {
     
+}
+
+StateLoops stateLoops[] = {
+    [IDLE] = idleStateLoop,
+    [LOBBY] = lobbyStateLoop,
+    [GAME] = gameStateLoop,
+    [END] = endStateCleanup
+};
+
+void* threadFunc(void *server)
+{
+    Server *thisServer = (Server *) server;
+
+    while (true)
+    {
+        stateLoops[thisServer->self->state](thisServer);
+    }
 }
 
 // public functions
@@ -313,7 +332,15 @@ int createServer(LibhtttpServer **serverPtr)
 
     *serverPtr = newServer;
 
-    LOG_I("[createServer()] HTTTP created and saved to pointer...");
+    // spawn backrgound thread
+    pthread_t threadId;
+    if (pthread_create(&threadId, NULL, threadFunc, (void*)newServer) != 0) 
+    {
+        perror("Failed to create thread");
+        return 1;
+    }
+
+    LOG_I("[createServer()] HTTTP server created and saved to pointer, background thread also started");
 
     return 0;
 
@@ -374,6 +401,31 @@ int openLobby(LibhtttpServer *serverPtr)
     return 0;
 }
 
+int startGame(LibhtttpServer *serverPtr)
+{
+    LOG_I("[startGame()] transitioning SERVER from GAME to LOBBY state...");
+
+    // check parameters
+    if (serverPtr == NULL)
+    {
+        LOG_E("[startGame()] serverPtr has no server allocated");
+        return -1;
+    }
+
+    Server *thisServer = serverPtr;
+    if (thisServer->self->state != LOBBY)
+    {
+        LOG_E("[startGame()] server is not currently in LOBBY state");
+        return 1; // allow to continue as though no issue (intended effect already in place)
+    }
+
+    thisServer->self->state = GAME;
+
+    LOG_I("[startGame()] SERVER is set to GAME state");
+
+    return 0;
+}
+
 int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content)
 {
     LOG_I("[sendBroadcastToClients()] sending broadcast to cliets...");
@@ -400,4 +452,3 @@ int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned 
 
     return 0;
 }
-

@@ -7,6 +7,7 @@ typedef void LibhtttpServer;
 
 int createServer(LibhtttpServer **serverPtr);
 int openLobby(LibhtttpServer *serverPtr);
+int startGame(LibhtttpServer *serverPtr);
 
 int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content);
 
