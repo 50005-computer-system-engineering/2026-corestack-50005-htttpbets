@@ -6,7 +6,7 @@
 typedef void LibhtttpServer;
 
 int createServer(LibhtttpServer **serverPtr);
-int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds);
+int openLobby(LibhtttpServer *serverPtr)
 int closeLobby(LibhtttpServer *serverPtr);
 
 int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned char **returnMsg);

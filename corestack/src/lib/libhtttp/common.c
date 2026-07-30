@@ -99,6 +99,8 @@ int createEndpoint(Endpoint **endpt)
     newEndpt->id = 0;
     // memcpy(newEndpt->token, (unsigned char *)"0000000", NONCE_LEN);
 
+    newEndpt->state = IDLE;
+
     // create new sockets
     if (createSockets(&newEndpt->socks) < 0)
     {
