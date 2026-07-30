@@ -3,12 +3,13 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <unistd.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "liblog.h"
 
