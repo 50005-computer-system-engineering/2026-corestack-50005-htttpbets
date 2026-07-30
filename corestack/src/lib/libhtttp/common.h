@@ -27,8 +27,16 @@ typedef struct {
     int udpBroad;       // broadcasts
 } Sockets;
 
+typedef enum {
+    IDLE,
+    LOBBY,
+    GAME,
+    END
+} EndpointState;
+
 typedef struct {
     uint32_t id;                        // Own ID
+    EndpointState state;
     Sockets *socks;                  // track sockets
 } Endpoint;
 
