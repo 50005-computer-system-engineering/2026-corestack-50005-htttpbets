@@ -93,6 +93,7 @@ int main(void)
 
             // Send the payload
             sendBroadcastToClients(server, sizeof(AttackPayload), (unsigned char *)&broadcast_payload);
+            
             // Logging
             printf("-> [Server] Broadcasted %u garbage lines to Target P%u\n\n", real_lines, real_target);
         }

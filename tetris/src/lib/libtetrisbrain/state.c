@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 // Initialise gamestate
-GameState gamestate_p1;
+GameState gamestate_player;
 
 // Function call to start the game
 void startGame(GameState *state)

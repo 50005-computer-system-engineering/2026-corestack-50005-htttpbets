@@ -44,7 +44,7 @@ typedef struct
 } GameState;
 
 // Establish game state
-extern GameState gamestate_p1;
+extern GameState gamestate_player;
 
 // Function call to start the game
 void startGame(GameState *state);
