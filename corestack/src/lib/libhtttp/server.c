@@ -96,27 +96,135 @@ int prepareBroadcastUDP(Server *serverPtr)
     return 0;
 }
 
-int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
+// private state-based functions
+/* 
+IDLE state where it makes thread busy wait for admin administered state change 
+Does not take any HTTTP packets in this state
+*/
+void idleStateLoop(Server *serverPtr)    // budy waits for next action
 {
-    LOG_I("[getFdSetTCP()] getting a pollfd struct from server");
-
-    // check if empty
-    if (serverPtr->clients == NULL || serverPtr->clients->head == NULL)
+    LOG_I("[idleStateLoop()] SERVER entering IDLE state, awaiting instructions...");
+    while (serverPtr->self->state == IDLE)
     {
-        LOG_E("[getFdSetTCP()] no clients connected to server");
-        return -1;
+        // busy wait
+        continue;
+    }
+    LOG_I("[idleStateLoop()] state change detected, SERVER exiting IDLE state");
+    return;
+}
+
+/*
+LOBBY state where clients are allowed to send JOIN, LEAVE HTTTP packets
+During this state, TCP connections from client are accepted (and server assigns player ID)
+*/ 
+void lobbyStateLoop(Server *serverPtr)   // loop where server accepts clients
+{
+    LOG_I("[lobbyStateLoop()] SERVER entering LOBBY state, accepting clients...");
+    
+    // prepare client list (upon entering lobby state)
+    LOG_D("[lobbyStateLoop()] allocating space for client list on SERVER");
+    if (serverPtr->clients != NULL)
+    {
+        // free and make a new array
+        if (freeList(&serverPtr->clients) < 0)
+        {
+            LOG_E("[lobbyStateLoop()] could not free list for new lobby");
+            return;
+        }
+        serverPtr->clients = NULL;
+    }
+    serverPtr->clients = malloc(sizeof(ClientLinkedList));
+    if (serverPtr->clients == NULL)
+    {
+        perror("[lobbyStateLoop()] malloc");
+        return;
+    }
+    LOG_D("[lobbyStateLoop()] memory allocated for client linked list");
+
+    // tracking the id assigned
+    int prevAssignedId = 0; 
+
+    // preparing TCP socket for polling
+    struct pollfd acceptPort;
+    acceptPort.fd = serverPtr->self->socks->tcp;   // socket to start connection with the poll
+    acceptPort.events = POLLIN;
+    acceptPort.revents = 0;
+
+    // while in this state, keep accepting clients
+    while (serverPtr->self->state == LOBBY)
+    {
+        // poll for a client
+        if (poll(&acceptPort, 1, 50) <= 0)  // timeout configured to prevent perma-blocking
+        {
+            continue; // skip if nothing
+        }
+
+        // accept a client if the socket has any POLLIN activity
+        LOG_D("[lobbyStateLoop()] polled activity, accpeting a client");
+        int clientFd = acceptOnTCP(serverPtr);
+        if (clientFd < 0)
+        {
+            LOG_E("[lobbyStateLoop()] accept failed to find client, skipping loop iteration...");
+            continue;
+        }
+        LOG_D("[lobbyStateLoop()] accept succses, assigning player id %u to new connection", ++prevAssignedId);
+        
+        // creating client endpoint of newly connected client
+        Endpoint newClient = {
+            .id = prevAssignedId,
+            .socks = malloc(sizeof(Sockets))
+        };
+        newClient.socks->tcp = clientFd;
+        if (registerNewClient(&newClient) < 0)
+        {
+            LOG_E("[lobbyStateLoop()] failed to register new client");
+            goto cleanup;
+        }
+        
+        // add completed new client to the clients list
+        if (addToList(serverPtr->clients, &newClient))
+        {
+            LOG_E("[lobbyStateLoop()] failed to add client to new list");
+            goto cleanup;
+        }
+        LOG_D("[lobbyStateLoop()] finished sending the new client their ID");
+
+        continue;
+        
+        cleanup:
+        free(newClient.socks);
+        newClient.socks = NULL;
+        LOG_E("[lobbyStateLoop()] failed to make new client, dropping it");
+
+        continue;
     }
 
-    // initialise struct
-    struct pollfd *fds = malloc(sizeof(struct pollfd) * serverPtr->clients->count);
-    if (fds == NULL)
+    LOG_I("[lobbyStateLoop()] state change detected, SERVER exiting LOBBY state");
+    return;
+}
+
+/*
+GAME state where it it listens for ACTION packets and sends STATE packets
+At start of state state, all clients are sent an START packet to change their state into a game state
+During this state, clients may still choose to LIST
+To end the state, END packet is sent to change its state again
+*/
+void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from clients
+{
+    LOG_I("[gameStateLoop()] SERVER entering GAME state, prerparing to listen for messages...");
+
+    // check if there are any players
+    if (serverPtr->clients->count <= 0)
     {
-        perror("server malloc");
-        return -1;
+        LOG_E("[gameStateLoop()] SERVER has no clients connected, reverting to lobby state...");
+        serverPtr->self->state = LOBBY;
+        return;
     }
 
-    // add all client fd to polled fds
-    struct pollfd *currentFd = fds;
+    // setup pollfd array for clients being listened to
+    struct pollfd *listenFdTCP = malloc(sizeof(struct pollfd) * serverPtr->clients->count);
+    struct pollfd *currentFd = listenFdTCP;
+    // loop through server's clients
     for (ClientNode *currentClient = serverPtr->clients->head; currentClient != NULL; currentClient = currentClient->next)
     {
         currentFd->fd = currentClient->client.socks->tcp;
@@ -124,22 +232,63 @@ int getFdSetTCP(Server *serverPtr, struct pollfd **clientFds)
         currentFd->revents = 0;
         currentFd++;
     }
+    struct pollfd listenFdUDP;
+    listenFdUDP.fd = serverPtr->self->socks->udpUni;
+    listenFdUDP.events = POLLIN;
+    listenFdUDP.revents = 0;
 
-    *clientFds = fds;
+    // while the GAME state is active, monitor for messages to each port
+    while (serverPtr->self->state != GAME)
+    {
+        // poll for any tcp activity
+        int socketActivity = poll(&listenFdTCP, serverPtr->clients->count, 50);
+        if (socketActivity <= 0)  // timeout configured to prevent perma-blocking
+        {
+            continue; // skip if nothing
+        }
+        
+        // listen to each message and handle
+        // TODO message buffer for high traffic situation
+        // FOR NOW handles 1 message at a time for testing and basic functionality
+        Message *msg = NULL;
+        uint32_t sourceId = 0;
+        for (uint32_t i=0; i < serverPtr->clients->count || socketActivity > 0; i++)
+        {
+            if (clientFds[i].revents == POLLIN)
+            {
+                int fd = clientFds[i].fd;
+                readyToRead--;
+                if (receiveMessage(fd, &msg) < 0)
+                {
+                    LOG_E("[gameStateLoop()] could not read message from TCP socket fd %d", fd);
+                    continue;
+                }
+                LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+            }
+        }
 
-    LOG_I("[getFdSetTCP()] added all clients to set");
-    return 0;
+    }
+}
+
+void endStateCleanup(Server *serverPtr)
+{
+    
 }
 
 // public functions
 int createServer(LibhtttpServer **serverPtr)
 {
+    // allocate memory for it
     Server *newServer = malloc(sizeof(Server));
     if (newServer == NULL)
     {
         perror("server malloc");
         return -1;
     }
+
+    LOG_I("[createServer()] creating HTTTP server...");
+
+    // create the endpoint
     if (createEndpoint(&newServer->self) < 0)
     {
         LOG_E("[createServer()] endpoint creation failed");
@@ -148,15 +297,13 @@ int createServer(LibhtttpServer **serverPtr)
     newServer->clients = NULL;
     LOG_I("[createServer()] new server created with sockets created");
 
-    // start listening until lobbySize of clients connect to server
+    // prepare ports for usage
     if (listenOnTCP(newServer) < 0)
     {
         LOG_E("[openLobby()] failed to bind port for listening");
         goto fail;
     }
     LOG_D("[createServer()] bound port for listening");
-
-    // setup UDP ports
     if (prepareBroadcastUDP(newServer) < 0 || prepareUnicastUDP(newServer) < 0)
     {
         LOG_E("[openLobby()] failed to prepare UDP port for listening");
@@ -165,17 +312,21 @@ int createServer(LibhtttpServer **serverPtr)
     LOG_D("[createServer()] UDP ports bound and ready for messaging");
 
     *serverPtr = newServer;
+
+    LOG_I("[createServer()] HTTTP created and saved to pointer...");
+
     return 0;
 
     fail:
+    LOG_I("[createServer()] failed to create new HTTTP server");
     free(newServer);
     newServer = NULL;
     return -1;
 }
 
-int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientIds)
+int pauseServer(LibhtttpServer *serverPtr)
 {
-    LOG_I("[openLobby()] opening server lobby for clients...");
+    LOG_I("[openLobby()] setting SERVER to IDLE state...");
 
     // check parameters
     if (serverPtr == NULL)
@@ -183,151 +334,43 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         LOG_E("[openLobby()] serverPtr has no server allocated");
         return -1;
     }
-    if (*lobbySize < 1)
-    {
-        LOG_E("[openLobby()] lobbySize is required to be at least 1");
-        return -1;
-    }
 
-    // allocate space for client array
     Server *thisServer = serverPtr;
-    if (thisServer->clients != NULL)
+    if (thisServer->self->state == IDLE)
     {
-        // free and make a new array
-        if (freeList(&thisServer->clients) < 0)
-        {
-            LOG_E("[openLobby()] could not free list for new lobby");
-            return -1;
-        }
-        thisServer->clients = NULL;
+        LOG_E("[openLobby()] server is already in IDLE state");
+        return 0; // allow to continue as though no issue (intended effect already in place)
     }
-    thisServer->clients = malloc(sizeof(ClientLinkedList));
-    if (thisServer->clients == NULL)
-    {
-        perror("server malloc");
-        return -1;
-    }
-    LOG_D("[openLobby()] memory allocated for client linked list");
 
-    // start accepting clients for TCP connections
-    uint8_t slot = 1;   // ID 0 is reserved for server
-    while (thisServer->clients->count < *lobbySize && slot != UINT32_MAX)
-    {
-        // blocks until client connects
-        int clientFd = acceptOnTCP(thisServer);
-        if (clientFd < 0)
-        {
-            LOG_E("[openLobby()] accept failed to find client, skipping loop iteration...");
-            continue;
-        }
-        LOG_D("[openLobby()] accept succses, adding new client to slot %u/%u...", slot, *lobbySize);
-        
-        // creating client endpoint of newly connected client
-        Endpoint newClient = {
-            .id = slot,
-            // .token = "0000000",
-            .socks = malloc(sizeof(Sockets))
-        };
-        newClient.socks->tcp = clientFd;
-        if (registerNewClient(&newClient) < 0)
-        {
-            LOG_E("[openLobby()] failed to register new client");
-            goto cleanup;
-        }
-        
-        // add completed new client to the clients list
-        if (addToList(thisServer->clients, &newClient))
-        {
-            LOG_E("[openLobby()] failed to add client to new list");
-            goto cleanup;
-        }
+    thisServer->self->state = IDLE;
 
-        slot++;
-        continue;
-        
-        cleanup:
-        free(newClient.socks);
-        newClient.socks = NULL;
-        // stack variable, cleared automatically I think
-        continue;
-    } // TODO implement halting lobby joining
+    LOG_I("[openLobby()] SERVER is set to LOBBY state");
 
-    // return a list of players
-    *lobbySize = thisServer->clients->count;
-    if (getIdArray(thisServer->clients, clientIds) < 0)
-    {
-        LOG_E("[openLobby()] failed to write list of client ids");
-        return -1;
-    }
-    LOG_D("[openLobby()] successfully returning array of %u player IDs", *lobbySize);
-
-    LOG_I("[openLobby()] Lobby opening complete");
     return 0;
 }
 
-int closeLobby(LibhtttpServer *serverPtr)
+int openLobby(LibhtttpServer *serverPtr)
 {
-    // TODO Implement close
-    return 0;
-}
+    LOG_I("[openLobby()] setting SERVER to LOBBY state...");
 
-int listenForClientMsg(LibhtttpServer *serverPtr, uint32_t *sourceId, unsigned char **returnBuffer)
-{
+    // check parameters
+    if (serverPtr == NULL)
+    {
+        LOG_E("[openLobby()] serverPtr has no server allocated");
+        return -1;
+    }
+
     Server *thisServer = serverPtr;
-    Message *returnMsg = NULL;
-
-    // listening for multiple clients
-    struct pollfd *clientFds;
-    if (getFdSetTCP(thisServer, &clientFds) < 0)
+    if (thisServer->self->state == LOBBY)
     {
-        LOG_E("[listenForClientMsg()] could not make a list of client socket fds");
-        return -1;
-    }
-    int readyToRead = poll(clientFds, thisServer->clients->count, 3 * 60 * 1000);
-    if (readyToRead <= 0)
-    {
-        LOG_E("[listenForClientMsg()] no message from any client within timeout period");
-        return -1;
-    }
-    
-    int temporarySoltuion = 0;  // TODO handle multiple clients
-    for (int i=0; i < thisServer->clients->count || readyToRead != 0; i++)
-    {
-        if (clientFds[i].revents == POLLIN)
-        {
-            temporarySoltuion = clientFds[i].fd;
-            readyToRead--;
-            break;  // TODO handle multiple clients
-        }
-    }
-    free(clientFds);
-
-    // receive and return
-    if (receiveMessage(temporarySoltuion, &returnMsg) < 0)
-    {
-        LOG_E("[listenForClientMsg()] failed to receive message");
-        return -1;
+        LOG_E("[openLobby()] server is already in LOBBY state");
+        return 0; // allow to continue as though no issue (intended effect already in place)
     }
 
-    *returnBuffer = malloc(returnMsg->length);
-    if (*returnBuffer == NULL)
-    {
-        perror("malloc");
-        // Free memory allocated for message
-        // TODO: Move me to a function/goto so you don't copy and paste this?
-        free(returnMsg->content);
-        free(returnMsg);
-        return -1;
-    }
+    thisServer->self->state = LOBBY;
 
-    *sourceId = returnMsg->sourceId;
-    memcpy(*returnBuffer, returnMsg->content, returnMsg->length);
+    LOG_I("[openLobby()] SERVER is set to LOBBY state");
 
-    // Free memory allocated for message
-    free(returnMsg->content);
-    free(returnMsg);
-
-    LOG_I("[listenForClientMsg()] received message");
     return 0;
 }
 
@@ -357,3 +400,4 @@ int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned 
 
     return 0;
 }
+
