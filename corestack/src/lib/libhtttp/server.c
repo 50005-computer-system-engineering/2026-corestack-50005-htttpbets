@@ -8,6 +8,7 @@
 typedef struct {
     Endpoint *self;
     ClientLinkedList *clients;
+    EndpointState state;
 } Server;
 
 // private functions
@@ -224,7 +225,7 @@ int openLobby(LibhtttpServer *serverPtr, uint32_t *lobbySize, uint32_t **clientI
         // creating client endpoint of newly connected client
         Endpoint newClient = {
             .id = slot,
-            .token = "0000000",
+            // .token = "0000000",
             .socks = malloc(sizeof(Sockets))
         };
         newClient.socks->tcp = clientFd;

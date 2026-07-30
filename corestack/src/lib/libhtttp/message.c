@@ -63,21 +63,21 @@ int registerNewClient(Endpoint *newClient)
 
     unsigned char *buffer = NULL;
 
-    // step 1: receive client nonce
-    buffer = malloc(NONCE_LEN);
-    if (buffer == NULL)
-    {
-        perror("[registerNewClient()] malloc");
-        return -1;
-    }
-    if (readBytes(newClient->socks->tcp, &buffer, NONCE_LEN) < 0)
-    {
-        LOG_E("[registerNewClient()] failed to read NONCE");
-        return -1;
-    }
-    memcpy(newClient->token, buffer, NONCE_LEN);
-    free(buffer);
-    buffer = NULL;
+    // // step 1: receive client nonce
+    // buffer = malloc(NONCE_LEN);
+    // if (buffer == NULL)
+    // {
+    //     perror("[registerNewClient()] malloc");
+    //     return -1;
+    // }
+    // if (readBytes(newClient->socks->tcp, &buffer, NONCE_LEN) < 0)
+    // {
+    //     LOG_E("[registerNewClient()] failed to read NONCE");
+    //     return -1;
+    // }
+    // memcpy(newClient->token, buffer, NONCE_LEN);
+    // free(buffer);
+    // buffer = NULL;
     // TODO: implement authentication with nonce signing
     
     // step 2: send user ID
@@ -102,25 +102,25 @@ int registerNewClient(Endpoint *newClient)
 // client function which waits for the client 
 int registerWithServer(Endpoint *myClient)
 {
-    // step 1: send nonce
+    // // step 1: send nonce
     unsigned char *buffer = NULL;
-    buffer = malloc(NONCE_LEN);
-    // TODO nonce generation
-    // buffer = generateNonce();
-    if (buffer == NULL)
-    {
-        perror("[registerWithServer()] malloc");
-        return -1;
-    }
+    // buffer = malloc(NONCE_LEN);
+    // // TODO nonce generation
+    // // buffer = generateNonce();
+    // if (buffer == NULL)
+    // {
+    //     perror("[registerWithServer()] malloc");
+    //     return -1;
+    // }
 
-    if (sendBytes(myClient->socks->tcp, buffer, NONCE_LEN) < 0)
-    {
-        LOG_E("[registerWithServer()] failed to send NONCE");
-        return -1;
-    }
-    free(buffer);
-    buffer = NULL;
-    // TODO implement authentication by verification of signed nonce
+    // if (sendBytes(myClient->socks->tcp, buffer, NONCE_LEN) < 0)
+    // {
+    //     LOG_E("[registerWithServer()] failed to send NONCE");
+    //     return -1;
+    // }
+    // free(buffer);
+    // buffer = NULL;
+    // // TODO implement authentication by verification of signed nonce
 
     // step 2: receive user id and save to Endpoint
     buffer = malloc(sizeof(uint32_t));

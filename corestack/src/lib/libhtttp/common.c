@@ -97,7 +97,7 @@ int createEndpoint(Endpoint **endpt)
 
     // assign some default values
     newEndpt->id = 0;
-    memcpy(newEndpt->token, (unsigned char *)"0000000", NONCE_LEN);
+    // memcpy(newEndpt->token, (unsigned char *)"0000000", NONCE_LEN);
 
     // create new sockets
     if (createSockets(&newEndpt->socks) < 0)

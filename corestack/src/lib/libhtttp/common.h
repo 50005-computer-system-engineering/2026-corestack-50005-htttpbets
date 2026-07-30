@@ -29,7 +29,6 @@ typedef struct {
 
 typedef struct {
     uint32_t id;                        // Own ID
-    unsigned char token[NONCE_LEN];     // token used for communication during session
     Sockets *socks;                  // track sockets
 } Endpoint;
 
