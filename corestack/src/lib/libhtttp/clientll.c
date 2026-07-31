@@ -50,26 +50,32 @@ int removeFromList(ClientLinkedList *list, uint32_t id)
     // check every next node until new 
     ClientNode *checking = NULL;
     checking = list->head;
+    // head is the target
     if (checking->client.id == id)
     {
-        goto removal;
+        LOG_D("[removeFromList()] match is current list head");
+        list->head = checking->next;
+        free(checking);
+        checking = NULL;
+        list->count--;
+        return 0;
     }
+    // any other node is target
     while (checking->next != NULL)
     {
         // match id
         if (checking->next->client.id == id)
         {
-            goto removal;
+            LOG_D("[removeFromList()] match is the next client in list");
+            ClientNode *removedNode = checking->next;
+            checking->next = checking->next->next;
+            free(removedNode);
+            list->count--;
+            return 0;
         }
     }
     LOG_E("[removeFromList()] id could not be matched in list");
-    return -1;
-    removal:
-        LOG_I("[removeFromList()] matching client found");
-        ClientNode *removedNode = checking->next;
-        checking->next = checking->next->next;
-        free(removedNode);
-        return 0;
+    return -1;        
 }
 
 int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
