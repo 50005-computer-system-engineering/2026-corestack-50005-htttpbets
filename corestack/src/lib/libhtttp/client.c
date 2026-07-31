@@ -1,3 +1,5 @@
+#include <sys/poll.h>
+
 #include "lib/libhtttp/client.h"
 #include "common.h"
 #include "message.h"
@@ -51,6 +53,137 @@ int prepareUDP(Sockets *socks, char *serverIp)
 
     return 0;
 }
+
+// private state functions
+typedef void (*StateLoops)(Endpoint *client);
+
+/*
+CLIENT in IDLE state where it is waiting for player to make action
+In this state, do nothing
+*/
+// TODO possibly add server discovery
+void idleStateLoop(Endpoint *client)
+{
+    LOG_I("[idleStateLoop()] CLIENT entering IDLE state, awaiting state change...");
+    while (client->state == IDLE)
+    {
+        // busy wait
+        continue;
+    }
+    LOG_I("[idleStateLoop()] state change detected, CLIENT exiting IDLE state");
+    return;
+}
+
+/*
+CLIENT in LOBBY state where is awaits the server message to START
+In this state, listen and make state change only upon START
+*/
+void lobbyStateLoop(Endpoint *client)
+{
+    LOG_I("[lobbyStateLoop()] CLIENT entering IDLE state, awaiting state change...");
+    while (client->state == LOBBY)
+    {
+        // Any HTTTP message in LOBBY state will be send through TCP
+        Message *msg;
+        if (receiveMessage(client->socks->tcp, &msg) < 0)
+        {
+            LOG_E("[lobbyStateLoop()] CLIENT failed to receive TCP message");
+            continue;
+        }
+        // TODO handle message
+    }
+    LOG_I("[lobbyStateLoop()] state change detected, CLIENT exiting LOBBY state");
+}
+
+/*
+CLIENT in GAME state where it listens for broadcasts, TCP, and UDP messages
+In this state listen and handle messages accordingly (mainly about passing the messages to upper layer protocol)
+*/
+void gameStateLoop(Endpoint *client)
+{
+    LOG_I("[gameStateLoop()] CLIENT entering GAME state, awaiting state change...");
+
+    // Any HTTTP message in LOBBY state will be sent through TCP, UDP unicast, or UDP broadcast
+    // create pollfd struct
+    struct pollfd *listenFd = malloc(sizeof(struct pollfd) * 3);
+    listenFd[0] = (struct pollfd) {
+        .fd = client->socks->tcp,
+        .events = POLLIN,
+        .revents = 0
+    };
+    listenFd[1] = (struct pollfd) {
+        .fd = client->socks->udpUni,
+        .events = POLLIN,
+        .revents = 0
+    };
+    listenFd[2] = (struct pollfd) {
+        .fd = client->socks->udpBroad,
+        .events = POLLIN,
+        .revents = 0
+    };
+    
+    while (client->state == GAME)
+    {
+        int socketActivity = poll(listenFd, 3, 50);
+        if (socketActivity > 0)
+        {
+            LOG_D("[gameStateLoop()] %d active sockets on CLIENT", socketActivity);
+            for (int i=0; i<3 && socketActivity>0; i++)
+            {
+                Message *msg;
+                if (listenFd[i].revents & POLLIN)
+                {
+                    if (receiveBroadcast(listenFd[i].fd, &msg) < 0)
+                    {
+                        LOG_E("[gameStateLoop()] failed to receive message from %d", listenFd[i].fd);
+                        continue;
+                    }
+
+                    if (listenFd[i].revents != 0)
+                    {
+                        socketActivity--;
+                    }
+
+                    LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                }
+            }
+        }
+        // handle message
+
+    }
+    LOG_I("[gameStateLoop()] state change detected, CLIENT exiting GAME state");
+}
+
+void endStateCleanup(Endpoint *client)
+{
+    LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
+
+    LOG_I("[endStateCleanup()] SERVER finished cleaning up");
+}
+
+// setup for private background thread function
+StateLoops stateLoops[] = {
+    [IDLE] = idleStateLoop,
+    [LOBBY] = lobbyStateLoop,
+    [GAME] = gameStateLoop,
+    [END] = endStateCleanup
+};
+
+void* threadFunc(void *client)
+{
+    Endpoint *thisClient = (Endpoint *) client;
+
+    while (thisClient->state != END)
+    {
+        stateLoops[thisClient->state](thisClient);
+    }
+
+    if (thisClient ->state == END)
+    {
+        stateLoops[thisClient->state](thisClient);
+    }
+}
+
 
 // public functions
 // allows developers to create a libhtttp client in application
