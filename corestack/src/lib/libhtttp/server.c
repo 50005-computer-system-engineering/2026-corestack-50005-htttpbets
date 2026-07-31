@@ -265,8 +265,24 @@ void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from 
                     LOG_E("[gameStateLoop()] could not read message from TCP socket fd %d", fd);
                     continue;
                 }
-                listenFdTCP[i].revents = 0;
                 LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                free(msg);
+                msg = NULL;
+            }
+        }
+        
+        if ((poll(&listenFdUDP, 1, 50) > 0) && (listenFdUDP.revents & POLLIN))   // also poll for a UDP message
+        {
+            int fd = listenFdUDP.fd;
+            if (receiveMessage(fd, &msg) < 0)
+            {
+                LOG_E("[gameStateLoop()] could not read message from UDP unicast socket fd %d", fd);
+            }
+            else
+            {
+                LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                free(msg);
+                msg = NULL;
             }
         }
     }
@@ -274,9 +290,26 @@ void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from 
 
 void endStateCleanup(Server *serverPtr)
 {
-    
+    LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
+
+    while (serverPtr->clients->head != NULL)
+    {
+        ClientNode *target = serverPtr->clients->head;
+        LOG_D("[endStateCleanup()] removing client %u", target->client.id);
+        if (close(target->client.socks->tcp) < 0 || close(target->client.socks->udpUni) < 0 || close(target->client.socks->udpBroad) < 0)
+        {
+            LOG_E("[endStateCleanup()] could not close a socket fd");
+        }
+        if (removeFromList(serverPtr->clients, target->client.id) < 0)
+        {
+            LOG_E("[endStateCleanup()] could not remove client %u from list", target->client.id);
+        }
+    }
+
+    LOG_I("[endStateCleanup()] SERVER finished cleaning up");
 }
 
+// setup for private background thread function
 StateLoops stateLoops[] = {
     [IDLE] = idleStateLoop,
     [LOBBY] = lobbyStateLoop,
@@ -288,13 +321,22 @@ void* threadFunc(void *server)
 {
     Server *thisServer = (Server *) server;
 
-    while (true)
+    while (thisServer->self->state != END)
+    {
+        stateLoops[thisServer->self->state](thisServer);
+    }
+
+    if (thisServer->self->state == END)
     {
         stateLoops[thisServer->self->state](thisServer);
     }
 }
 
 // public functions
+/*
+Creates SERVER in memory and a background thread for listener
+SERVER will start in IDLE state and await a state change triggered by user program
+*/
 int createServer(LibhtttpServer **serverPtr)
 {
     // allocate memory for it
@@ -351,31 +393,10 @@ int createServer(LibhtttpServer **serverPtr)
     return -1;
 }
 
-int pauseServer(LibhtttpServer *serverPtr)
-{
-    LOG_I("[openLobby()] setting SERVER to IDLE state...");
-
-    // check parameters
-    if (serverPtr == NULL)
-    {
-        LOG_E("[openLobby()] serverPtr has no server allocated");
-        return -1;
-    }
-
-    Server *thisServer = serverPtr;
-    if (thisServer->self->state == IDLE)
-    {
-        LOG_E("[openLobby()] server is already in IDLE state");
-        return 0; // allow to continue as though no issue (intended effect already in place)
-    }
-
-    thisServer->self->state = IDLE;
-
-    LOG_I("[openLobby()] SERVER is set to LOBBY state");
-
-    return 0;
-}
-
+/*
+Changes a SERVER into LOBBY state
+Background thread will see the state change and adjust behaviour accordingly
+*/
 int openLobby(LibhtttpServer *serverPtr)
 {
     LOG_I("[openLobby()] setting SERVER to LOBBY state...");
@@ -401,6 +422,10 @@ int openLobby(LibhtttpServer *serverPtr)
     return 0;
 }
 
+/*
+Changes SERVER into GAME state (prerequisite state: LOBBY)
+SERVER will update the clients and start listening for messages (handled by background thread)
+*/
 int startGame(LibhtttpServer *serverPtr)
 {
     LOG_I("[startGame()] transitioning SERVER from GAME to LOBBY state...");
@@ -416,12 +441,41 @@ int startGame(LibhtttpServer *serverPtr)
     if (thisServer->self->state != LOBBY)
     {
         LOG_E("[startGame()] server is not currently in LOBBY state");
-        return 1; // allow to continue as though no issue (intended effect already in place)
+        return -1; // disallow, not in prerequisite state
     }
 
     thisServer->self->state = GAME;
 
     LOG_I("[startGame()] SERVER is set to GAME state");
+
+    return 0;
+}
+
+/*
+Changes SERVER into END state (prerequisite state: GAME)
+SERVER will cleanup and close connections with all clients
+*/
+int endGame(LibhtttpServer *serverPtr)
+{
+    LOG_I("[endGame()] transitioning SERVER from GAME to LOBBY state...");
+
+    // check parameters
+    if (serverPtr == NULL)
+    {
+        LOG_E("[endGame()] serverPtr has no server allocated");
+        return -1;
+    }
+
+    Server *thisServer = serverPtr;
+    if (thisServer->self->state != GAME)
+    {
+        LOG_E("[endGame()] server is not currently in GAME state");
+        return -1; // disallow, not in prerequisite state
+    }
+
+    thisServer->self->state = END;
+
+    LOG_I("[startGame()] SERVER is set to END state");
 
     return 0;
 }
