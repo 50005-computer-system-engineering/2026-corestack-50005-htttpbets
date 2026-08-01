@@ -506,3 +506,36 @@ int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned 
 
     return 0;
 }
+
+/*
+Function returns the number of clients and the valid clientIds
+*/
+int getClientInfo(LibhtttpServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
+{
+    LOG_I("[openLobby()] retrieving client info...");
+
+    // check parameters
+    if (serverPtr == NULL)
+    {
+        LOG_E("[openLobby()] serverPtr has no server allocated");
+        return -1;
+    }
+    Server *thisServer = serverPtr;
+
+    // iterate through client linked list for clientIds
+    *nClients = thisServer->clients->count;
+    uint32_t *idArray = malloc(sizeof(uint32_t)*(*nClients));
+    ClientNode *client = thisServer->clients->head;
+    LOG_D("[getClientInfo()] getting ids of %u clients connected to SERVER", *nClients);  
+    for (uint32_t i=0; i<*nClients; i++)
+    {
+        LOG_D("\t[getClientInfo()] SERVER has client with id %u", *client->client.id) ; 
+        idArray[i] = client->client.id;
+        client = client->next;
+    }
+
+    // write to return pointer
+    clientIds = idArray;
+
+    LOG_I("[openLobby()] client information written to pointers");
+}
