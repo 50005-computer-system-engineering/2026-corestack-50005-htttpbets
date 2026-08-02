@@ -184,7 +184,6 @@ void* threadFunc(void *client)
     }
 }
 
-
 // public functions
 // allows developers to create a libhtttp client in application
 int createClient(LibhtttpClient **clientPtr)
@@ -194,12 +193,33 @@ int createClient(LibhtttpClient **clientPtr)
     // create endpoint
     if (createEndpoint(&newClient) < 0)
     {
-        LOG_E("client: could not create endpoint struct for client");
+        LOG_E("[createClient()] could not create endpoint struct for client");
         return -1;
     }
 
-    LOG_I("[createClient()] new client created");
+    // open sockets
+    if (createSockets(&newClient->socks) < 0)
+    {
+        LOG_E("[createClient()] socket creation failed");
+        return -1;
+    }
+
+    // default values
+    newClient->id = 0;
+    newClient->state = 0;
+
     *clientPtr = newClient;
+
+    // spawn backrgound thread
+    pthread_t threadId;
+    if (pthread_create(&threadId, NULL, threadFunc, (void*)newClient) != 0) 
+    {
+        perror("Failed to create thread");
+        return 1;
+    }
+
+    LOG_I("[createClient()] new client created, and spawned background thread");
+
     return 0;
 }
 
@@ -209,11 +229,6 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
     Endpoint *thisClient = clientPtr;
 
     LOG_I("[client joinLobby()] attempting connection to lobby located at IP %s", ipAddress);
-    if (createSockets(&thisClient->socks) < 0)
-    {
-        LOG_E("libhtttp/client createClient: socket creation failed");
-        return -1;
-    }
 
     if (connectOnTCP(thisClient->socks, ipAddress) < 0)
     {
@@ -232,6 +247,9 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
         LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
+
+    // joining lobby successful, enter lobby state
+    thisClient->state = LOBBY;
 
     LOG_I("[joinLobby()] lobby joining complete");
     return 0;
@@ -314,5 +332,3 @@ int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBu
 
     return 0;
 }
-
-// pending functions - message sending, receiving, lobby leaving
