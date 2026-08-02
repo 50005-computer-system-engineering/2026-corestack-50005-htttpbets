@@ -529,7 +529,7 @@ int getClientInfo(LibhtttpServer *serverPtr, uint32_t *nClients, uint32_t *clien
     LOG_D("[getClientInfo()] getting ids of %u clients connected to SERVER", *nClients);  
     for (uint32_t i=0; i<*nClients; i++)
     {
-        LOG_D("\t[getClientInfo()] SERVER has client with id %u", *client->client.id) ; 
+        LOG_D("\t[getClientInfo()] SERVER has client with id %u", client->client.id) ; 
         idArray[i] = client->client.id;
         client = client->next;
     }
