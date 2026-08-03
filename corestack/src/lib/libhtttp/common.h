@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "liblog.h"
+#include "messageq.h"
 
 // known ports
 #define PORT_TCP 6700
@@ -39,6 +40,7 @@ typedef struct {
     uint32_t id;                        // Own ID
     EndpointState state;
     Sockets *socks;                  // track sockets
+    MessageQueue messages;
 } Endpoint;
 
 // functions for sockets
