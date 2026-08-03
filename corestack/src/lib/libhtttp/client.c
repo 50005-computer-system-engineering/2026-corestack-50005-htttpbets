@@ -62,7 +62,7 @@ CLIENT in IDLE state where it is waiting for player to make action
 In this state, do nothing
 */
 // TODO possibly add server discovery
-void idleStateLoop(Endpoint *client)
+void clientIdleState(Endpoint *client)
 {
     LOG_I("[idleStateLoop()] CLIENT entering IDLE state, awaiting state change...");
     while (client->state == IDLE)
@@ -78,7 +78,7 @@ void idleStateLoop(Endpoint *client)
 CLIENT in LOBBY state where is awaits the server message to START
 In this state, listen and make state change only upon START
 */
-void lobbyStateLoop(Endpoint *client)
+void clientLobbyState(Endpoint *client)
 {
     LOG_I("[lobbyStateLoop()] CLIENT entering IDLE state, awaiting state change...");
     while (client->state == LOBBY)
@@ -99,7 +99,7 @@ void lobbyStateLoop(Endpoint *client)
 CLIENT in GAME state where it listens for broadcasts, TCP, and UDP messages
 In this state listen and handle messages accordingly (mainly about passing the messages to upper layer protocol)
 */
-void gameStateLoop(Endpoint *client)
+void clientGameState(Endpoint *client)
 {
     LOG_I("[gameStateLoop()] CLIENT entering GAME state, awaiting state change...");
 
@@ -154,7 +154,7 @@ void gameStateLoop(Endpoint *client)
     LOG_I("[gameStateLoop()] state change detected, CLIENT exiting GAME state");
 }
 
-void endStateCleanup(Endpoint *client)
+void clientEndState(Endpoint *client)
 {
     LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
 
@@ -163,10 +163,10 @@ void endStateCleanup(Endpoint *client)
 
 // setup for private background thread function
 StateLoops stateLoops[] = {
-    [IDLE] = idleStateLoop,
-    [LOBBY] = lobbyStateLoop,
-    [GAME] = gameStateLoop,
-    [END] = endStateCleanup
+    [IDLE] = clientIdleState,
+    [LOBBY] = clientLobbyState,
+    [GAME] = clientGameState,
+    [END] = clientEndState
 };
 
 void* threadFunc(void *client)
