@@ -45,6 +45,16 @@ int sendBytes(int sockfd, const unsigned char *buf, uint64_t length)
     {
         uint64_t remaining = length - totalSent;
         ssize_t m = send(sockfd, buf + totalSent, (size_t)remaining, 0);
+        if (m < 0)
+        {
+            perror("[sendBytes()] send");
+            return -1;
+        }
+        if (m == 0)
+        {
+            LOG_E("[sendBytes()] send() returned 0, aborting to avoid infinite loop");
+            return -1;
+        }
         totalSent += (uint64_t)m;
     }
     return 0;
@@ -191,15 +201,16 @@ int receiveMessage(int sockfd, Message **returnPtr)
         LOG_E("[receiveMessage()] failed to read message");
         goto fail;
     }
-    // returnMsg->content = malloc(returnMsg->length);
-    // if (returnMsg->content == NULL)
-    // {
-    //     perror("receiveMessage malloc");
-    //     goto fail;
-    // }
-    // memcpy(returnMsg->content, buffer, returnMsg->length);
-    // free(buffer);
-    returnMsg->content = buffer;
+    returnMsg->content = malloc(returnMsg->length + 1);
+    if (returnMsg->content == NULL)
+    {
+        perror("[receiveMessage()] malloc");
+        free(buffer);
+        goto fail;
+    }
+    memcpy(returnMsg->content, buffer, returnMsg->length);
+    returnMsg->content[returnMsg->length] = '\0';
+    free(buffer);
     buffer = NULL;
 
     // return this ptr
