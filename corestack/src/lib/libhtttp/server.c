@@ -310,25 +310,25 @@ void serverEndState(Server *serverPtr)
 }
 
 // setup for private background thread function
-StateLoops stateLoops[] = {
+StateLoops serverStateLoops[] = {
     [IDLE] = serverIdleState,
     [LOBBY] = serverLobbyState,
     [GAME] = serverGameState,
     [END] = serverEndState
 };
 
-void* threadFunc(void *server)
+void* serverThreadFunc(void *server)
 {
     Server *thisServer = (Server *) server;
 
     while (thisServer->self->state != END)
     {
-        stateLoops[thisServer->self->state](thisServer);
+        serverStateLoops[thisServer->self->state](thisServer);
     }
 
     if (thisServer->self->state == END)
     {
-        stateLoops[thisServer->self->state](thisServer);
+        serverStateLoops[thisServer->self->state](thisServer);
     }
 }
 
@@ -376,7 +376,7 @@ int createServer(LibhtttpServer **serverPtr)
 
     // spawn backrgound thread
     pthread_t threadId;
-    if (pthread_create(&threadId, NULL, threadFunc, (void*)newServer) != 0) 
+    if (pthread_create(&threadId, NULL, serverThreadFunc, (void*)newServer) != 0) 
     {
         perror("Failed to create thread");
         return 1;

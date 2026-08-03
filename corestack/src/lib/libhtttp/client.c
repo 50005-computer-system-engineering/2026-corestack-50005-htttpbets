@@ -80,7 +80,7 @@ In this state, listen and make state change only upon START
 */
 void clientLobbyState(Endpoint *client)
 {
-    LOG_I("[lobbyStateLoop()] CLIENT entering IDLE state, awaiting state change...");
+    LOG_I("[lobbyStateLoop()] CLIENT entering LOBBY state, awaiting state change...");
     while (client->state == LOBBY)
     {
         // Any HTTTP message in LOBBY state will be send through TCP
@@ -162,25 +162,25 @@ void clientEndState(Endpoint *client)
 }
 
 // setup for private background thread function
-StateLoops stateLoops[] = {
+StateLoops clientStateLoops[] = {
     [IDLE] = clientIdleState,
     [LOBBY] = clientLobbyState,
     [GAME] = clientGameState,
     [END] = clientEndState
 };
 
-void* threadFunc(void *client)
+void* clientThreadFunc(void *client)
 {
     Endpoint *thisClient = (Endpoint *) client;
 
     while (thisClient->state != END)
     {
-        stateLoops[thisClient->state](thisClient);
+        clientStateLoops[thisClient->state](thisClient);
     }
 
     if (thisClient ->state == END)
     {
-        stateLoops[thisClient->state](thisClient);
+        clientStateLoops[thisClient->state](thisClient);
     }
 }
 
@@ -212,7 +212,7 @@ int createClient(LibhtttpClient **clientPtr)
 
     // spawn backrgound thread
     pthread_t threadId;
-    if (pthread_create(&threadId, NULL, threadFunc, (void*)newClient) != 0) 
+    if (pthread_create(&threadId, NULL, clientThreadFunc, (void*)newClient) != 0) 
     {
         perror("Failed to create thread");
         return 1;
