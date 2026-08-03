@@ -103,7 +103,7 @@ typedef void (*StateLoops)(Server *serverPtr);
 IDLE state where it makes thread busy wait for admin administered state change 
 Does not take any HTTTP packets in this state
 */
-void idleStateLoop(Server *serverPtr)    // budy waits for next action
+void serverIdleState(Server *serverPtr)    // budy waits for next action
 {
     LOG_I("[idleStateLoop()] SERVER entering IDLE state, awaiting instructions...");
     while (serverPtr->self->state == IDLE)
@@ -119,7 +119,7 @@ void idleStateLoop(Server *serverPtr)    // budy waits for next action
 LOBBY state where clients are allowed to send JOIN, LEAVE HTTTP packets
 During this state, TCP connections from client are accepted (and server assigns player ID)
 */ 
-void lobbyStateLoop(Server *serverPtr)   // loop where server accepts clients
+void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
 {
     LOG_I("[lobbyStateLoop()] SERVER entering LOBBY state, accepting clients...");
     
@@ -211,7 +211,7 @@ At start of state state, all clients are sent an START packet to change their st
 During this state, clients may still choose to LIST
 To end the state, END packet is sent to change its state again
 */
-void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from clients
+void serverGameState(Server *serverPtr)    // loop where listens for unicast from clients
 {
     LOG_I("[gameStateLoop()] SERVER entering GAME state, prerparing to listen for messages...");
 
@@ -288,7 +288,7 @@ void gameStateLoop(Server *serverPtr)    // loop where listens for unicast from 
     }
 }
 
-void endStateCleanup(Server *serverPtr)
+void serverEndState(Server *serverPtr)
 {
     LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
 
@@ -311,10 +311,10 @@ void endStateCleanup(Server *serverPtr)
 
 // setup for private background thread function
 StateLoops stateLoops[] = {
-    [IDLE] = idleStateLoop,
-    [LOBBY] = lobbyStateLoop,
-    [GAME] = gameStateLoop,
-    [END] = endStateCleanup
+    [IDLE] = serverIdleState,
+    [LOBBY] = serverLobbyState,
+    [GAME] = serverGameState,
+    [END] = serverEndState
 };
 
 void* threadFunc(void *server)
