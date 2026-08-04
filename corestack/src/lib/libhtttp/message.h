@@ -13,7 +13,7 @@ typedef enum {
 } MessageCode;
 
 typedef struct {
-    uint32_t sourceId;
+    MessageCode code;
     uint32_t pathLen;
     unsigned char *path`;
 } Message;
