@@ -85,7 +85,7 @@ void clientLobbyState(Endpoint *client)
     {
         // Any HTTTP message in LOBBY state will be send through TCP
         Message *msg;
-        if (receiveMessage(client->socks->tcp, &msg) < 0)
+        if (receiveMessageTCP(client->socks->tcp, &msg) < 0)
         {
             LOG_E("[lobbyStateLoop()] CLIENT failed to receive TCP message");
             continue;
@@ -133,7 +133,7 @@ void clientGameState(Endpoint *client)
                 Message *msg;
                 if (listenFd[i].revents & POLLIN)
                 {
-                    if (receiveBroadcast(listenFd[i].fd, &msg) < 0)
+                    if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
                     {
                         LOG_E("[gameStateLoop()] failed to receive message from %d", listenFd[i].fd);
                         continue;
@@ -228,25 +228,44 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 {
     Endpoint *thisClient = clientPtr;
 
-    LOG_I("[client joinLobby()] attempting connection to lobby located at IP %s", ipAddress);
+    LOG_I("[joinLobby()] attempting connection to lobby located at IP %s", ipAddress);
 
+    // TALKING TO SERVER
+    // connect on TCP first
     if (connectOnTCP(thisClient->socks, ipAddress) < 0)
     {
-        LOG_E("libhtttp/client joinLobby: failed to connect to server at IP");
+        LOG_E("[startClientHandshake()] failed to connect to server at IP");
         return -1;
     }
 
-    if (registerWithServer(thisClient) < 0)
+    // receive user id and save to Endpoint
+    unsigned char *buffer = NULL;
+    buffer = malloc(sizeof(uint32_t));
+    if (buffer == NULL)
     {
-        LOG_E("[joinLobby()] failed to register with server");
+        perror("[startClientHandshake()] malloc");
         return -1;
     }
+    if (readBytes(thisClient->socks->tcp, &buffer, sizeof(uint32_t)) < 0)
+    {
+        LOG_E("[startClientHandshake()] failed to read sourceId");
+        return -1;
+    } 
+    uint32_t sourceBytes;
+    memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
+    thisClient->id = ntohl(sourceBytes);
+    free(buffer);
+    buffer = NULL;
 
+    // INDEPENDENT OF SERVER
+    // prepare UDP ports for future use upon connection
     if (prepareUDP(thisClient->socks, ipAddress) < 0)
     {
         LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
+
+    return 0;
 
     // joining lobby successful, enter lobby state
     thisClient->state = LOBBY;
@@ -276,7 +295,7 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
     memcpy(msg.content, content, length);
 
     // send via socket
-    if (sendMessage(thisClient->socks->tcp, msg) < 0)
+    if (sendMessageTCP(thisClient->socks->tcp, msg) < 0)
     {
         LOG_E("[sendAsClient()] sending has failed");
         goto fail;
@@ -297,7 +316,7 @@ int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBu
 
     // block until broadcast received
     Message *returnMsg;  
-    if (receiveBroadcast(thisClient->socks->udpBroad, &returnMsg) < 0)
+    if (receiveMessageUDP(thisClient->socks->udpBroad, &returnMsg) < 0)
     {
         LOG_E("[receiveBroadcastAsClient()] Failed to receive broadcast");
         return -1;

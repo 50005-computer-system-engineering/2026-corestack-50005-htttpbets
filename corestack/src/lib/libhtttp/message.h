@@ -9,14 +9,14 @@ typedef struct {
     unsigned char *content;
 } Message;
 
-// messaging functions
-int receiveMessage(int sockfd, Message **returnPtr);
-int sendMessage(int sockfd, Message completeMsg);
-int receiveBroadcast(int sockfd, Message **returnPtr);
-int sendBroadcast(int sockfd, Message completeMsg);
+// byte reading functions
+int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length);
+int sendBytes(int sockfd, const unsigned char *buf, uint64_t length);
 
-// registration functions
-int registerNewClient(Endpoint *newClient);
-int registerWithServer(Endpoint *myClient);
+// messaging functions
+int receiveMessageTCP(int sockfd, Message **returnPtr);
+int receiveMessageUDP(int sockfd, Message **returnPtr);
+int sendMessageTCP(int sockfd, const Message completeMsg);
+int sendMessageUDP(int sockfd, const Message completeMsg);
 
 #endif
