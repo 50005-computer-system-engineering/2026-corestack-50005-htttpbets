@@ -1,6 +1,6 @@
 #include <sys/poll.h>
 
-#include "lib/libhtttp/server.h"
+#include "lib/libbattleroyale/server.h"
 #include "common.h"
 #include "message.h"
 #include "clientll.h"
@@ -349,7 +349,7 @@ void* serverThreadFunc(void *server)
 Creates SERVER in memory and a background thread for listener
 SERVER will start in IDLE state and await a state change triggered by user program
 */
-int createServer(LibhtttpServer **serverPtr)
+int createServer(BRServer **serverPtr)
 {
     // allocate memory for it
     Server *newServer = malloc(sizeof(Server));
@@ -409,7 +409,7 @@ int createServer(LibhtttpServer **serverPtr)
 Changes a SERVER into LOBBY state
 Background thread will see the state change and adjust behaviour accordingly
 */
-int openLobby(LibhtttpServer *serverPtr)
+int openLobby(BRServer *serverPtr)
 {
     LOG_I("[openLobby()] setting SERVER to LOBBY state...");
 
@@ -438,7 +438,7 @@ int openLobby(LibhtttpServer *serverPtr)
 Changes SERVER into GAME state (prerequisite state: LOBBY)
 SERVER will update the clients and start listening for messages (handled by background thread)
 */
-int startGame(LibhtttpServer *serverPtr)
+int startGame(BRServer *serverPtr)
 {
     LOG_I("[startGame()] transitioning SERVER from GAME to LOBBY state...");
 
@@ -467,7 +467,7 @@ int startGame(LibhtttpServer *serverPtr)
 Changes SERVER into END state (prerequisite state: GAME)
 SERVER will cleanup and close connections with all clients
 */
-int endGame(LibhtttpServer *serverPtr)
+int endGame(BRServer *serverPtr)
 {
     LOG_I("[endGame()] transitioning SERVER from GAME to LOBBY state...");
 
@@ -492,7 +492,7 @@ int endGame(LibhtttpServer *serverPtr)
     return 0;
 }
 
-int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned char *content)
+int sendBroadcastToClients(BRServer *serverPtr, uint32_t length, unsigned char *content)
 {
     LOG_I("[sendBroadcastToClients()] sending broadcast to cliets...");
 
@@ -522,7 +522,7 @@ int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned 
 /*
 Function returns the number of clients and the valid clientIds
 */
-int getClientInfo(LibhtttpServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
+int getClientInfo(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
 {
     LOG_I("[openLobby()] retrieving client info...");
 
