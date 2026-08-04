@@ -153,9 +153,6 @@ int registerWithServer(Endpoint *myClient)
     return 0;
 }
 
-// TODO administrative messages (kick/ban)
-// admin functions
-
 // app layer message functions
 int receiveMessage(int sockfd, Message **returnPtr)
 {
