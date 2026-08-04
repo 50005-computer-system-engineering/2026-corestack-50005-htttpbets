@@ -108,11 +108,11 @@ int createEndpoint(Endpoint **endpt)
         goto fail;
     }
 
-    // create a message queue
-    newEndpt->messages = MessageQueue {
-        .front = NULL,
-        .back = NULL
-    };
+    // // create a message queue
+    // newEndpt->messages = (MessageQueue){
+    //     .front = NULL,
+    //     .back = NULL
+    // };
 
     *endpt = newEndpt;
     return 0;

@@ -105,13 +105,13 @@ Does not take any HTTTP packets in this state
 */
 void serverIdleState(Server *serverPtr)    // budy waits for next action
 {
-    LOG_I("[idleStateLoop()] SERVER entering IDLE state, awaiting instructions...");
+    LOG_I("[serverIdleState()] SERVER entering IDLE state, awaiting instructions...");
     while (serverPtr->self->state == IDLE)
     {
         // busy wait
         continue;
     }
-    LOG_I("[idleStateLoop()] state change detected, SERVER exiting IDLE state");
+    LOG_I("[serverIdleState()] state change detected, SERVER exiting IDLE state");
     return;
 }
 
@@ -121,16 +121,16 @@ During this state, TCP connections from client are accepted (and server assigns 
 */ 
 void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
 {
-    LOG_I("[lobbyStateLoop()] SERVER entering LOBBY state, accepting clients...");
+    LOG_I("[serverLobbyState()] SERVER entering LOBBY state, accepting clients...");
     
     // prepare client list (upon entering lobby state)
-    LOG_D("[lobbyStateLoop()] allocating space for client list on SERVER");
+    LOG_D("[serverLobbyState()] allocating space for client list on SERVER");
     if (serverPtr->clients != NULL)
     {
         // free and make a new array
         if (freeList(&serverPtr->clients) < 0)
         {
-            LOG_E("[lobbyStateLoop()] could not free list for new lobby");
+            LOG_E("[serverLobbyState()] could not free list for new lobby");
             return;
         }
         serverPtr->clients = NULL;
@@ -138,10 +138,10 @@ void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
     serverPtr->clients = malloc(sizeof(ClientLinkedList));
     if (serverPtr->clients == NULL)
     {
-        perror("[lobbyStateLoop()] malloc");
+        perror("[serverLobbyState()] malloc");
         return;
     }
-    LOG_D("[lobbyStateLoop()] memory allocated for client linked list");
+    LOG_D("[serverLobbyState()] memory allocated for client linked list");
 
     // tracking the id assigned
     int prevAssignedId = 0; 
@@ -162,14 +162,14 @@ void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
         }
 
         // accept a client if the socket has any POLLIN activity
-        LOG_D("[lobbyStateLoop()] polled activity, accpeting a client");
+        LOG_D("[serverLobbyState()] polled activity, accpeting a client");
         int clientFd = acceptOnTCP(serverPtr);
         if (clientFd < 0)
         {
-            LOG_E("[lobbyStateLoop()] accept failed to find client, skipping loop iteration...");
+            LOG_E("[serverLobbyState()] accept failed to find client, skipping loop iteration...");
             continue;
         }
-        LOG_D("[lobbyStateLoop()] accept succses, assigning player id %u to new connection", ++prevAssignedId);
+        LOG_D("[serverLobbyState()] accept succses, assigning player id %u to new connection", ++prevAssignedId);
         
         // creating client endpoint of newly connected client
         Endpoint newClient = {
@@ -177,31 +177,43 @@ void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
             .socks = malloc(sizeof(Sockets))
         };
         newClient.socks->tcp = clientFd;
-        if (registerNewClient(&newClient) < 0)
+
+        LOG_D("[serverLobbyState()] sending client %u their ID", newClient.id);
+
+        unsigned char *buffer = NULL;
+        
+        buffer = malloc(sizeof(uint32_t));
+        if (buffer == NULL)
         {
-            LOG_E("[lobbyStateLoop()] failed to register new client");
+            perror("[serverLobbyState()] malloc");
+            goto cleanup;
+        }
+        uint32_t idBytes = htonl(newClient.id);
+        if (sendBytes(newClient.socks->tcp, (unsigned char *)&idBytes, sizeof(uint32_t)) < 0)
+        {
+            LOG_E("[serverLobbyState()] failed to send source ID");
             goto cleanup;
         }
         
         // add completed new client to the clients list
         if (addToList(serverPtr->clients, &newClient))
         {
-            LOG_E("[lobbyStateLoop()] failed to add client to new list");
+            LOG_E("[serverLobbyState()] failed to add client to new list");
             goto cleanup;
         }
-        LOG_D("[lobbyStateLoop()] finished sending the new client their ID");
+        LOG_D("[serverLobbyState()] finished sending the new client their ID");
 
         continue;
         
         cleanup:
         free(newClient.socks);
         newClient.socks = NULL;
-        LOG_E("[lobbyStateLoop()] failed to make new client, dropping it");
+        LOG_E("[serverLobbyState()] failed to make new client, dropping it");
 
         continue;
     }
 
-    LOG_I("[lobbyStateLoop()] state change detected, SERVER exiting LOBBY state");
+    LOG_I("[serverLobbyState()] state change detected, SERVER exiting LOBBY state");
     return;
 }
 
@@ -213,12 +225,12 @@ To end the state, END packet is sent to change its state again
 */
 void serverGameState(Server *serverPtr)    // loop where listens for unicast from clients
 {
-    LOG_I("[gameStateLoop()] SERVER entering GAME state, prerparing to listen for messages...");
+    LOG_I("[serverGameState()] SERVER entering GAME state, prerparing to listen for messages...");
 
     // check if there are any players
     if (serverPtr->clients->count <= 0)
     {
-        LOG_E("[gameStateLoop()] SERVER has no clients connected, reverting to lobby state...");
+        LOG_E("[serverGameState()] SERVER has no clients connected, reverting to lobby state...");
         serverPtr->self->state = LOBBY;
         return;
     }
@@ -260,12 +272,12 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
             {
                 int fd = listenFdTCP[i].fd;
                 socketActivity--;
-                if (receiveMessage(fd, &msg) < 0)
+                if (receiveMessageTCP(fd, &msg) < 0)
                 {
-                    LOG_E("[gameStateLoop()] could not read message from TCP socket fd %d", fd);
+                    LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
                     continue;
                 }
-                LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
                 free(msg);
                 msg = NULL;
             }
@@ -274,13 +286,13 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         if ((poll(&listenFdUDP, 1, 50) > 0) && (listenFdUDP.revents & POLLIN))   // also poll for a UDP message
         {
             int fd = listenFdUDP.fd;
-            if (receiveMessage(fd, &msg) < 0)
+            if (receiveMessageUDP(fd, &msg) < 0)
             {
-                LOG_E("[gameStateLoop()] could not read message from UDP unicast socket fd %d", fd);
+                LOG_E("[serverGameState()] could not read message from UDP unicast socket fd %d", fd);
             }
             else
             {
-                LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
                 free(msg);
                 msg = NULL;
             }
@@ -290,23 +302,23 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
 
 void serverEndState(Server *serverPtr)
 {
-    LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
+    LOG_I("[serverEndState()] SERVER entering END state, closing connection with all clients");
 
     while (serverPtr->clients->head != NULL)
     {
         ClientNode *target = serverPtr->clients->head;
-        LOG_D("[endStateCleanup()] removing client %u", target->client.id);
+        LOG_D("[serverEndState()] removing client %u", target->client.id);
         if (close(target->client.socks->tcp) < 0 || close(target->client.socks->udpUni) < 0 || close(target->client.socks->udpBroad) < 0)
         {
-            LOG_E("[endStateCleanup()] could not close a socket fd");
+            LOG_E("[serverEndState()] could not close a socket fd");
         }
         if (removeFromList(serverPtr->clients, target->client.id) < 0)
         {
-            LOG_E("[endStateCleanup()] could not remove client %u from list", target->client.id);
+            LOG_E("[serverEndState()] could not remove client %u from list", target->client.id);
         }
     }
 
-    LOG_I("[endStateCleanup()] SERVER finished cleaning up");
+    LOG_I("[serverEndState()] SERVER finished cleaning up");
 }
 
 // setup for private background thread function
@@ -496,7 +508,7 @@ int sendBroadcastToClients(LibhtttpServer *serverPtr, uint32_t length, unsigned 
     LOG_D("[sendBroadcastToClients()] sending broadcast with header:\n\tsource: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
 
     // send as broadcast
-    if (sendBroadcast(thisServer->self->socks->udpBroad, completeMsg))
+    if (sendMessageUDP(thisServer->self->socks->udpBroad, completeMsg))
     {
         LOG_E("[sendBroadcastToClients()] failed to send broadcast");
         return -1;

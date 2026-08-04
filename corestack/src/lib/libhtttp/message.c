@@ -51,107 +51,12 @@ int sendBytes(int sockfd, const unsigned char *buf, uint64_t length)
 }
 
 // public functions
-// registration functions
-int registerNewClient(Endpoint *newClient)
-{
-    if (newClient == NULL) 
-    {
-        LOG_E("[registerNewClient()] invalid newClient ptr passed");
-    }
-
-    LOG_I("[registerNewClient()] registering client with id %u\n", newClient->id);
-
-    unsigned char *buffer = NULL;
-
-    // // step 1: receive client nonce
-    // buffer = malloc(NONCE_LEN);
-    // if (buffer == NULL)
-    // {
-    //     perror("[registerNewClient()] malloc");
-    //     return -1;
-    // }
-    // if (readBytes(newClient->socks->tcp, &buffer, NONCE_LEN) < 0)
-    // {
-    //     LOG_E("[registerNewClient()] failed to read NONCE");
-    //     return -1;
-    // }
-    // memcpy(newClient->token, buffer, NONCE_LEN);
-    // free(buffer);
-    // buffer = NULL;
-    // TODO: implement authentication with nonce signing
-    
-    // step 2: send user ID
-    buffer = malloc(sizeof(uint32_t));
-    if (buffer == NULL)
-    {
-        perror("[registerNewClient()] malloc");
-        return -1;
-    }
-    uint32_t idBytes = htonl(newClient->id);
-    if (sendBytes(newClient->socks->tcp, (unsigned char *)&idBytes, sizeof(uint32_t)) < 0)
-    {
-        LOG_E("[registerNewClient()] failed to send source ID");
-        return -1;
-    }
-
-    LOG_I("[registerNewClient()] registration complete");
-
-    return 0;
-}
-
-// client function which waits for the client 
-int registerWithServer(Endpoint *myClient)
-{
-    // // step 1: send nonce
-    unsigned char *buffer = NULL;
-    // buffer = malloc(NONCE_LEN);
-    // // TODO nonce generation
-    // // buffer = generateNonce();
-    // if (buffer == NULL)
-    // {
-    //     perror("[registerWithServer()] malloc");
-    //     return -1;
-    // }
-
-    // if (sendBytes(myClient->socks->tcp, buffer, NONCE_LEN) < 0)
-    // {
-    //     LOG_E("[registerWithServer()] failed to send NONCE");
-    //     return -1;
-    // }
-    // free(buffer);
-    // buffer = NULL;
-    // // TODO implement authentication by verification of signed nonce
-
-    // step 2: receive user id and save to Endpoint
-    buffer = malloc(sizeof(uint32_t));
-    if (buffer == NULL)
-    {
-        perror("[registerWithServer()] malloc");
-        return -1;
-    }
-    if (readBytes(myClient->socks->tcp, &buffer, sizeof(uint32_t)) < 0)
-    {
-        LOG_E("[registerWithServer()] failed to read sourceId");
-        return -1;
-    } 
-    uint32_t sourceBytes;
-    memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
-    myClient->id = ntohl(sourceBytes);
-    free(buffer);
-    buffer = NULL;
-
-    return 0;
-}
-
-// TODO administrative messages (kick/ban)
-// admin functions
-
 // app layer message functions
-int receiveMessage(int sockfd, Message **returnPtr)
+int receiveMessageTCP(int sockfd, Message **returnPtr)
 {
     Message *returnMsg = calloc(1, sizeof(Message));
 
-    LOG_I("[receiveMessage()] preparing to receive message");
+    LOG_I("[receiveAppMessage()] preparing to receive message");
 
     if (returnMsg == NULL)
     {
@@ -160,11 +65,11 @@ int receiveMessage(int sockfd, Message **returnPtr)
     }
 
     // read Message header bytes
-    LOG_D("[receiveMessage()] allocated memory for Message, listening for header...");
+    LOG_D("[receiveAppMessage()] allocated memory for Message, listening for header...");
     unsigned char *buffer = NULL;
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        LOG_E("[receiveMessage()] failed to read sourceId\n");
+        LOG_E("[receiveAppMessage()] failed to read sourceId\n");
         goto fail;
     } 
     uint32_t sourceBytes;
@@ -175,7 +80,7 @@ int receiveMessage(int sockfd, Message **returnPtr)
 
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        LOG_E("[receiveMessage()] failed to read length");
+        LOG_E("[receiveAppMessage()] failed to read length");
         goto fail;
     } 
     uint32_t lenBytes;
@@ -185,20 +90,12 @@ int receiveMessage(int sockfd, Message **returnPtr)
     buffer = NULL;
 
     // listen for message considering the header
-    LOG_D("[receiveMessage()] now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
+    LOG_D("[receiveAppMessage()] now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
     if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
     {
-        LOG_E("[receiveMessage()] failed to read message");
+        LOG_E("[receiveAppMessage()] failed to read message");
         goto fail;
     }
-    // returnMsg->content = malloc(returnMsg->length);
-    // if (returnMsg->content == NULL)
-    // {
-    //     perror("receiveMessage malloc");
-    //     goto fail;
-    // }
-    // memcpy(returnMsg->content, buffer, returnMsg->length);
-    // free(buffer);
     returnMsg->content = buffer;
     buffer = NULL;
 
@@ -221,39 +118,27 @@ fail:
     return -1;
 }
 
-int sendMessage(int sockfd, const Message completeMsg)
+int receiveMessageUDP(int sockfd, Message **returnPtr)
 {
-    LOG_I("[sendMessage()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
-    uint32_t sourceId = htonl(completeMsg.sourceId);
-    sendBytes(sockfd, (const unsigned char *)&sourceId, sizeof(uint32_t));
-    uint32_t length = htonl(completeMsg.length);
-    sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
-    sendBytes(sockfd, completeMsg.content, completeMsg.length);
-    LOG_I("[sendMessage()] pushed all bytes though socket");
-    return 0;
-}
-
-int receiveBroadcast(int sockfd, Message **returnPtr)
-{
-    LOG_I("[receiveBroadcast()] preparing to receive broadcast...");
+    LOG_I("[receiveAppMessageUDP()] preparing to receive broadcast...");
 
     // receiving message
     int flagsSet = 0;
     unsigned char *messageBytes = malloc(4096); // TODO fix the message size problem
     if (messageBytes == NULL)
     {
-        perror("[receiveBroadcast()] malloc");
+        perror("[receiveAppMessageUDP()] malloc");
         return -1;
     }
 
-    LOG_D("[receiveBroadcast()] waiting for bytes");
+    LOG_D("[receiveAppMessageUDP()] waiting for bytes");
 
     if (recvfrom(sockfd, messageBytes, 4096, flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
     {
-        perror("[receiveBroadcast()] recvfrom");
+        perror("[receiveAppMessageUDP()] recvfrom");
         return -1;
     }
-    LOG_D("[receiveBroadcast()] received raw message bytes");
+    LOG_D("[receiveAppMessageUDP()] received raw message bytes");
 
     // fit bytes into message message struct
     Message *returnMsg = calloc(1, sizeof(Message));
@@ -262,17 +147,29 @@ int receiveBroadcast(int sockfd, Message **returnPtr)
     returnMsg->content = malloc(returnMsg->length);
     memcpy(returnMsg->content, messageBytes+sizeof(returnMsg->sourceId)+sizeof(returnMsg->length), returnMsg->length);
 
-    LOG_D("[receiveBroadcast()] received broadcast with following message:\n\tsource: %u\n\tlength: %u", returnMsg->sourceId, returnMsg->length);
+    LOG_D("[receiveAppMessageUDP()] received broadcast with following message:\n\tsource: %u\n\tlength: %u", returnMsg->sourceId, returnMsg->length);
 
-    LOG_I("[receiveBroadcast()] broadcast has been received");
+    LOG_I("[receiveAppMessageUDP()] broadcast has been received");
     *returnPtr = returnMsg;
 
     return 0;
 }
 
-int sendBroadcast(int sockfd, const Message completeMsg)
+int sendMessageTCP(int sockfd, const Message completeMsg)
 {
-    LOG_I("[sendBroadcast()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+    LOG_I("[sendAppMessage()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+    uint32_t sourceId = htonl(completeMsg.sourceId);
+    sendBytes(sockfd, (const unsigned char *)&sourceId, sizeof(uint32_t));
+    uint32_t length = htonl(completeMsg.length);
+    sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
+    sendBytes(sockfd, completeMsg.content, completeMsg.length);
+    LOG_I("[sendAppMessage()] pushed all bytes though socket");
+    return 0;
+}
+
+int sendMessageUDP(int sockfd, const Message completeMsg)
+{
+    LOG_I("[sendAppMessageUDP()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
     
     // preparing parameters for sendto()
     struct sockaddr_in addr = {
@@ -288,18 +185,18 @@ int sendBroadcast(int sockfd, const Message completeMsg)
     unsigned char *messageBytes = malloc(msgLen);
     if (messageBytes == NULL)
     {
-        perror("[sendBroadcast()] malloc");
+        perror("[sendAppMessageUDP()] malloc");
         return -1;
     }
     memcpy(messageBytes, &completeMsg.sourceId, sizeof(completeMsg.sourceId));
     memcpy(messageBytes + sizeof(completeMsg.sourceId), &completeMsg.length, sizeof(completeMsg.length));
     memcpy(messageBytes + sizeof(completeMsg.sourceId) + sizeof(completeMsg.length), completeMsg.content, completeMsg.length);
-    LOG_D("[sendBroadcast()] copied Message into raw bytes");
+    LOG_D("[sendAppMessageUDP()] copied Message into raw bytes");
 
     // send the entire message over broadcast port
     if (sendto(sockfd, messageBytes, msgLen, flagsSet, (struct sockaddr *)&addr, addrLen) < 0)
     {
-        perror("[sendBroadcast()] sendto");
+        perror("[sendAppMessageUDP()] sendto");
         return -1;
     }
 
@@ -307,6 +204,6 @@ int sendBroadcast(int sockfd, const Message completeMsg)
     free(messageBytes);
     messageBytes = NULL;
 
-    LOG_I("[sendBroadcast()] broadcast has been sent");
+    LOG_I("[sendAppMessageUDP()] broadcast has been sent");
     return 0;
 }
