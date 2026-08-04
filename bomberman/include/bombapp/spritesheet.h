@@ -54,7 +54,7 @@ void spritesheet_update(Spritesheet *s);
  * @param rotation Rotation in degrees (0 for none)
  * @param tint Color tint (WHITE for no tint)
  */
-void spritesheet_draw(Spritesheet *s, Vector2 position, float rotation, Color tint);
+void spritesheet_draw(Spritesheet *s, Vector2 position, Vector2 origin_scale, float rotation, Color tint);
  
 // Unload the texture from GPU memory
 // ALWAYS remember to call this!!! or memory leak :(

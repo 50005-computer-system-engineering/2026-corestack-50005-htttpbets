@@ -1,9 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 #include <raylib.h>
+#include "bomberman.h"
 
-void player_init(void);
-void player_update(void);
-void player_draw(void);
-void player_cleanup(void);
+void player_init(Bomberman* bm);
 #endif
