@@ -1,6 +1,6 @@
 #include <sys/poll.h>
 
-#include "lib/libhtttp/client.h"
+#include "lib/libbattleroyale/client.h"
 #include "common.h"
 #include "message.h"
 
@@ -186,7 +186,7 @@ void* clientThreadFunc(void *client)
 
 // public functions
 // allows developers to create a libhtttp client in application
-int createClient(LibhtttpClient **clientPtr)
+int createClient(BRClient **clientPtr)
 {
     Endpoint *newClient = NULL;
 
@@ -224,7 +224,7 @@ int createClient(LibhtttpClient **clientPtr)
 }
 
 // connects to a libhtttp server
-int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
+int joinLobby(BRClient *clientPtr, char *ipAddress)
 {
     Endpoint *thisClient = clientPtr;
 
@@ -275,7 +275,7 @@ int joinLobby(LibhtttpClient *clientPtr, char *ipAddress)
 }
 
 // message functions
-int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *content)
+int sendAsClient(BRClient *clientPtr, uint32_t length, unsigned char *content)
 {
     Endpoint *thisClient = clientPtr;
 
@@ -310,7 +310,7 @@ int sendAsClient(LibhtttpClient *clientPtr, uint32_t length, unsigned char *cont
     return -1;
 }
 
-int receiveBroadcastAsClient(LibhtttpClient *clientPtr, unsigned char **returnBuffer)
+int receiveBroadcastAsClient(BRClient *clientPtr, unsigned char **returnBuffer)
 {
     Endpoint *thisClient = clientPtr;
 

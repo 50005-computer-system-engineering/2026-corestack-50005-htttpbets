@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-#include "libhtttp/server.h"
-#include "libhtttp/client.h"
+#include "libbattleroyale/server.h"
+#include "libbattleroyale/client.h"
 
 #define NUM_TEST_CLIENTS 2
 
@@ -97,7 +97,7 @@ int awaitInstruction(int stagingPipe[NUM_TEST_CLIENTS][2], int id)
 /*
 This functions waits for executes the specific test for client at a certain stage
 */
-int executeTestStage(LibhtttpClient *testClient, int id, enum TestStage stage)
+int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
 {
     enum TestResult result = FAIL;
 
@@ -216,7 +216,7 @@ int main(void)
         // }
         
         // setup the test server
-        LibhtttpServer *testServer;
+        BRServer *testServer;
         if (createServer(&testServer) < 0)
         {
             printf("server: failed to create instance\n");
@@ -290,7 +290,7 @@ int main(void)
     if (pid == 0)   // child - a client proc
     {
         // setup the test client
-        LibhtttpClient *testClient;
+        BRClient *testClient;
 
         if (createClient(&testClient) < 0)
         {
