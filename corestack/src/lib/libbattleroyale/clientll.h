@@ -1,5 +1,5 @@
-#ifndef LIBHTTTP_CLIENTLL_H
-#define LIBHTTTP_CLIENTLL_H
+#ifndef LIBBR_CLIENTLL_H
+#define LIBBR_CLIENTLL_H
 
 #include "common.h"
 
