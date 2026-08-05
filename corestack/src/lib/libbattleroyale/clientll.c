@@ -78,7 +78,7 @@ int removeFromList(ClientLinkedList *list, uint32_t id)
     return -1;        
 }
 
-int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
+int getFromList(ClientLinkedList *list, Endpoint *returnClient, uint32_t id)
 {
     // check for emply list
     if (list->head == NULL)
@@ -101,12 +101,12 @@ int getFromList(ClientLinkedList *list, Endpoint **returnClient, uint32_t id)
         checking = checking->next;
     }
     LOG_E("[getFromList()] id could not be matched in list");
-    *returnClient = malloc(sizeof(1));
+    returnClient = NULL;
     return -1;
 
     // return struct through pointer
     found:
-    *returnClient = &checking->client;
+    *returnClient = checking->client;
     LOG_I("[getFromList()] client assigned to return buffer");
     return 0;
 }

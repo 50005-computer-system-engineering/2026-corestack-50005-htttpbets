@@ -7,7 +7,6 @@
 typedef struct {
     Endpoint *self;
     ClientLinkedList *clients;
-    EndpointState state;
 } Server;
 
 static MessageQueue *serverMessages;
@@ -31,17 +30,17 @@ int listenOnTCP(Server *serverPtr)
     };
     if (bind(serverPtr->self->socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
-        perror("listenOnTCP bind");
+        perror("[listenOnTCP()] bind");
         return -1;
     }
 
     // Listen on sockets for TCP connections 
     if (listen(serverPtr->self->socks->tcp, 100))
     {
-        perror("listenOnTCP listen");
+        perror("[listenOnTCP()] listen");
         return -1;
     }
-    LOG_I("[listenOnTCP()]: server now listening for TCP connections on port %d", PORT_TCP);
+    LOG_I("[listenOnTCP()] server now listening for TCP connections on port %d", PORT_TCP);
     return 0;
 }
 
@@ -266,8 +265,7 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         // listen to each message and handle
         // TODO message buffer for high traffic situation
         // FOR NOW handles 1 message at a time for testing and basic functionality
-        Message *msg = NULL;
-        uint32_t sourceId = 0;
+        Message msg;
         for (uint32_t i=0; i < serverPtr->clients->count || socketActivity > 0; i++)
         {
             if (listenFdTCP[i].revents == POLLIN)
@@ -279,7 +277,7 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
                     LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
                     continue;
                 }
-                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
             }
         }
         
@@ -289,15 +287,12 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
             if (receiveMessageUDP(fd, &msg) < 0)
             {
                 LOG_E("[serverGameState()] could not read message from UDP unicast socket fd %d", fd);
+                continue;
             }
-            else
-            {
-                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
-            }
+            LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
         }
         
-        free(msg);
-        msg = NULL;
+        Message_enqueue(serverMessages, msg);
     }
 }
 
@@ -502,33 +497,6 @@ int endGame(BRServer *serverPtr)
     return 0;
 }
 
-int sendBroadcastToClients(BRServer *serverPtr, uint32_t length, unsigned char *content)
-{
-    LOG_I("[sendBroadcastToClients()] sending broadcast to cliets...");
-
-    // cast to private server struct
-    Server *thisServer = serverPtr;
-
-    // prepare the complete message
-    Message completeMsg = {
-        .sourceId = thisServer->self->id,
-        .length = length,
-        .content = content
-    };
-    LOG_D("[sendBroadcastToClients()] sending broadcast with header:\n\tsource: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
-
-    // send as broadcast
-    if (sendMessageUDP(thisServer->self->socks->udpBroad, completeMsg))
-    {
-        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
-        return -1;
-    }
-
-    LOG_I("[sendBroadcastToClients()] broadcast has been sent");
-
-    return 0;
-}
-
 /*
 Function returns the number of clients and the valid clientIds
 */
@@ -560,4 +528,60 @@ int getClientInfo(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
     clientIds = idArray;
 
     LOG_I("[openLobby()] client information written to pointers");
+}
+
+int sendAppMessageToClient(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
+{
+    LOG_I("[sendAppMessageToClient()] sending broadcast to cliets...");
+
+    // cast to private server struct
+    Server *thisServer = serverPtr;
+
+    // prepare the complete message
+    Message completeMsg = {
+        .sourceId = thisServer->self->id,
+        .msgType = MSG_APP,
+    };
+    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+
+    // get client
+    Endpoint targetClient;
+    if (getFromList(thisServer->clients, &targetClient, targetId) < 0)
+    {
+        LOG_E("[sendAppMessageToClient()] failed to get target client %u from the list", targetId);
+        return -1;
+    }
+
+    LOG_D("[sendAppMessageToClient()] sending message to client %u:\n\tcontent: %s", targetId, completeMsg.msgContent);
+
+    // send the message
+    if (sendMessageTCP(targetClient.socks->tcp, completeMsg))
+    {
+        LOG_E("[sendAppMessageToClient()] failed to send message");
+        return -1;
+    }
+
+    LOG_I("[sendAppMessageToClient()] message has been sent");
+
+    return 0;
+}
+
+int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
+{
+    Server *thisServer = serverPtr;
+
+    // prepare the complete message
+    Message completeMsg = {
+        .sourceId = thisServer->self->id,
+        .msgType = MSG_APP,
+    };
+    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+
+    if (sendBroadcastUDP(thisServer->self->socks->udpBroad, completeMsg))
+    {
+        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        return -1;
+    }
+
+    LOG_I("[sendBroadcastToClients()] message has been sent");
 }

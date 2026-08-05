@@ -86,7 +86,7 @@ void clientLobbyState(Endpoint *client)
     while (client->state == LOBBY)
     {
         // Any HTTTP message in LOBBY state will be send through TCP
-        Message *msg;
+        Message msg;
         if (receiveMessageTCP(client->socks->tcp, &msg) < 0)
         {
             LOG_E("[lobbyStateLoop()] CLIENT failed to receive TCP message");
@@ -132,7 +132,7 @@ void clientGameState(Endpoint *client)
             LOG_D("[gameStateLoop()] %d active sockets on CLIENT", socketActivity);
             for (int i=0; i<3 && socketActivity>0; i++)
             {
-                Message *msg;
+                Message msg;
                 if (listenFd[i].revents & POLLIN)
                 {
                     if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
@@ -146,13 +146,10 @@ void clientGameState(Endpoint *client)
                         socketActivity--;
                     }
 
-                    LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
+                    LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
                 }
 
-                Message_enqueue(clientMessages, *msg);
-
-                free(msg);
-                msg = NULL;
+                Message_enqueue(clientMessages, msg);
             }
         }
     }
@@ -288,38 +285,29 @@ int joinLobby(BRClient *clientPtr, char *ipAddress)
 }
 
 // message functions
-int sendAsClient(BRClient *clientPtr, uint32_t length, unsigned char *content)
+int sendAppMessage(BRClient *clientPtr, unsigned char content[512])
 {
     Endpoint *thisClient = clientPtr;
 
     // build message
     Message msg = {
         .sourceId = thisClient->id,
-        .length = length,
-        .content = malloc(length)
+        .msgType = MSG_APP,
     };
-    if (msg.content == NULL)
-    {
-        perror("[sendAsClient()] malloc");
-        return -1;
-    }
-    
-    // add content to message
-    memcpy(msg.content, content, length);
+    snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
 
     // send via socket
     if (sendMessageTCP(thisClient->socks->tcp, msg) < 0)
     {
-        LOG_E("[sendAsClient()] sending has failed");
+        LOG_E("[sendAppMessage()] sending has failed");
         goto fail;
     }
 
-    LOG_I("[sendAsClient()] message has been sent");
+    LOG_I("[sendAppMessage()] message has been sent");
 
     return 0;
 
     fail:
-    free(msg.content);
     return -1;
 }
 
