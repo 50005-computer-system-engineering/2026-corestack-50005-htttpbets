@@ -4,7 +4,7 @@
 #include "common.h"
 
 static MessageQueue *clientMessages;
-static pthread_mutex_t clientMessageLock;
+static pthread_mutex_t clientMessagesLock;
 
 // private functions
 int connectOnTCP(Sockets *socks, char *serverIp)
@@ -92,7 +92,11 @@ void clientLobbyState(Endpoint *client)
             LOG_E("[lobbyStateLoop()] CLIENT failed to receive TCP message");
             continue;
         }
-        // TODO handle message
+        if (msg.msgType == MSG_START)
+        {
+            LOG_D("[lobbyStateLoop()] CLIENT received message to START");
+            client->state = GAME;
+        }
     }
     LOG_I("[lobbyStateLoop()] state change detected, CLIENT exiting LOBBY state");
 }
@@ -149,7 +153,13 @@ void clientGameState(Endpoint *client)
                     LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
                 }
 
-                Message_enqueue(clientMessages, msg);
+                if (msg.msgType == MSG_APP)
+                {
+                    LOG_D("[clientGameState()] Message received for application");
+                    pthread_mutex_lock(&clientMessagesLock);
+                    Message_enqueue(clientMessages, msg);
+                    pthread_mutex_unlock(&clientMessagesLock);
+                }
             }
         }
     }
@@ -212,6 +222,7 @@ int createClient(BRClient **clientPtr)
 
     *clientPtr = newClient;
     
+    // prepare queue
     clientMessages = malloc(sizeof(MessageQueue));
     if (clientMessages == NULL)
     {
@@ -219,6 +230,7 @@ int createClient(BRClient **clientPtr)
         return -1;
     }
     Message_init(clientMessages);
+    pthread_mutex_init(&clientMessagesLock, NULL);
 
     // spawn backrgound thread
     pthread_t threadId;
@@ -311,44 +323,28 @@ int sendAppMessage(BRClient *clientPtr, unsigned char content[512])
     return -1;
 }
 
-int receiveBroadcastAsClient(BRClient *clientPtr, unsigned char **returnBuffer)
+/*
+function allows developers to get a message from the message queue
+returns 0 if no message, returns 1 if there is
+*/
+int getClientAppMessage(unsigned char returnMsg[512])
 {
-    Endpoint *thisClient = clientPtr;
-
-    // block until broadcast received
-    Message *returnMsg;  
-    if (receiveMessageUDP(thisClient->socks->udpBroad, &returnMsg) < 0)
+    if (pthread_mutex_trylock(&clientMessagesLock) == 0)
     {
-        LOG_E("[receiveBroadcastAsClient()] Failed to receive broadcast");
-        return -1;
+        if (Message_empty(clientMessages))
+        {
+            LOG_D("[getClientAppMessage()] no messages to process");
+            return 0;
+        }
+        memcpy(returnMsg, Message_peek(clientMessages)->msgContent, MSG_CONTENT_LENGTH);
+        Message_dequeue(clientMessages);
+        pthread_mutex_unlock(&clientMessagesLock);
+        LOG_D("[getClientAppMessage()] client message has been returned to pointer");
+        return 1;
     }
-
-    // Test for message validity
-    if (returnMsg == NULL || returnMsg->content == NULL || returnMsg->length == 0)
+    else 
     {
-        LOG_E("[receiveBroadcastAsClient()] received null/empty message");
-        if (returnMsg) 
-            free(returnMsg);
-        return -1;
+        LOG_D("[getClientAppMessage()] queue is busy being locked");
+        return 0;
     }
-
-    // Malloc buffer for message content
-    *returnBuffer = malloc((size_t)returnMsg->length);
-    if (*returnBuffer == NULL)
-    {
-        perror("[receiveBroadcastAsClient()] malloc");
-        free(returnMsg->content);
-        free(returnMsg);
-        return -1;
-    }
-    
-    // copy message content to return buffer
-    memcpy(*returnBuffer, returnMsg->content, (size_t)returnMsg->length);
-
-    // free function's pointers
-    free(returnMsg->content);
-    free(returnMsg);
-    returnMsg = NULL;
-
-    return 0;
 }

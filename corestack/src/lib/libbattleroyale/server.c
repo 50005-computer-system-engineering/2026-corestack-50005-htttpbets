@@ -9,8 +9,8 @@ typedef struct {
     ClientLinkedList *clients;
 } Server;
 
-static MessageQueue *serverMessages;
-static pthread_mutex_t serverMessageLock;
+static MessageQueue serverMessages;
+static pthread_mutex_t serverMessagesLock;
 
 // private functions
 int listenOnTCP(Server *serverPtr)
@@ -94,6 +94,27 @@ int prepareBroadcastUDP(Server *serverPtr)
 
     LOG_I("[prepareBroadcastUDP()] UDP broadcast port ready for transmission");
 
+    return 0;
+}
+
+int sendBroadcastTCP(Server *serverPtr, const Message completeMsg)
+{
+    // iterate through and send
+    LOG_I("[broadcastOnTCP()] sending messages to %u clients", serverPtr->clients->count);
+    ClientNode *current = serverPtr->clients->head;
+    for (int i=0; i<serverPtr->clients->count; i++)
+    {
+        if (current != NULL)
+        {
+            int fd = current->client.socks->tcp;
+            sendMessageTCP(fd, completeMsg);
+        }
+        else
+        {
+            return -1;
+        }
+    }
+    LOG_I("[broadcastOnTCP()] sent message to all %u clients", serverPtr->clients->count);
     return 0;
 }
 
@@ -236,6 +257,14 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         return;
     }
 
+    // send TCP broadcast for clients to change state
+    LOG_D("[serverGameState()] SERVER instructing clients to transition into GAME state");
+    if (sendBroadcastTCP(serverPtr, (Message) {.sourceId = serverPtr->self->id, .msgType = MSG_START, .msgContent = ""}) < 0)
+    {
+        LOG_E("[serverGameState()] SERVER failed to broadcast new state to all clients");
+        return;
+    }
+
     // setup pollfd array for clients being listened to
     struct pollfd *listenFdTCP = malloc(sizeof(struct pollfd) * serverPtr->clients->count);
     struct pollfd *currentFd = listenFdTCP;
@@ -263,8 +292,6 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         }
         
         // listen to each message and handle
-        // TODO message buffer for high traffic situation
-        // FOR NOW handles 1 message at a time for testing and basic functionality
         Message msg;
         for (uint32_t i=0; i < serverPtr->clients->count || socketActivity > 0; i++)
         {
@@ -292,7 +319,15 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
             LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
         }
         
-        Message_enqueue(serverMessages, msg);
+        // enqueue a message if its an application layer message
+        if (msg.msgType == MSG_APP)
+        {
+            LOG_D("[serverGameState()] Message received for application");
+            pthread_mutex_lock(&serverMessagesLock);
+            Message_enqueue(&serverMessages, msg);
+            pthread_mutex_unlock(&serverMessagesLock);
+        }
+        // TODO other type message handling
     }
 }
 
@@ -304,7 +339,7 @@ void serverEndState(Server *serverPtr)
     {
         ClientNode *target = serverPtr->clients->head;
         LOG_D("[serverEndState()] removing client %u", target->client.id);
-        if (close(target->client.socks->tcp) < 0 || close(target->client.socks->udpUni) < 0 || close(target->client.socks->udpBroad) < 0)
+        if (closeSockets(serverPtr->self->socks) < 0)
         {
             LOG_E("[serverEndState()] could not close a socket fd");
         }
@@ -382,14 +417,9 @@ int createServer(BRServer **serverPtr)
 
     *serverPtr = newServer;
 
-    // initialise message queue
-    serverMessages = malloc(sizeof(MessageQueue));
-    if (serverMessages == NULL)
-    {
-        LOG_E("[createClient()] failed to allocate space to message queue");
-        return -1;
-    }
-    Message_init(serverMessages);
+    // prepare message queue
+    Message_init(&serverMessages);
+    pthread_mutex_init(&serverMessagesLock, NULL);
 
     // spawn backrgound thread
     pthread_t threadId;
@@ -584,4 +614,50 @@ int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
     }
 
     LOG_I("[sendBroadcastToClients()] message has been sent");
+}
+
+int sendReliableBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
+{
+    Server *thisServer = serverPtr;
+
+    // prepare the complete message
+    Message completeMsg = {
+        .sourceId = thisServer->self->id,
+        .msgType = MSG_APP,
+    };
+    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+
+    if (sendBroadcastTCP(serverPtr, completeMsg))
+    {
+        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        return -1;
+    }
+
+    LOG_I("[sendBroadcastToClients()] message has been sent");
+}
+
+/*
+function allows developers to get a message from the message queue
+returns 0 if no message, returns 1 if there is
+*/
+int getServerAppMessage(unsigned char returnMsg[512])
+{
+    if (pthread_mutex_trylock(&serverMessagesLock) == 0)
+    {
+        if (Message_empty(&serverMessages))
+        {
+            LOG_D("[getServerAppMessage()] no messages to process");
+            return 0;
+        }
+        memcpy(returnMsg, Message_peek(&serverMessages)->msgContent, MSG_CONTENT_LENGTH);
+        Message_dequeue(&serverMessages);
+        pthread_mutex_unlock(&serverMessagesLock);
+        LOG_D("[getServerAppMessage()] client message has been returned to pointer");
+        return 1;
+    }
+    else 
+    {
+        LOG_D("[getServerAppMessage()] queue is busy being locked");
+        return 0;
+    }
 }

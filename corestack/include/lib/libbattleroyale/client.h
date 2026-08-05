@@ -11,4 +11,6 @@ int joinLobby(BRClient *clientPtr, char *ipAddress);
 
 int sendAppMessage(BRClient *clientPtr, unsigned char content[512]); // use defined value instead of explicit number
 
+int getClientAppMessage(unsigned char returnMsg[512]);
+
 #endif

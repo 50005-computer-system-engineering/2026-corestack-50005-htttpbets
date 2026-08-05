@@ -12,5 +12,8 @@ int endGame(BRServer *serverPtr);
 
 int sendAppMessageToClient(BRServer *serverPtr, uint32_t clientId, unsigned char content[512]); // use defined value instead of explicit number
 int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512]);
+int sendReliableBroadcastToClients(BRServer *serverPtr, unsigned char content[512]);
+
+int getServerAppMessage(unsigned char returnMsg[512]);
 
 #endif
