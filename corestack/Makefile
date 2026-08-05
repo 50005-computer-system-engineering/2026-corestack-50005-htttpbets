@@ -219,12 +219,12 @@ TEST_DIR     := tests
 TEST_BIN_DIR := build/tests
 
 # Test-only include path: lets libhtttp tests #include "protocol.h" directly
-TEST_CFLAGS := $(CFLAGS) -Isrc/lib/libhtttp
+TEST_CFLAGS := $(CFLAGS) -Isrc/lib/libbattleroyale
 
-TARGET_STATIC := $(LIB_OUT)/libhtttp.a
+TARGET_STATIC := $(LIB_OUT)/libbattleroyale.a
 
-# Auto-discover every .c file under tests/libhtttp/
-TEST_SRCS := $(wildcard $(TEST_DIR)/libhtttp/*.c)
+# Auto-discover every .c file under tests/libbattleroyale/
+TEST_SRCS := $(wildcard $(TEST_DIR)/libbattleroyale/*.c)
 TEST_BINS := $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SRCS))
 
 test: $(TEST_BINS)
@@ -238,7 +238,7 @@ test: $(TEST_BINS)
 
 $(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
 	@mkdir -p $(dir $@)
-	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lhtttp
+	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lbattleroyale
 	@echo "Built test binary: $@"
 
 $(TEST_BIN_DIR):
