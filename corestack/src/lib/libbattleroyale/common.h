@@ -1,5 +1,5 @@
-#ifndef LIBHTTTP_COMMON_H
-#define LIBHTTTP_COMMON_H
+#ifndef LIBBR_COMMON_H
+#define LIBBR_COMMON_H
 
 #include <arpa/inet.h>
 #include <netinet/in.h>

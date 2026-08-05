@@ -1,5 +1,5 @@
-#ifndef LIBHTTTP_MESSAGE_H
-#define LIBHTTTP_MESSAGE_H
+#ifndef LIBBR_MESSAGE_H
+#define LIBBR_MESSAGE_H
 
 #include "common.h"
 
