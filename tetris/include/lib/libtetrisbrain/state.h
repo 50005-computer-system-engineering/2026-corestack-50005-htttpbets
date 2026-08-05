@@ -6,11 +6,24 @@
 #include <stdbool.h>
 
 /* ----- GAME STATE ----- */
+typedef enum
+{
+    TARGET_MANUAL, // Manual cycling
+    TARGET_RANDOM, // Random opponent
+    TARGET_KO,     // Highest stack
+    TARGET_MODE_COUNT
+} TargetingMode;
+
 typedef struct
 {
     Board board;
     Piece current;
     Piece next;
+    TargetingMode target_mode;
+    int player_id;
+    int target_player_id;
+    int gravity_timer;
+    int lock_timer;
     int held_type;
     bool has_held;
     int bag[14];

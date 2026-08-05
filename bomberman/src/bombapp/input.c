@@ -26,6 +26,12 @@ void input_update(void) {
         event_bus_trigger(EVENT_INPUT_MOVE_RELEASED, NULL);
     }
 
+    // Sprint toggle
+    if (IsKeyPressed(CONFIG.KEYS.SPRINT))
+        event_bus_trigger(EVENT_INPUT_SPRINT_CHANGED, &(SprintEventArgs){.toggled = true});
+    else if (IsKeyUp(CONFIG.KEYS.SPRINT))
+        event_bus_trigger(EVENT_INPUT_SPRINT_CHANGED, &(SprintEventArgs){.toggled = false});
+
     // Bomb Placement
     if (IsKeyPressed(CONFIG.KEYS.BOMB))
         event_bus_trigger(EVENT_INPUT_BOMB_PRESSED, NULL);

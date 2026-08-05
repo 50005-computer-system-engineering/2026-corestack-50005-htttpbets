@@ -10,14 +10,18 @@ const Config CONFIG = {
         .MOVE_DOWN = KEY_S,
         .MOVE_LEFT = KEY_A,
         .MOVE_RIGHT = KEY_D,
+        .SPRINT = KEY_LEFT_SHIFT,
         .BOMB = KEY_SPACE,
         .EXIT = KEY_ESCAPE
     },
 
     .PHYSICS = {
-        .PLAYER_SPEED = 300.0f
+        .TILE_SIZE = 120.0f,
+        .PICKUP_SIZE = 80.0f,
+        .PLAYER_SPEED = 3.0f,
+        .PLAYER_SPRINT_SPEED = 5.5f
     },
-
+    
     .ASSETS = {
         .PLAYER_STAND = {
             (SpritesheetAsset){
@@ -61,5 +65,21 @@ const Config CONFIG = {
             .path = "../../assets/sprites/Bomber_Win.png",
             .cols = 12, .rows = 1, .scale = player_scale, .fps = player_fps, .should_loop = true
         },
+
+        .TILE_EMPTY = "../../assets/tiles/Tile_Grass.png",
+        .TILE_BREAKABLE = "../../assets/tiles/Tile_Breakable.png",
+        .TILE_WALL = "../../assets/tiles/Tile_Unbreakable.png",
+        .TILE_BOMB = "../../assets/tiles/Bomb.png",
+        .TILE_POWERUP_BOMB = "../../assets/tiles/Powerup_Bomb.png",
+        .TILE_POWERUP_FIRE = "../../assets/tiles/Powerup_Fire.png",
+
+        .TILE_EXPLODE_CORE = "../../assets/tiles/Explode_Core.png",
+        .TILE_EXPLODE_MID = "../../assets/tiles/Explode_Mid.png",
+        .TILE_EXPLODE_CAP = "../../assets/tiles/Explode_Cap.png",
+    },
+
+    .SETTINGS = {
+        .MUSIC_VOLUME = 0.7f,
+        .SFX_VOLUME = 1.0f
     }
 };
