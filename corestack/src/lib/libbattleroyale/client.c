@@ -2,7 +2,9 @@
 
 #include "lib/libbattleroyale/client.h"
 #include "common.h"
-#include "message.h"
+
+static MessageQueue *clientMessages;
+static pthread_mutex_t clientMessageLock;
 
 // private functions
 int connectOnTCP(Sockets *socks, char *serverIp)
@@ -146,10 +148,13 @@ void clientGameState(Endpoint *client)
 
                     LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
                 }
+
+                Message_enqueue(clientMessages, *msg);
+
+                free(msg);
+                msg = NULL;
             }
         }
-        // handle message
-
     }
     LOG_I("[gameStateLoop()] state change detected, CLIENT exiting GAME state");
 }
@@ -209,6 +214,14 @@ int createClient(BRClient **clientPtr)
     newClient->state = 0;
 
     *clientPtr = newClient;
+    
+    clientMessages = malloc(sizeof(MessageQueue));
+    if (clientMessages == NULL)
+    {
+        LOG_E("[createClient()] failed to allocate space to message queue");
+        return -1;
+    }
+    Message_init(clientMessages);
 
     // spawn backrgound thread
     pthread_t threadId;
