@@ -123,10 +123,10 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             break;
         case SEND_MESSAGES:
             // build message
-            uint32_t msgLen = 11;
-            unsigned char *msgContent = (unsigned char *)"gamer word";
+            unsigned char msgContent[512];
+            snprintf(msgContent, 512, "client %d: gamer word", id);
             // perform send
-            if (sendAsClient(testClient, msgLen, msgContent) < 0)
+            if (sendAppMessage(testClient, msgContent) < 0)
             {
                 printf("client %d: could not send message\n", id);
                 result = FAIL;

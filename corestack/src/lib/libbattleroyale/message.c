@@ -51,124 +51,107 @@ int sendBytes(int sockfd, const unsigned char *buf, uint64_t length)
 
 // public functions
 // app layer message functions
-int receiveMessageTCP(int sockfd, Message **returnPtr)
+int receiveMessageTCP(int sockfd, Message *returnPtr)
 {
-    Message *returnMsg = calloc(1, sizeof(Message));
-
-    LOG_I("[receiveAppMessage()] preparing to receive message");
-
-    if (returnMsg == NULL)
+    if (returnPtr == NULL)
     {
-        perror("[receiveMessage()] malloc");
+        LOG_E("[receiveMessageTCP()] pointer passed is not valid place in memory");
         goto fail;
     }
 
+    LOG_I("[receiveMessageTCP()] preparing to receive message");
+
     // read Message header bytes
-    LOG_D("[receiveAppMessage()] allocated memory for Message, listening for header...");
+    LOG_D("[receiveMessageTCP()] listening for message...");
     unsigned char *buffer = NULL;
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        LOG_E("[receiveAppMessage()] failed to read sourceId\n");
+        LOG_E("[receiveMessageTCP()] failed to read source id");
         goto fail;
     } 
     uint32_t sourceBytes;
     memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
-    returnMsg->sourceId = ntohl(sourceBytes);
+    returnPtr->sourceId = ntohl(sourceBytes);
     free(buffer);
     buffer = NULL;
 
     if (readBytes(sockfd, &buffer, sizeof(uint32_t)) < 0)
     {
-        LOG_E("[receiveAppMessage()] failed to read length");
+        LOG_E("[receiveMessageTCP()] failed to read message type");
         goto fail;
     } 
-    uint32_t lenBytes;
-    memcpy(&lenBytes, buffer, sizeof(lenBytes));
-    returnMsg->length = ntohl(lenBytes);
+    MessageType typeBytes;
+    memcpy(&typeBytes, buffer, sizeof(typeBytes));
+    returnPtr->msgType = (MessageType)ntohl(typeBytes);
     free(buffer);
     buffer = NULL;
 
-    // listen for message considering the header
-    LOG_D("[receiveAppMessage()] now listening for message with header:\n\tsourceId: %u\n\tlength: %u\n", returnMsg->sourceId, returnMsg->length);
-    if (readBytes(sockfd, &buffer, returnMsg->length) < 0)
+    if (readBytes(sockfd, &buffer, MSG_CONTENT_LENGTH) < 0)
     {
-        LOG_E("[receiveAppMessage()] failed to read message");
+        LOG_E("[receiveMessageTCP()] failed to read message content");
         goto fail;
     }
-    returnMsg->content = buffer;
+    snprintf(returnPtr->msgContent, MSG_CONTENT_LENGTH, buffer);
     buffer = NULL;
 
-    // return this ptr
-    *returnPtr = returnMsg;
+    LOG_D("[receiveMessageTCP()] received broadcast with following message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", returnPtr->sourceId, returnPtr->msgType, returnPtr->msgContent);
+    LOG_I("[receiveMessageTCP()] finsihed receiving message");
 
     return 0;
 
-fail:
+    fail:
     free(buffer);
-    if (returnMsg != NULL)
-    {
-        if (returnMsg->content != NULL)
-        {
-            free(returnMsg->content);
-        }
-        free(returnMsg);
-    }
 
     return -1;
 }
 
-int receiveMessageUDP(int sockfd, Message **returnPtr)
+int receiveMessageUDP(int sockfd, Message *returnPtr)
 {
-    LOG_I("[receiveAppMessageUDP()] preparing to receive broadcast...");
+    LOG_I("[receiveMessageUDP()] preparing to receive broadcast...");
 
     // receiving message
     int flagsSet = 0;
-    unsigned char *messageBytes = malloc(4096); // TODO fix the message size problem
+    unsigned char *messageBytes = malloc(sizeof(Message)); // TODO fix the message size problem
     if (messageBytes == NULL)
     {
-        perror("[receiveAppMessageUDP()] malloc");
+        perror("[receiveMessageUDP()] malloc");
         return -1;
     }
 
-    LOG_D("[receiveAppMessageUDP()] waiting for bytes");
+    LOG_D("[receiveMessageUDP()] waiting for bytes");
 
-    if (recvfrom(sockfd, messageBytes, 4096, flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
+    if (recvfrom(sockfd, messageBytes, sizeof(Message), flagsSet, NULL, NULL) < 0) // TODO specify message length to something reasonable
     {
         perror("[receiveAppMessageUDP()] recvfrom");
         return -1;
     }
-    LOG_D("[receiveAppMessageUDP()] received raw message bytes");
+    LOG_D("[receiveMessageUDP()] received raw message bytes");
 
     // fit bytes into message message struct
-    Message *returnMsg = calloc(1, sizeof(Message));
-    returnMsg->sourceId = *messageBytes;
-    returnMsg->length = *(messageBytes+sizeof(returnMsg->length));
-    returnMsg->content = malloc(returnMsg->length);
-    memcpy(returnMsg->content, messageBytes+sizeof(returnMsg->sourceId)+sizeof(returnMsg->length), returnMsg->length);
+    returnPtr = calloc(1, sizeof(Message));
+    memcpy(returnPtr, messageBytes, sizeof(Message));
 
-    LOG_D("[receiveAppMessageUDP()] received broadcast with following message:\n\tsource: %u\n\tlength: %u", returnMsg->sourceId, returnMsg->length);
-
-    LOG_I("[receiveAppMessageUDP()] broadcast has been received");
-    *returnPtr = returnMsg;
+    LOG_D("[receiveMessageUDP()] received broadcast with following message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", returnPtr->sourceId, returnPtr->msgType, returnPtr->msgContent);
+    LOG_I("[receiveMessageUDP()] broadcast has been received");
 
     return 0;
 }
 
 int sendMessageTCP(int sockfd, const Message completeMsg)
 {
-    LOG_I("[sendAppMessage()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+    LOG_I("[sendMessageTCP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", completeMsg.sourceId, completeMsg.msgType, completeMsg.msgContent);
     uint32_t sourceId = htonl(completeMsg.sourceId);
     sendBytes(sockfd, (const unsigned char *)&sourceId, sizeof(uint32_t));
-    uint32_t length = htonl(completeMsg.length);
-    sendBytes(sockfd, (const unsigned char *)&length, sizeof(uint32_t));
-    sendBytes(sockfd, completeMsg.content, completeMsg.length);
-    LOG_I("[sendAppMessage()] pushed all bytes though socket");
+    MessageType type = htonl(completeMsg.msgType);
+    sendBytes(sockfd, (const unsigned char *)&type, sizeof(uint32_t));
+    sendBytes(sockfd, completeMsg.msgContent, MSG_CONTENT_LENGTH);
+    LOG_I("[sendMessageTCP()] pushed all bytes though socket");
     return 0;
 }
 
-int sendMessageUDP(int sockfd, const Message completeMsg)
+int sendBroadcastUDP(int sockfd, const Message completeMsg)
 {
-    LOG_I("[sendAppMessageUDP()] sending message with the header:\n\tsourceId: %u\n\tlength: %u", completeMsg.sourceId, completeMsg.length);
+    LOG_I("[sendMessageUDP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", completeMsg.sourceId, completeMsg.msgType, completeMsg.msgContent);
     
     // preparing parameters for sendto()
     struct sockaddr_in addr = {
@@ -178,31 +161,18 @@ int sendMessageUDP(int sockfd, const Message completeMsg)
     };
     int flagsSet = 0;
     socklen_t addrLen = sizeof(addr);
-    
-    // prepare message as raw bytes
-    size_t msgLen = sizeof(completeMsg.sourceId) + sizeof(completeMsg.length) + completeMsg.length;
-    unsigned char *messageBytes = malloc(msgLen);
-    if (messageBytes == NULL)
-    {
-        perror("[sendAppMessageUDP()] malloc");
-        return -1;
-    }
-    memcpy(messageBytes, &completeMsg.sourceId, sizeof(completeMsg.sourceId));
-    memcpy(messageBytes + sizeof(completeMsg.sourceId), &completeMsg.length, sizeof(completeMsg.length));
-    memcpy(messageBytes + sizeof(completeMsg.sourceId) + sizeof(completeMsg.length), completeMsg.content, completeMsg.length);
-    LOG_D("[sendAppMessageUDP()] copied Message into raw bytes");
 
     // send the entire message over broadcast port
-    if (sendto(sockfd, messageBytes, msgLen, flagsSet, (struct sockaddr *)&addr, addrLen) < 0)
+    if (sendto(sockfd, (unsigned char *)&completeMsg, sizeof(Message), flagsSet, (struct sockaddr *)&addr, addrLen) < 0)
     {
-        perror("[sendAppMessageUDP()] sendto");
+        perror("[sendMessageUDP()] sendto");
         return -1;
     }
 
     // cleanup
-    free(messageBytes);
-    messageBytes = NULL;
 
-    LOG_I("[sendAppMessageUDP()] broadcast has been sent");
+    LOG_I("[sendMessageUDP()] broadcast has been sent");
     return 0;
 }
+
+// TODO unicasting with UDP

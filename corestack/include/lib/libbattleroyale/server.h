@@ -10,6 +10,7 @@ int openLobby(BRServer *serverPtr);
 int startGame(BRServer *serverPtr);
 int endGame(BRServer *serverPtr);
 
-int sendBroadcastToClients(BRServer *serverPtr, uint32_t length, unsigned char *content);
+int sendAppMessageToClient(BRServer *serverPtr, uint32_t clientId, unsigned char content[512]); // use defined value instead of explicit number
+int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512]);
 
 #endif
