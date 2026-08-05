@@ -12,7 +12,8 @@
 #include <unistd.h>
 
 #include "utils/logger.h"
-// #include "messageq.h"
+#include "utils/queue.h"
+#include "message.h"
 
 // known ports
 #define PORT_TCP 6700

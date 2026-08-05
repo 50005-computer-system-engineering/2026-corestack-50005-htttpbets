@@ -2,7 +2,6 @@
 
 #include "lib/libbattleroyale/server.h"
 #include "common.h"
-#include "message.h"
 #include "clientll.h"
 
 typedef struct {
@@ -10,6 +9,9 @@ typedef struct {
     ClientLinkedList *clients;
     EndpointState state;
 } Server;
+
+static MessageQueue *serverMessages;
+static pthread_mutex_t serverMessageLock;
 
 // private functions
 int listenOnTCP(Server *serverPtr)
@@ -278,8 +280,6 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
                     continue;
                 }
                 LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
-                free(msg);
-                msg = NULL;
             }
         }
         
@@ -293,10 +293,11 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
             else
             {
                 LOG_D("[serverGameState()] received message:\n\tsource: %u\n\tlength: %u\n\tcontent: %s", msg->sourceId, msg->length, msg->content);
-                free(msg);
-                msg = NULL;
             }
         }
+        
+        free(msg);
+        msg = NULL;
     }
 }
 
@@ -385,6 +386,15 @@ int createServer(BRServer **serverPtr)
     LOG_D("[createServer()] UDP ports bound and ready for messaging");
 
     *serverPtr = newServer;
+
+    // initialise message queue
+    serverMessages = malloc(sizeof(MessageQueue));
+    if (serverMessages == NULL)
+    {
+        LOG_E("[createClient()] failed to allocate space to message queue");
+        return -1;
+    }
+    Message_init(serverMessages);
 
     // spawn backrgound thread
     pthread_t threadId;

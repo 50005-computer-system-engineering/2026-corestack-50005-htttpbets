@@ -1,5 +1,4 @@
 #include "message.h"
-#include "common.h"
 
 // private functions
 // same functions as in common.c in PA2, not exposed to library users
