@@ -242,6 +242,7 @@ int main(void)
             printf("server: failed client test in ESTABLISH_CONNECTION stage");
             goto server_cleanup;
         }
+
         printf("server: stage ESTABLISH_CONNETION complete, setting up next stage\n");
 
         // STAGE 2 - MESSAGE
@@ -262,7 +263,6 @@ int main(void)
             printf("server: a client failed in SEND_MESSAGES\n");
             goto server_cleanup;
         }
-        printf("server: stage SEND_MESSAGES complete, setting up next stage\n");
 
         // STAGE 3 - BROADCAST
         printf("server: starting test stage BROADCASTING\n");
@@ -281,7 +281,7 @@ int main(void)
         
         // CLEANUP
         server_cleanup:
-        endGame(testServer);
+        // endGame(testServer);
         wait(NULL); // for all children to exit
         free(testServer);
         return 0;

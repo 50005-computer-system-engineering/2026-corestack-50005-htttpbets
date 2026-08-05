@@ -8,6 +8,7 @@
 typedef enum {
     MSG_JOIN,
     MSG_LEAVE,
+    MSG_START,
     MSG_APP
 } MessageType;
 
