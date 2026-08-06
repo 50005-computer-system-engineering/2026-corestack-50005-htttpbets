@@ -108,6 +108,7 @@ int sendBroadcastTCP(Server *serverPtr, const Message completeMsg)
         {
             int fd = current->client.socks->tcp;
             sendMessageTCP(fd, completeMsg);
+            current = current->next;
         }
         else
         {
@@ -334,6 +335,8 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
 void serverEndState(Server *serverPtr)
 {
     LOG_I("[serverEndState()] SERVER entering END state, closing connection with all clients");
+
+    // TODO end all clients
 
     while (serverPtr->clients->head != NULL)
     {

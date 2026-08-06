@@ -286,9 +286,7 @@ int joinLobby(BRClient *clientPtr, char *ipAddress)
         LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
-
-    return 0;
-
+    
     // joining lobby successful, enter lobby state
     thisClient->state = LOBBY;
 
