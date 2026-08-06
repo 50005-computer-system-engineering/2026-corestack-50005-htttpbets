@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 
 #include "libbattleroyale/server.h"
@@ -106,6 +107,8 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
     // execute test functions
     switch (stage) 
     {
+        // used in multiple tests
+        unsigned char msgContent[512];
         case SETUP:
             // do nothing
             result = PASS;
@@ -123,7 +126,6 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             break;
         case SEND_MESSAGES:
             // build message
-            unsigned char msgContent[512];
             snprintf(msgContent, 512, "client %d: gamer word", id);
             // perform send
             if (sendAppMessage(testClient, msgContent) < 0)
@@ -136,8 +138,18 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             result = PASS;
             break;
         case BROADCASTING:
-            // TODO broadcasting test
-            result = PASS;
+            // broadcasts are sent prior to this test running (should already be in queue)
+            result = FAIL;
+            while (getClientAppMessage(msgContent) != 0)
+            {
+                // break when reliable broadcast is matched
+                if (strcmp(msgContent, "removed from game by anticheat (just a test phrase)") == 0)
+                {
+                    printf("client %d: successfully received TCP broadcast\n", id);
+                    result = PASS;
+                    break;
+                }
+            }
             break;
         case CLEANUP:
             // do nothing, handled by after the loop in the client fork
@@ -207,13 +219,6 @@ int main(void)
     {
         // close write end of status pipe (used to listen for status from clients)
         close(statusPipe[1]);
-
-        // // setup trackers for status pipes (not currently implemented)
-        // int clientStatus[NUM_TEST_CLIENTS];
-        // for (int i=0; i < NUM_TEST_CLIENTS; i++)
-        // {
-        //     clientStatus[i] = 0;
-        // }
         
         // setup the test server
         BRServer *testServer;
@@ -266,12 +271,23 @@ int main(void)
 
         // STAGE 3 - BROADCAST
         printf("server: starting test stage BROADCASTING\n");
+        printf("server: GAME state, server now broadcasting messages to clients\n");
+        if (sendBroadcastToClients(testServer, "banned for racism") < 0)
+        {
+            printf("server: failed to send UDP broadcast at BROADCASTING stage\n");
+            goto server_cleanup;
+        }
+        if (sendReliableBroadcastToClients(testServer, "removed from game by anticheat (just a test phrase)") < 0)
+        {
+            printf("server: failed to send TCP broadcast at BROADCASTING stage\n");
+            goto server_cleanup;
+        }
+        sleep(5);
         if (signalNextStage(stagingPipes, BROADCASTING) < 0)
         {
             printf("server: failed to prompt clients to start BROADCASTING stage\n");
             goto server_cleanup;
         }
-        printf("server: GAME state, server now listening for client messages\n");
         if (awaitTestResults(statusPipe) < 0)
         {
             printf("server: a client failed in BROADCASTING\n");
