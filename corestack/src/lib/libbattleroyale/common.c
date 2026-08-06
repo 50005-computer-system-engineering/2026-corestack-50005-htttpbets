@@ -27,7 +27,6 @@ int checkSockets(Sockets socks)
 // closes both socket fd
 int closeSockets(Sockets *socks)
 {
-    LOG_I("[closeSockets()] closing sockets...");
     if (checkSockets(*socks) == 0)
     {
         LOG_E("[closeSockets()] sockets not created, no need to close");
@@ -39,7 +38,21 @@ int closeSockets(Sockets *socks)
     socks->udpUni = -1;
     close(socks->udpBroad);
     socks->udpBroad = -1;
-    LOG_I("[closeSockets()] closed sockets successfully");
+    LOG_I("[closeSockets()] closed Sockets struct file descriptors successfully");
+    return 0;
+}
+
+int freeSockets(Sockets **socks)
+{
+    Sockets *closingSockets = *socks;
+    if (closeSockets(closingSockets))
+    {
+        LOG_E("[closeSockets()] sockets could not be closed");
+        return -1;
+    }
+    free(closingSockets);
+    closingSockets = NULL;
+    LOG_I("[closeSockets()] freed Sockets struct in memory");
     return 0;
 }
 
@@ -52,7 +65,7 @@ int createSockets(Sockets **socks)
     newSocks->tcp = socket(AF_INET, SOCK_STREAM, 0);
     if (newSocks->tcp < 0)
     {
-        perror("[common createSockets()] socket");
+        perror("[createSockets()] socket");
         goto fail;
     }
 
@@ -60,7 +73,7 @@ int createSockets(Sockets **socks)
     newSocks->udpUni = socket(AF_INET, SOCK_DGRAM, 0);
     if (newSocks->udpUni < 0)
     {
-        perror("[common createSockets()] socket");
+        perror("[createSockets()] socket");
         close(newSocks->tcp);
         goto fail;
     }
@@ -69,7 +82,7 @@ int createSockets(Sockets **socks)
     newSocks->udpBroad = socket(AF_INET, SOCK_DGRAM, 0);
     if (newSocks->udpBroad < 0)
     {
-        perror("[common createSockets()] socket");
+        perror("[createSockets()] socket");
         close(newSocks->tcp);
         close(newSocks->udpUni);
         goto fail;
@@ -124,16 +137,15 @@ int createEndpoint(Endpoint **endpt)
 }
 
 // smoothly close an endpoint
-int closeEnpoint(Endpoint **endpt)
+int freeEndpoint(Endpoint **endpt)
 {
     Endpoint *closingEndpt = *endpt;
     // close sockets
-    if (closeSockets(closingEndpt->socks) < 0)
+    if (freeSockets(&closingEndpt->socks) < 0)
     {
         LOG_E("[closeEndpoint()] could not close sockets");
         return -1;
     } 
-    free(closingEndpt->socks);
     closingEndpt->socks = NULL;
 
     // free struct memeory
@@ -144,4 +156,3 @@ int closeEnpoint(Endpoint **endpt)
     
     return 0;
 }
-
