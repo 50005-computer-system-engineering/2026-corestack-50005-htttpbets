@@ -151,10 +151,6 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
                 }
             }
             break;
-        case CLEANUP:
-            // do nothing, handled by after the loop in the client fork
-            result = PASS;
-            break;
     }
 
     return result;
@@ -297,7 +293,10 @@ int main(void)
         
         // CLEANUP
         server_cleanup:
-        // endGame(testServer);
+        if (endGame(testServer) < 0)
+        {
+            printf("server: failed to enter END state\n");
+        }
         wait(NULL); // for all children to exit
         free(testServer);
         return 0;
@@ -339,7 +338,7 @@ int main(void)
 
         // CLEANUP
         client_cleanup:
-        free(testClient);
+        printf("client %d: test failed or CLEANUP reached, cleaning the client from memory\n", id);
         exit(0);
     }
 }

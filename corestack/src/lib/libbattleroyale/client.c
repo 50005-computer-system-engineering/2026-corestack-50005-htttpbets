@@ -82,23 +82,23 @@ In this state, listen and make state change only upon START
 */
 void clientLobbyState(Endpoint *client)
 {
-    LOG_I("[lobbyStateLoop()] CLIENT entering LOBBY state, awaiting state change...");
+    LOG_I("[clientLobbyState()] CLIENT entering LOBBY state, awaiting state change...");
     while (client->state == LOBBY)
     {
         // Any HTTTP message in LOBBY state will be send through TCP
         Message msg;
         if (receiveMessageTCP(client->socks->tcp, &msg) < 0)
         {
-            LOG_E("[lobbyStateLoop()] CLIENT failed to receive TCP message");
+            LOG_E("[clientLobbyState()] CLIENT failed to receive TCP message");
             continue;
         }
         if (msg.msgType == MSG_START)
         {
-            LOG_D("[lobbyStateLoop()] CLIENT received message to START");
+            LOG_D("[clientLobbyState()] CLIENT received message to START");
             client->state = GAME;
         }
     }
-    LOG_I("[lobbyStateLoop()] state change detected, CLIENT exiting LOBBY state");
+    LOG_I("[clientLobbyState()] state change detected, CLIENT exiting LOBBY state");
 }
 
 /*
@@ -107,7 +107,7 @@ In this state listen and handle messages accordingly (mainly about passing the m
 */
 void clientGameState(Endpoint *client)
 {
-    LOG_I("[gameStateLoop()] CLIENT entering GAME state, awaiting state change...");
+    LOG_I("[clientGameState()] CLIENT entering GAME state, awaiting state change...");
 
     // Any HTTTP message in LOBBY state will be sent through TCP, UDP unicast, or UDP broadcast
     // create pollfd struct
@@ -133,7 +133,7 @@ void clientGameState(Endpoint *client)
         int socketActivity = poll(listenFd, 3, 50);
         if (socketActivity > 0)
         {
-            LOG_D("[gameStateLoop()] %d active sockets on CLIENT", socketActivity);
+            LOG_D("[clientGameState()] %d active sockets on CLIENT", socketActivity);
             for (int i=0; i<3 && socketActivity>0; i++)
             {
                 if (listenFd[i].revents & POLLIN)
@@ -145,7 +145,7 @@ void clientGameState(Endpoint *client)
                     {
                         if (receiveMessageTCP(listenFd[i].fd, &msg) < 0)
                         {
-                            LOG_E("[gameStateLoop()] failed to receive TCP message from %d", listenFd[i].fd);
+                            LOG_E("[clientGameState()] failed to receive TCP message from %d", listenFd[i].fd);
                             continue;
                         }
                     }
@@ -154,7 +154,7 @@ void clientGameState(Endpoint *client)
                     {
                         if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
                         {
-                            LOG_E("[gameStateLoop()] failed to receive TCP message from %d", listenFd[i].fd);
+                            LOG_E("[clientGameState()] failed to receive TCP message from %d", listenFd[i].fd);
                             continue;
                         }
                     }
@@ -164,7 +164,7 @@ void clientGameState(Endpoint *client)
                         socketActivity--;
                     }
 
-                    LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
+                    LOG_D("[clientGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
                     if (msg.msgType == MSG_APP)
                     {
                         LOG_D("[clientGameState()] Message received for application");
@@ -172,18 +172,26 @@ void clientGameState(Endpoint *client)
                         Message_enqueue(&clientMessages, msg);
                         pthread_mutex_unlock(&clientMessagesLock);
                     }
+                    if (msg.msgType == MSG_END)
+                    {
+                        LOG_D("[clientGameState()] Message received to change to END state");
+                        client->state = END;
+                    }
                 }
             }
         }
     }
-    LOG_I("[gameStateLoop()] state change detected, CLIENT exiting GAME state");
+    LOG_I("[clientGameState()] state change detected, CLIENT exiting GAME state");
 }
 
 void clientEndState(Endpoint *client)
 {
-    LOG_I("[endStateCleanup()] SERVER entering END state, closing connection with all clients");
-
-    LOG_I("[endStateCleanup()] SERVER finished cleaning up");
+    LOG_I("[endStateCleanup()] CLIENT entering END state, closing connection with all clients");
+    if (freeEndpoint(&client) < 0)
+    {
+        LOG_E("[clientEndState()] could not free client in memory");
+    }
+    LOG_I("[endStateCleanup()] CLIENT finished cleaning up");
 }
 
 // setup for private background thread function

@@ -48,7 +48,10 @@ typedef struct {
 int checkSockets(Sockets socks);
 int createSockets(Sockets **socks);
 int closeSockets(Sockets *socks);
+int freeSockets(Sockets **socks);
+
+// functions for endpoints
 int createEndpoint(Endpoint **endpt);
-int closeEnpoint(Endpoint **endpt);
+int freeEndpoint(Endpoint **endpt);
 
 #endif

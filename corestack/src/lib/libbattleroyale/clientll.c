@@ -150,11 +150,14 @@ int freeList(ClientLinkedList **listToFree)
     {
         // initialise loop
         current = next;
-        // if (current->next != NULL)
-        // {
         next = current->next;
-        // }
         LOG_D("[freeList()] removing ClientNode for client %u", current->client.id);
+        // close connections
+        if (closeSockets(current->client.socks) < 0)
+        {
+            LOG_E("[freeList()] could not close socket connections with client %u", current->client.id);
+            return -1;
+        }
         // free current ClientNode
         free(current);
         current = NULL;

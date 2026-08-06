@@ -13,6 +13,25 @@ static MessageQueue serverMessages;
 static pthread_mutex_t serverMessagesLock;
 
 // private functions
+int freeServer(Server **serverPtr)
+{
+    Server *freeingServer = *serverPtr;
+    if (freeList(&freeingServer->clients))
+    {
+        LOG_E("[freeServer()] could not free client list");
+        return -1;
+    }
+    if (freeEndpoint(&freeingServer->self) < 0)
+    {
+        LOG_E("[freeServer()] could not free self");
+        return -1;
+    }
+    free(freeingServer);
+    freeingServer = NULL;
+    LOG_I("[freeServer()] freed server");
+    return 0;
+}
+
 int listenOnTCP(Server *serverPtr)
 {
     // Check if sockets have valid fd 
@@ -336,20 +355,16 @@ void serverEndState(Server *serverPtr)
 {
     LOG_I("[serverEndState()] SERVER entering END state, closing connection with all clients");
 
-    // TODO end all clients
-
-    while (serverPtr->clients->head != NULL)
+    if (sendBroadcastTCP(serverPtr, (Message){.sourceId = serverPtr->self->id, .msgType = MSG_END, .msgContent = ""}) < 0)
     {
-        ClientNode *target = serverPtr->clients->head;
-        LOG_D("[serverEndState()] removing client %u", target->client.id);
-        if (closeSockets(serverPtr->self->socks) < 0)
-        {
-            LOG_E("[serverEndState()] could not close a socket fd");
-        }
-        if (removeFromList(serverPtr->clients, target->client.id) < 0)
-        {
-            LOG_E("[serverEndState()] could not remove client %u from list", target->client.id);
-        }
+        LOG_E("[serverEndState()] could not send instruction to proceed to end state");
+    }
+
+    LOG_D("[serverEndState()] SERVER sent command to END game to all CLIENT");
+
+    if (freeServer(&serverPtr) < 0)
+    {
+        LOG_E("[serverEndState()] could not free server in memory");
     }
 
     LOG_I("[serverEndState()] SERVER finished cleaning up");
