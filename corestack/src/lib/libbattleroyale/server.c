@@ -398,7 +398,7 @@ void* serverThreadFunc(void *server)
 Creates SERVER in memory and a background thread for listener
 SERVER will start in IDLE state and await a state change triggered by user program
 */
-int createServer(BRServer **serverPtr)
+int brserver_init(BRServer **serverPtr)
 {
     // allocate memory for it
     Server *newServer = malloc(sizeof(Server));
@@ -408,30 +408,30 @@ int createServer(BRServer **serverPtr)
         return -1;
     }
 
-    LOG_I("[createServer()] creating HTTTP server...");
+    LOG_I("[brserver_init()] creating HTTTP server...");
 
     // create the endpoint
     if (createEndpoint(&newServer->self) < 0)
     {
-        LOG_E("[createServer()] endpoint creation failed");
+        LOG_E("[brserver_init()] endpoint creation failed");
         goto fail;
     }
     newServer->clients = NULL;
-    LOG_I("[createServer()] new server created with sockets created");
+    LOG_I("[brserver_init()] new server created with sockets created");
 
     // prepare ports for usage
     if (listenOnTCP(newServer) < 0)
     {
-        LOG_E("[openLobby()] failed to bind port for listening");
+        LOG_E("[brserver_open()] failed to bind port for listening");
         goto fail;
     }
-    LOG_D("[createServer()] bound port for listening");
+    LOG_D("[brserver_init()] bound port for listening");
     if (prepareBroadcastUDP(newServer) < 0 || prepareUnicastUDP(newServer) < 0)
     {
-        LOG_E("[openLobby()] failed to prepare UDP port for listening");
+        LOG_E("[brserver_open()] failed to prepare UDP port for listening");
         goto fail;
     }
-    LOG_D("[createServer()] UDP ports bound and ready for messaging");
+    LOG_D("[brserver_init()] UDP ports bound and ready for messaging");
 
     *serverPtr = newServer;
 
@@ -447,12 +447,12 @@ int createServer(BRServer **serverPtr)
         return 1;
     }
 
-    LOG_I("[createServer()] HTTTP server created and saved to pointer, background thread also started");
+    LOG_I("[brserver_init()] HTTTP server created and saved to pointer, background thread also started");
 
     return 0;
 
     fail:
-    LOG_I("[createServer()] failed to create new HTTTP server");
+    LOG_I("[brserver_init()] failed to create new HTTTP server");
     free(newServer);
     newServer = NULL;
     return -1;
@@ -462,27 +462,27 @@ int createServer(BRServer **serverPtr)
 Changes a SERVER into LOBBY state
 Background thread will see the state change and adjust behaviour accordingly
 */
-int openLobby(BRServer *serverPtr)
+int brserver_open(BRServer *serverPtr)
 {
-    LOG_I("[openLobby()] setting SERVER to LOBBY state...");
+    LOG_I("[brserver_open()] setting SERVER to LOBBY state...");
 
     // check parameters
     if (serverPtr == NULL)
     {
-        LOG_E("[openLobby()] serverPtr has no server allocated");
+        LOG_E("[brserver_open()] serverPtr has no server allocated");
         return -1;
     }
 
     Server *thisServer = serverPtr;
     if (thisServer->self->state == LOBBY)
     {
-        LOG_E("[openLobby()] server is already in LOBBY state");
+        LOG_E("[brserver_open()] server is already in LOBBY state");
         return 0; // allow to continue as though no issue (intended effect already in place)
     }
 
     thisServer->self->state = LOBBY;
 
-    LOG_I("[openLobby()] SERVER is set to LOBBY state");
+    LOG_I("[brserver_open()] SERVER is set to LOBBY state");
 
     return 0;
 }
@@ -491,27 +491,27 @@ int openLobby(BRServer *serverPtr)
 Changes SERVER into GAME state (prerequisite state: LOBBY)
 SERVER will update the clients and start listening for messages (handled by background thread)
 */
-int startGame(BRServer *serverPtr)
+int brserver_start(BRServer *serverPtr)
 {
-    LOG_I("[startGame()] transitioning SERVER from GAME to LOBBY state...");
+    LOG_I("[brserver_start()] transitioning SERVER from GAME to LOBBY state...");
 
     // check parameters
     if (serverPtr == NULL)
     {
-        LOG_E("[startGame()] serverPtr has no server allocated");
+        LOG_E("[brserver_start()] serverPtr has no server allocated");
         return -1;
     }
 
     Server *thisServer = serverPtr;
     if (thisServer->self->state != LOBBY)
     {
-        LOG_E("[startGame()] server is not currently in LOBBY state");
+        LOG_E("[brserver_start()] server is not currently in LOBBY state");
         return -1; // disallow, not in prerequisite state
     }
 
     thisServer->self->state = GAME;
 
-    LOG_I("[startGame()] SERVER is set to GAME state");
+    LOG_I("[brserver_start()] SERVER is set to GAME state");
 
     return 0;
 }
@@ -520,27 +520,27 @@ int startGame(BRServer *serverPtr)
 Changes SERVER into END state (prerequisite state: GAME)
 SERVER will cleanup and close connections with all clients
 */
-int endGame(BRServer *serverPtr)
+int brserver_end(BRServer *serverPtr)
 {
-    LOG_I("[endGame()] transitioning SERVER from GAME to LOBBY state...");
+    LOG_I("[brserver_end()] transitioning SERVER from GAME to LOBBY state...");
 
     // check parameters
     if (serverPtr == NULL)
     {
-        LOG_E("[endGame()] serverPtr has no server allocated");
+        LOG_E("[brserver_end()] serverPtr has no server allocated");
         return -1;
     }
 
     Server *thisServer = serverPtr;
     if (thisServer->self->state != GAME)
     {
-        LOG_E("[endGame()] server is not currently in GAME state");
+        LOG_E("[brserver_end()] server is not currently in GAME state");
         return -1; // disallow, not in prerequisite state
     }
 
     thisServer->self->state = END;
 
-    LOG_I("[startGame()] SERVER is set to END state");
+    LOG_I("[brserver_start()] SERVER is set to END state");
 
     return 0;
 }
@@ -548,14 +548,14 @@ int endGame(BRServer *serverPtr)
 /*
 Function returns the number of clients and the valid clientIds
 */
-int getClientInfo(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
+int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
 {
-    LOG_I("[openLobby()] retrieving client info...");
+    LOG_I("[brserver_open()] retrieving client info...");
 
     // check parameters
     if (serverPtr == NULL)
     {
-        LOG_E("[openLobby()] serverPtr has no server allocated");
+        LOG_E("[brserver_open()] serverPtr has no server allocated");
         return -1;
     }
     Server *thisServer = serverPtr;
@@ -564,10 +564,10 @@ int getClientInfo(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
     *nClients = thisServer->clients->count;
     uint32_t *idArray = malloc(sizeof(uint32_t)*(*nClients));
     ClientNode *client = thisServer->clients->head;
-    LOG_D("[getClientInfo()] getting ids of %u clients connected to SERVER", *nClients);  
+    LOG_D("[brserver_client_info()] getting ids of %u clients connected to SERVER", *nClients);  
     for (uint32_t i=0; i<*nClients; i++)
     {
-        LOG_D("\t[getClientInfo()] SERVER has client with id %u", client->client.id) ; 
+        LOG_D("\t[brserver_client_info()] SERVER has client with id %u", client->client.id) ; 
         idArray[i] = client->client.id;
         client = client->next;
     }
@@ -575,12 +575,12 @@ int getClientInfo(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
     // write to return pointer
     clientIds = idArray;
 
-    LOG_I("[openLobby()] client information written to pointers");
+    LOG_I("[brserver_open()] client information written to pointers");
 }
 
-int sendAppMessageToClient(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
+int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
 {
-    LOG_I("[sendAppMessageToClient()] sending broadcast to cliets...");
+    LOG_I("[brserver_send_to_target()] sending broadcast to cliets...");
 
     // cast to private server struct
     Server *thisServer = serverPtr;
@@ -596,25 +596,25 @@ int sendAppMessageToClient(BRServer *serverPtr, uint32_t targetId, unsigned char
     Endpoint targetClient;
     if (getFromList(thisServer->clients, &targetClient, targetId) < 0)
     {
-        LOG_E("[sendAppMessageToClient()] failed to get target client %u from the list", targetId);
+        LOG_E("[brserver_send_to_target()] failed to get target client %u from the list", targetId);
         return -1;
     }
 
-    LOG_D("[sendAppMessageToClient()] sending message to client %u:\n\tcontent: %s", targetId, completeMsg.msgContent);
+    LOG_D("[brserver_send_to_target()] sending message to client %u:\n\tcontent: %s", targetId, completeMsg.msgContent);
 
     // send the message
     if (sendMessageTCP(targetClient.socks->tcp, completeMsg))
     {
-        LOG_E("[sendAppMessageToClient()] failed to send message");
+        LOG_E("[brserver_send_to_target()] failed to send message");
         return -1;
     }
 
-    LOG_I("[sendAppMessageToClient()] message has been sent");
+    LOG_I("[brserver_send_to_target()] message has been sent");
 
     return 0;
 }
 
-int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
+int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[512])
 {
     Server *thisServer = serverPtr;
 
@@ -627,14 +627,14 @@ int sendBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
 
     if (sendBroadcastUDP(thisServer->self->socks->udpBroad, completeMsg))
     {
-        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        LOG_E("[brserver_send_broadcast()] failed to send broadcast");
         return -1;
     }
 
-    LOG_I("[sendBroadcastToClients()] message has been sent");
+    LOG_I("[brserver_send_broadcast()] message has been sent");
 }
 
-int sendReliableBroadcastToClients(BRServer *serverPtr, unsigned char content[512])
+int brserver_send_to_all(BRServer *serverPtr, unsigned char content[512])
 {
     Server *thisServer = serverPtr;
 
@@ -647,35 +647,35 @@ int sendReliableBroadcastToClients(BRServer *serverPtr, unsigned char content[51
 
     if (sendBroadcastTCP(serverPtr, completeMsg))
     {
-        LOG_E("[sendBroadcastToClients()] failed to send broadcast");
+        LOG_E("[brserver_send_to_all()] failed to send broadcast");
         return -1;
     }
 
-    LOG_I("[sendBroadcastToClients()] message has been sent");
+    LOG_I("[brserver_send_to_all()] message has been sent");
 }
 
 /*
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int getServerAppMessage(unsigned char returnMsg[512])
+int brserver_get_app_msg(unsigned char returnMsg[512])
 {
     if (pthread_mutex_trylock(&serverMessagesLock) == 0)
     {
         if (Message_empty(&serverMessages))
         {
-            LOG_D("[getServerAppMessage()] no messages to process");
+            LOG_D("[brserver_get_app_msg()] no messages to process");
             return 0;
         }
         memcpy(returnMsg, Message_peek(&serverMessages)->msgContent, MSG_CONTENT_LENGTH);
         Message_dequeue(&serverMessages);
         pthread_mutex_unlock(&serverMessagesLock);
-        LOG_D("[getServerAppMessage()] client message has been returned to unsigned char array");
+        LOG_D("[brserver_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     }
     else 
     {
-        LOG_D("[getServerAppMessage()] queue is busy being locked");
+        LOG_D("[brserver_get_app_msg()] queue is busy being locked");
         return 0;
     }
 }

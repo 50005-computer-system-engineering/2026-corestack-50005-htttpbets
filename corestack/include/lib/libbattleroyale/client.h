@@ -5,12 +5,12 @@
 
 typedef void BRClient;
 
-int createClient(BRClient **clientPtr);
-int joinLobby(BRClient *clientPtr, char *ipAddress);
+int brclient_init(BRClient **clientPtr);
+int brclient_join(BRClient *clientPtr, char *ipAddress);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
-int sendAppMessage(BRClient *clientPtr, unsigned char content[512]); // use defined value instead of explicit number
+int brclient_send_msg(BRClient *clientPtr, unsigned char content[512]); // use defined value instead of explicit number
 
-int getClientAppMessage(unsigned char returnMsg[512]);
+int brclient_get_app_msg(unsigned char returnMsg[512]);
 
 #endif
