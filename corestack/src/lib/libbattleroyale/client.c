@@ -219,21 +219,21 @@ void* clientThreadFunc(void *client)
 
 // public functions
 // allows developers to create a libhtttp client in application
-int createClient(BRClient **clientPtr)
+int brclient_init(BRClient **clientPtr)
 {
     Endpoint *newClient = NULL;
 
     // create endpoint
     if (createEndpoint(&newClient) < 0)
     {
-        LOG_E("[createClient()] could not create endpoint struct for client");
+        LOG_E("[brclient_init()] could not create endpoint struct for client");
         return -1;
     }
 
     // open sockets
     if (createSockets(&newClient->socks) < 0)
     {
-        LOG_E("[createClient()] socket creation failed");
+        LOG_E("[brclient_init()] socket creation failed");
         return -1;
     }
 
@@ -255,17 +255,17 @@ int createClient(BRClient **clientPtr)
         return 1;
     }
 
-    LOG_I("[createClient()] new client created, and spawned background thread");
+    LOG_I("[brclient_init()] new client created, and spawned background thread");
 
     return 0;
 }
 
 // connects to a libhtttp server
-int joinLobby(BRClient *clientPtr, char *ipAddress)
+int brclient_join(BRClient *clientPtr, char *ipAddress)
 {
     Endpoint *thisClient = clientPtr;
 
-    LOG_I("[joinLobby()] attempting connection to lobby located at IP %s", ipAddress);
+    LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ipAddress);
 
     // TALKING TO SERVER
     // connect on TCP first
@@ -298,19 +298,19 @@ int joinLobby(BRClient *clientPtr, char *ipAddress)
     // prepare UDP ports for future use upon connection
     if (prepareUDP(thisClient->socks, ipAddress) < 0)
     {
-        LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
+        LOG_E("[brclient_join()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
 
     // joining lobby successful, enter lobby state
     thisClient->state = LOBBY;
 
-    LOG_I("[joinLobby()] lobby joining complete");
+    LOG_I("[brclient_join()] lobby joining complete");
     return 0;
 }
 
 // message functions
-int sendAppMessage(BRClient *clientPtr, unsigned char content[512])
+int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
 {
     Endpoint *thisClient = clientPtr;
 
@@ -324,11 +324,11 @@ int sendAppMessage(BRClient *clientPtr, unsigned char content[512])
     // send via socket
     if (sendMessageTCP(thisClient->socks->tcp, msg) < 0)
     {
-        LOG_E("[sendAppMessage()] sending has failed");
+        LOG_E("[brclient_send_msg()] sending has failed");
         goto fail;
     }
 
-    LOG_I("[sendAppMessage()] message has been sent");
+    LOG_I("[brclient_send_msg()] message has been sent");
 
     return 0;
 
@@ -340,24 +340,24 @@ int sendAppMessage(BRClient *clientPtr, unsigned char content[512])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int getClientAppMessage(unsigned char returnMsg[512])
+int brclient_get_app_msg(unsigned char returnMsg[512])
 {
     if (pthread_mutex_trylock(&clientMessagesLock) == 0)
     {
         if (Message_empty(&clientMessages))
         {
-            LOG_D("[getClientAppMessage()] no messages to process");
+            LOG_D("[brclient_get_app_msg()] no messages to process");
             return 0;
         }
         snprintf(returnMsg, MSG_CONTENT_LENGTH, Message_peek(&clientMessages)->msgContent);
         Message_dequeue(&clientMessages);
         pthread_mutex_unlock(&clientMessagesLock);
-        LOG_D("[getClientAppMessage()] client message has been returned unsigned char array");
+        LOG_D("[brclient_get_app_msg()] client message has been returned unsigned char array");
         return 1;
     }
     else 
     {
-        LOG_D("[getClientAppMessage()] queue is busy being locked");
+        LOG_D("[brclient_get_app_msg()] queue is busy being locked");
         return 0;
     }
 }

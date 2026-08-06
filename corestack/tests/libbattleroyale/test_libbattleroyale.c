@@ -115,7 +115,7 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             break;
         case ESTABLISH_CONNECTION:
             // attempt a connection
-            if (joinLobby(testClient, "127.0.0.1") < 0)
+            if (brclient_join(testClient, "127.0.0.1") < 0)
             {
                 printf("client %d: failed to join the lobby\n", id);
                 result = FAIL;
@@ -128,7 +128,7 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             // build message
             snprintf(msgContent, 512, "client %d: gamer word", id);
             // perform send
-            if (sendAppMessage(testClient, msgContent) < 0)
+            if (brclient_send_msg(testClient, msgContent) < 0)
             {
                 printf("client %d: could not send message\n", id);
                 result = FAIL;
@@ -140,7 +140,7 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
         case BROADCASTING:
             // broadcasts are sent prior to this test running (should already be in queue)
             result = FAIL;
-            while (getClientAppMessage(msgContent) != 0)
+            while (brclient_get_app_msg(msgContent) != 0)
             {
                 // break when reliable broadcast is matched
                 if (strcmp(msgContent, "removed from game by anticheat (just a test phrase)") == 0)
@@ -218,7 +218,7 @@ int main(void)
         
         // setup the test server
         BRServer *testServer;
-        if (createServer(&testServer) < 0)
+        if (brserver_init(&testServer) < 0)
         {
             printf("server: failed to create instance\n");
             goto server_cleanup;
@@ -227,7 +227,7 @@ int main(void)
 
         // STAGE 1 - CONNECTION
         printf("server: starting test stage ESTABLISH_CONNECTION\n");
-        if (openLobby(testServer) < 0)
+        if (brserver_open(testServer) < 0)
         {
             printf("server: failed to open lobby for client connections\n");
             goto server_cleanup;
@@ -248,7 +248,7 @@ int main(void)
 
         // STAGE 2 - MESSAGE
         printf("server: starting test stage SEND_MESSAGES\n");
-        if (startGame(testServer) < 0)
+        if (brserver_start(testServer) < 0)
         {
             printf("server: failed to change server to game state");
             goto server_cleanup;
@@ -268,12 +268,12 @@ int main(void)
         // STAGE 3 - BROADCAST
         printf("server: starting test stage BROADCASTING\n");
         printf("server: GAME state, server now broadcasting messages to clients\n");
-        if (sendBroadcastToClients(testServer, "banned for racism") < 0)
+        if (brserver_send_broadcast(testServer, "banned for racism") < 0)
         {
             printf("server: failed to send UDP broadcast at BROADCASTING stage\n");
             goto server_cleanup;
         }
-        if (sendReliableBroadcastToClients(testServer, "removed from game by anticheat (just a test phrase)") < 0)
+        if (brserver_send_to_all(testServer, "removed from game by anticheat (just a test phrase)") < 0)
         {
             printf("server: failed to send TCP broadcast at BROADCASTING stage\n");
             goto server_cleanup;
@@ -293,7 +293,7 @@ int main(void)
         
         // CLEANUP
         server_cleanup:
-        if (endGame(testServer) < 0)
+        if (brserver_end(testServer) < 0)
         {
             printf("server: failed to enter END state\n");
         }
@@ -307,7 +307,7 @@ int main(void)
         // setup the test client
         BRClient *testClient;
 
-        if (createClient(&testClient) < 0)
+        if (brclient_init(&testClient) < 0)
         {
             printf("client %d: failed to create instance\n", id);
             goto client_cleanup;
