@@ -655,7 +655,7 @@ int getServerAppMessage(unsigned char returnMsg[512])
         memcpy(returnMsg, Message_peek(&serverMessages)->msgContent, MSG_CONTENT_LENGTH);
         Message_dequeue(&serverMessages);
         pthread_mutex_unlock(&serverMessagesLock);
-        LOG_D("[getServerAppMessage()] client message has been returned to pointer");
+        LOG_D("[getServerAppMessage()] client message has been returned to unsigned char array");
         return 1;
     }
     else 

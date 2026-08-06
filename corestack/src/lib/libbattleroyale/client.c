@@ -3,7 +3,7 @@
 #include "lib/libbattleroyale/client.h"
 #include "common.h"
 
-static MessageQueue *clientMessages;
+static MessageQueue clientMessages;
 static pthread_mutex_t clientMessagesLock;
 
 // private functions
@@ -136,13 +136,27 @@ void clientGameState(Endpoint *client)
             LOG_D("[gameStateLoop()] %d active sockets on CLIENT", socketActivity);
             for (int i=0; i<3 && socketActivity>0; i++)
             {
-                Message msg;
                 if (listenFd[i].revents & POLLIN)
                 {
-                    if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
+                    Message msg;
+
+                    // receiving TCP message
+                    if (i == 0)
                     {
-                        LOG_E("[gameStateLoop()] failed to receive message from %d", listenFd[i].fd);
-                        continue;
+                        if (receiveMessageTCP(listenFd[i].fd, &msg) < 0)
+                        {
+                            LOG_E("[gameStateLoop()] failed to receive TCP message from %d", listenFd[i].fd);
+                            continue;
+                        }
+                    }
+                    // receiving UDP messages
+                    else 
+                    {
+                        if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
+                        {
+                            LOG_E("[gameStateLoop()] failed to receive TCP message from %d", listenFd[i].fd);
+                            continue;
+                        }
                     }
 
                     if (listenFd[i].revents != 0)
@@ -151,14 +165,13 @@ void clientGameState(Endpoint *client)
                     }
 
                     LOG_D("[gameStateLoop()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
-                }
-
-                if (msg.msgType == MSG_APP)
-                {
-                    LOG_D("[clientGameState()] Message received for application");
-                    pthread_mutex_lock(&clientMessagesLock);
-                    Message_enqueue(clientMessages, msg);
-                    pthread_mutex_unlock(&clientMessagesLock);
+                    if (msg.msgType == MSG_APP)
+                    {
+                        LOG_D("[clientGameState()] Message received for application");
+                        pthread_mutex_lock(&clientMessagesLock);
+                        Message_enqueue(&clientMessages, msg);
+                        pthread_mutex_unlock(&clientMessagesLock);
+                    }
                 }
             }
         }
@@ -223,13 +236,7 @@ int createClient(BRClient **clientPtr)
     *clientPtr = newClient;
     
     // prepare queue
-    clientMessages = malloc(sizeof(MessageQueue));
-    if (clientMessages == NULL)
-    {
-        LOG_E("[createClient()] failed to allocate space to message queue");
-        return -1;
-    }
-    Message_init(clientMessages);
+    Message_init(&clientMessages);
     pthread_mutex_init(&clientMessagesLock, NULL);
 
     // spawn backrgound thread
@@ -286,7 +293,7 @@ int joinLobby(BRClient *clientPtr, char *ipAddress)
         LOG_E("[joinLobby()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
-    
+
     // joining lobby successful, enter lobby state
     thisClient->state = LOBBY;
 
@@ -329,15 +336,15 @@ int getClientAppMessage(unsigned char returnMsg[512])
 {
     if (pthread_mutex_trylock(&clientMessagesLock) == 0)
     {
-        if (Message_empty(clientMessages))
+        if (Message_empty(&clientMessages))
         {
             LOG_D("[getClientAppMessage()] no messages to process");
             return 0;
         }
-        memcpy(returnMsg, Message_peek(clientMessages)->msgContent, MSG_CONTENT_LENGTH);
-        Message_dequeue(clientMessages);
+        snprintf(returnMsg, MSG_CONTENT_LENGTH, Message_peek(&clientMessages)->msgContent);
+        Message_dequeue(&clientMessages);
         pthread_mutex_unlock(&clientMessagesLock);
-        LOG_D("[getClientAppMessage()] client message has been returned to pointer");
+        LOG_D("[getClientAppMessage()] client message has been returned unsigned char array");
         return 1;
     }
     else 
