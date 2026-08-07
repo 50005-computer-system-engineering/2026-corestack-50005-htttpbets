@@ -16,56 +16,14 @@
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
 #include "lib/libtetrisbrain/killfeed.h"
-#include "lib/libhtttp/client.h"
-
-// Logging purposes
-#include "lib/liblog.h"
+#include "lib/libbattleroyale/client.h"
 
 // Networking purposes
 #define LOCAL_HOST "127.0.0.1"
+#define LOBBY_SIZE 2
 
 // Global network client
-LibhtttpClient *network_client = NULL;
-
-// TEST PATCH: BACKGROUND THREADS
-#include <pthread.h>
-
-// TEST PATCH: Dedicated background thread for receiving network broadcasts
-void *networkListenerThread(void *arg)
-{
-    GameState *state = (GameState *)arg;
-    unsigned char *net_buffer = NULL; // Empty buffer to store
-
-    // Instantiated as well as active
-    while (!state->game_over && network_client != NULL)
-    {
-        // Poll server for incoming socket packets (non-blocking)
-        if (receiveBroadcastAsClient(network_client, &net_buffer) == 0)
-        {
-            if (net_buffer != NULL)
-            {
-                // Cast the raw byte buffer back into our struct
-                AttackPayload *incoming = (AttackPayload *)net_buffer;
-                // Convert the network bytes back to readable integers
-                uint32_t source_id = ntohl(incoming->source_player);
-                uint32_t target_id = ntohl(incoming->target_player);
-                uint32_t lines = ntohl(incoming->lines);
-                LOG_I("[networkListenerThread] decoded broadcast: target_id=%u, my player_id=%u", target_id, state->player_id);
-                // Check if attack was actually meant for this player
-                if (target_id == state->player_id)
-                {
-                    state->pending_garbage += lines;
-                    addKillFeed(source_id, target_id, lines);
-                    LOG_I("[networkListenerThread] P%u received %u lines from P%u (pending_garbage now %u)", state->player_id, lines, source_id, state->pending_garbage);
-                }
-                // Clean up
-                free(net_buffer);
-            }
-            net_buffer = NULL; // Reset pointer for the next loop
-        }
-    }
-    return NULL;
-}
+BRClient *network_client = NULL;
 
 // Process gravity and lock delay intervals
 static void updateGameTimers(GameState *state)
@@ -89,7 +47,7 @@ static void updateGameTimers(GameState *state)
             tickGame(state);
             if (state->outgoing_garbage > 0)
             {
-                // Pack the payload
+                // Pack the payload dynamically
                 AttackPayload payload =
                     {
                         .source_player = state->player_id,
@@ -118,19 +76,13 @@ static void updateGameTimers(GameState *state)
 }
 
 // --- MAIN GAME LOOP ---
-int main(int argc, char *argv[])
+int main(int argc, char *argv[]) // PATCH FIX: ADDED TO ASSIGN PLAYER ID BY TERMINAL
 {
-    // TEST PATCH FIX FOR PLAYER_ID AND TARGET_PLAYER_ID
-    // Force dynamic ID assignment via launch argument
-    if (argc < 2)
+    int assigned_player_id = 1;
+    if (argc > 1)
     {
-        printf("Usage: %s <player_id>\n", argv[0]);
-        printf("Example: %s 1\n", argv[0]);
-        return -1;
+        assigned_player_id = atoi(argv[1]);
     }
-
-    int assigned_player_id = atoi(argv[1]);
-    uint32_t lobby_size = 2;
 
     // PATCH FIX FOR FLICKERING TERMINAL
     setvbuf(stdout, NULL, _IOFBF, 16384);
@@ -139,21 +91,24 @@ int main(int argc, char *argv[])
     printf("\e[1;1H\e[2J");
     fflush(stdout);
 
-    // Network Initialization
-    if (createClient(&network_client) < 0) // Failed
+    // Network Client Initialization
+    if (brclient_init(&network_client) < 0) // Failed
     {
         printf("[tetrisu] Failed to create network client.\n");
         network_client = NULL;
     }
-    else if (joinLobby(network_client, LOCAL_HOST) < 0)
+    else if (brclient_join(network_client, LOCAL_HOST) < 0)
     {
         printf("[tetrisu] Failed to join lobby.\n");
         network_client = NULL;
     }
     else
     {
-        printf("[tetrisu] Connected to lobby successfully!\n");
+        printf("[tetrisu] Connected to lobby successfully! Assigned Player ID: P%d\n", gamestate_player.player_id);
     }
+
+    // Allow time for server to reach LOBBY_SIZE and enter GAME state
+    printf("[tetrisu] Waiting for lobby to fill and game to start...\n");
     sleep(5); // Brief delay to read connection status
 
     // Clear terminal screen
@@ -164,27 +119,42 @@ int main(int argc, char *argv[])
 
     startGame(&gamestate_player);
     gamestate_player.player_id = assigned_player_id;                                   // Assign player ID
-    gamestate_player.target_player_id = (gamestate_player.player_id % lobby_size) + 1; // Starting player target
+    gamestate_player.target_player_id = (gamestate_player.player_id % LOBBY_SIZE) + 1; // Starting player target
     gamestate_player.held_type = 0;                                                    // Initialize hold box
-    gamestate_player.has_held = false;
+    gamestate_player.has_held = false;                                                 // Clear flag for hold box
 
     // Event Bus setup
     event_bus_init(EVENT_COUNT);
     event_bus_listen(EVENT_ATTACK_GENERATED, on_attack_generated);
-
-    // Launch background thread to handle blocking receiveBroadcastAsClient calls
-    pthread_t net_thread;
-    if (network_client != NULL)
-    {
-        pthread_create(&net_thread, NULL, networkListenerThread, &gamestate_player);
-        pthread_detach(net_thread); // Runs independently in the background
-    }
 
     // --- THE GAME LOOP ---
     while (!gamestate_player.game_over)
     {
         // Deal with active inputs
         processInputs(&gamestate_player);
+
+        // Read directly from message queue for incoming attacks
+        unsigned char net_buffer[512] = {0};
+
+        if (brclient_get_app_msg(net_buffer) == 1)
+        {
+            // Pack network struct and convert into standard network format
+            AttackPayload incoming;
+
+            // Copy data back into struct
+            memcpy(&incoming, net_buffer, sizeof(AttackPayload));
+
+            uint32_t source_id = ntohl(incoming.source_player);
+            uint32_t target_id = ntohl(incoming.target_player);
+            uint32_t lines = ntohl(incoming.lines);
+
+            // Apply incoming garbage
+            if (target_id == gamestate_player.player_id && lines > 0)
+            {
+                gamestate_player.pending_garbage += lines;
+                addKillFeed(source_id, target_id, lines);
+            }
+        }
 
         // Refresh internal variables
         updateGameTimers(&gamestate_player);
