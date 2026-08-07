@@ -1,5 +1,35 @@
 #include "clientll.h"
 
+int initaliseList(ClientLinkedList **list)
+{
+    // check pointer
+    if (*list == NULL)
+    {
+        LOG_D("[initaliseList()] cleaning list");
+        free(*list);
+    }
+
+    // make a new list
+    ClientLinkedList *newList = malloc(sizeof(ClientLinkedList));
+    if (newList == NULL)
+    {
+        perror("[initialiseList()] malloc");
+        LOG_E("[initialiseList()] could not allocate memory for linked list");
+        return -1;
+    }
+
+    // default values 
+    newList->count = 0;
+    newList->head = NULL;
+
+    //return to pointer
+    *list = newList;
+
+    LOG_I("[initaliseList()] initalised list successfully");
+
+    return 0;
+}
+
 int addToList(ClientLinkedList *list, Endpoint *client)
 {
     // list might be full (unlikely)

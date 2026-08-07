@@ -16,6 +16,7 @@ typedef struct {
 } ClientLinkedList;
 
 // list functions
+int initaliseList(ClientLinkedList **list);
 int addToList(ClientLinkedList *list, Endpoint *client);
 int removeFromList(ClientLinkedList *list, uint32_t id);
 int getFromList(ClientLinkedList *list, Endpoint *client, uint32_t id);

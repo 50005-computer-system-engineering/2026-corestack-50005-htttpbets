@@ -164,26 +164,6 @@ During this state, TCP connections from client are accepted (and server assigns 
 void serverLobbyState(Server *serverPtr)   // loop where server accepts clients
 {
     LOG_I("[serverLobbyState()] SERVER entering LOBBY state, accepting clients...");
-    
-    // prepare client list (upon entering lobby state)
-    LOG_D("[serverLobbyState()] allocating space for client list on SERVER");
-    if (serverPtr->clients != NULL)
-    {
-        // free and make a new array
-        if (freeList(&serverPtr->clients) < 0)
-        {
-            LOG_E("[serverLobbyState()] could not free list for new lobby");
-            return;
-        }
-        serverPtr->clients = NULL;
-    }
-    serverPtr->clients = malloc(sizeof(ClientLinkedList));
-    if (serverPtr->clients == NULL)
-    {
-        perror("[serverLobbyState()] malloc");
-        return;
-    }
-    LOG_D("[serverLobbyState()] memory allocated for client linked list");
 
     // tracking the id assigned
     int prevAssignedId = 0; 
@@ -416,7 +396,11 @@ int brserver_init(BRServer **serverPtr)
         LOG_E("[brserver_init()] endpoint creation failed");
         goto fail;
     }
-    newServer->clients = NULL;
+    if (initaliseList(&newServer->clients) < 0)
+    {
+        LOG_E("[brserver_init()] client list creation failed");
+        goto fail;
+    }
     LOG_I("[brserver_init()] new server created with sockets created");
 
     // prepare ports for usage
@@ -550,12 +534,12 @@ Function returns the number of clients and the valid clientIds
 */
 int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds)
 {
-    LOG_I("[brserver_open()] retrieving client info...");
+    LOG_I("[brserver_client_info()] retrieving client info...");
 
     // check parameters
     if (serverPtr == NULL)
     {
-        LOG_E("[brserver_open()] serverPtr has no server allocated");
+        LOG_E("[brserver_client_info()] serverPtr has no server allocated");
         return -1;
     }
     Server *thisServer = serverPtr;
@@ -575,7 +559,7 @@ int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clie
     // write to return pointer
     clientIds = idArray;
 
-    LOG_I("[brserver_open()] client information written to pointers");
+    LOG_I("[brserver_client_info()] client information written to pointers");
 }
 
 int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
