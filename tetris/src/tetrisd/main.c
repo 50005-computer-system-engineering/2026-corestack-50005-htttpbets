@@ -97,13 +97,13 @@ int main(void)
         if (brserver_get_app_msg(buffer) == 1)
         {
             // Cast the raw byte buffer back into our struct
-            AttackPayload incoming_attack;
-            memcpy(&incoming_attack, buffer, sizeof(AttackPayload));
+            AttackPayload incoming;
+            memcpy(&incoming, buffer, sizeof(AttackPayload));
 
             // Convert the network bytes back to readable integers
-            uint32_t real_source = ntohl(incoming_attack.source_player);
-            uint32_t real_target = ntohl(incoming_attack.target_player);
-            uint32_t real_lines = ntohl(incoming_attack.lines);
+            uint32_t real_source = ntohl(incoming.source_player);
+            uint32_t real_target = ntohl(incoming.target_player);
+            uint32_t real_lines = ntohl(incoming.lines);
 
             // Logging
             printf(" <!> EVENT ROUTED: (In-Game P%u) attacked P%u with %u lines!\n", real_source, real_target, real_lines);
@@ -114,24 +114,14 @@ int main(void)
                 // Prepare out buffer
                 unsigned char out_buffer[512] = {0};
 
-                // Prepare payload to send to other client
-                AttackPayload broadcast_payload;
-                broadcast_payload.source_player = htonl(real_source);
-                broadcast_payload.target_player = htonl(real_target);
-                broadcast_payload.lines = htonl(real_lines);
-
                 // Add into buffer
-                memcpy(out_buffer, &broadcast_payload, sizeof(AttackPayload));
+                memcpy(out_buffer, &incoming, sizeof(AttackPayload));
 
                 // Send the payload via UDP
                 brserver_send_broadcast(server, out_buffer);
 
                 // Logging
                 printf("-> [Server] Broadcasted %u garbage lines to Target P%u\n\n", real_lines, real_target);
-            }
-            else // Target disconnected or DNE; logs warning and discards
-            {
-                printf("-> [Server] WARNING: Target P%u not found. Discarding attack.\n\n", real_target);
             }
         }
     }
