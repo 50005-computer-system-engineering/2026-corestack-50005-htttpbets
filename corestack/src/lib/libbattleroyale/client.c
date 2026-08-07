@@ -347,6 +347,7 @@ int brclient_get_app_msg(unsigned char returnMsg[512])
         if (Message_empty(&clientMessages))
         {
             LOG_D("[brclient_get_app_msg()] no messages to process");
+            pthread_mutex_unlock(&serverMessagesLock);
             return 0;
         }
         snprintf(returnMsg, MSG_CONTENT_LENGTH, Message_peek(&clientMessages)->msgContent);
