@@ -11,7 +11,8 @@
 // parsing constants
 #define END_LINE "\r\n"
 #define END_SECT END_LINE END_LINE
-#define BODY_SEP ","
+#define BODY_SEP ", "
+#define KEY_VAL_SEP ": "
 
 // HyperText structs
 typedef unsigned char HyperText[HT_MAX_SIZE];

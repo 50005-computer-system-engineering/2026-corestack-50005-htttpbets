@@ -86,28 +86,49 @@ ParsedHT parse_hypertext(const HyperText ht)
     sect_tok = strtok(ht, END_SECT);
     char *field;
     char *value;
-    int n_headers = count_headers(ht);
+    int n_headers = count_headers(sect_tok);
     parser_result.headers = dict_init(n_headers);
     part_tok = strtok(sect_tok, END_LINE);
 
-    for (int i; i<n_headers, i++)
+    for (int i; i<n_headers; i++)
     {
-        field = strok(part_tok, ": ");
-        value = strtok(part_tok, ": ");
+        field = strtok(part_tok, KEY_VAL_SEP);
+        value = strtok(part_tok, KEY_VAL_SEP);
         if (add_key_value_pair(parser_result.headers, field, value, i) < 0)
         {
-            LOG_E("[parse_hypertext()] could not parse and write headers");
+            LOG_E("[parse_hypertext()] could not write parsed headers");
             goto bad_hypertext;
         }
     }
+    field = NULL;
+    value = NULL;
 
     // part 3: body
-    // TODO parse body
+    sect_tok = strtok(ht, END_SECT);
+    char *member;
+    int n_members = count_body_members(sect_tok);
+    parser_result.body = dict_init(n_members);
+    part_tok = strtok(sect_tok, BODY_SEP);
 
-    // TODO return good parse 
+    for (int i; i<n_members; i++)
+    {
+        member = strtok(part_tok, KEY_VAL_SEP);
+        field = strtok(part_tok, KEY_VAL_SEP);
+        if (add_key_value_pair(parser_result.headers, member, value, i) < 0)
+        {
+            LOG_E("[parse_hypertext()] could not write parsed body");
+            goto bad_hypertext;
+        }
+    }
+    member = NULL;
+    value = NULL;
+
+    LOG_I("[parse_hypertext()] successfully parsed a message");
+
+    return parser_result;
 
     // returning error
     bad_hypertext:
-    LOG_E("[parse_hypertext] could not parse the hypertext message, bad format:\n=====BAD MESSAGE====\n%s\n=====BAD MESSAGE====", ht);
+    LOG_E("[parse_hypertext()] could not parse the hypertext message, bad format:\n=====BAD MESSAGE====\n%s\n=====BAD MESSAGE====", ht);
     return (ParsedHT) {.version = NULL, .req_method = NULL, .req_path = NULL, .headers = NULL, .body = NULL};
 }
