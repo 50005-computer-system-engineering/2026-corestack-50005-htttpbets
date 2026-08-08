@@ -7,6 +7,7 @@
 #include "libbattleroyale/server.h"
 #include "libbattleroyale/client.h"
 
+#define NUM_TEST_CLIENTS 2
 
 enum TestStage {
     WAIT,

@@ -113,7 +113,11 @@ int main(void)
     fflush(stdout);
 
     startGame(&gamestate_player);
-    gamestate_player.player_id = brclient_get_id(network_client); // Replaced hardcoded initialization with server-assigned ID retrieval;
+    if (brclient_get_id(network_client, &gamestate_player.player_id) < 0) // Replaced hardcoded initialization with server-assigned ID retrieval
+    {
+        printf("[tetrisu] Failed to retrieve player ID from server.\n");
+        gamestate_player.game_over = true; // Bail out cleanly rather than run with an uninitialized ID
+    }
     gamestate_player.target_player_id = (gamestate_player.player_id % LOBBY_SIZE) + 1; // Starting player target -> ring routing to strictly target next numerical player ID
     gamestate_player.held_type = 0;                                                    // Initialize hold box
     gamestate_player.has_held = false;                                                 // Clear flag for hold box

@@ -390,6 +390,6 @@ int brclient_get_id(BRClient *clientPtr, uint32_t *id)
     }
     Endpoint *thisClient = clientPtr;
     *id = thisClient->id;
-    LOG_I("[brclient_get_id()] retrieved own client id %u", id);
+    LOG_I("[brclient_get_id()] retrieved own client id %u", *id);
     return 0;
 }
