@@ -59,7 +59,8 @@ int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
         return 0;
     }
 
-    // Counter
+    // Counters
+    state->combo++; // Increment combo counter
     int base_garbage = 0;
     bool is_difficult_clear = is_t_spin || (lines_cleared == 4);
 
