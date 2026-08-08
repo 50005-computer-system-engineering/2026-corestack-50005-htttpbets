@@ -11,6 +11,7 @@ typedef struct {
 
 static MessageQueue serverMessages;
 static pthread_mutex_t serverMessagesLock;
+static int pcFlags[2] = {0, 0};
 
 // private functions
 int freeServer(Server **serverPtr)
@@ -323,9 +324,16 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         if (msg.msgType == MSG_APP)
         {
             LOG_D("[serverGameState()] Message received for application");
+            if (pcFlags[0])
+            {
+                pcFlags[1] = 1;
+                LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
+                sched_yield();
+            }
             pthread_mutex_lock(&serverMessagesLock);
             Message_enqueue(&serverMessages, msg);
             pthread_mutex_unlock(&serverMessagesLock);
+            pcFlags[1] = 0;
         }
         // TODO other type message handling
     }
@@ -644,23 +652,25 @@ returns 0 if no message, returns 1 if there is
 */
 int brserver_get_app_msg(unsigned char returnMsg[512])
 {
-    if (pthread_mutex_trylock(&serverMessagesLock) == 0)
+    if (!Message_empty(&serverMessages))
     {
-        if (Message_empty(&serverMessages))
+        if (pcFlags[1])
         {
-            LOG_D("[brserver_get_app_msg()] no messages to process");
-            pthread_mutex_unlock(&serverMessagesLock);
-            return 0;
+            pcFlags[0] = 1;
+            LOG_D("[brserver_get_app_msg()] yielding CPU control for listener thread to write to queue");
+            sched_yield();
         }
+        pthread_mutex_lock(&serverMessagesLock);
         memcpy(returnMsg, Message_peek(&serverMessages)->msgContent, MSG_CONTENT_LENGTH);
         Message_dequeue(&serverMessages);
         pthread_mutex_unlock(&serverMessagesLock);
+        pcFlags[0] = 0; 
         LOG_D("[brserver_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     }
     else 
     {
-        LOG_D("[brserver_get_app_msg()] queue is busy being locked");
+        LOG_D("[brserver_get_app_msg()] queue is empty");
         return 0;
     }
 }

@@ -5,6 +5,7 @@
 
 static MessageQueue clientMessages;
 static pthread_mutex_t clientMessagesLock;
+static int pcFlags[2] = {0, 0};
 
 // private functions
 int connectOnTCP(Sockets *socks, char *serverIp)
@@ -168,9 +169,16 @@ void clientGameState(Endpoint *client)
                     if (msg.msgType == MSG_APP)
                     {
                         LOG_D("[clientGameState()] Message received for application");
+                        if (pcFlags[0])
+                        {
+                            pcFlags[1] = 1;
+                            LOG_D("[clientGameState()] listener yielding CPU control for user polling queue");
+                            sched_yield();
+                        }
                         pthread_mutex_lock(&clientMessagesLock);
                         Message_enqueue(&clientMessages, msg);
                         pthread_mutex_unlock(&clientMessagesLock);
+                        pcFlags[1] = 0;
                     }
                     if (msg.msgType == MSG_END)
                     {
@@ -342,23 +350,25 @@ returns 0 if no message, returns 1 if there is
 */
 int brclient_get_app_msg(unsigned char returnMsg[512])
 {
-    if (pthread_mutex_trylock(&clientMessagesLock) == 0)
+    if (!Message_empty(&clientMessages))
     {
-        if (Message_empty(&clientMessages))
+        if (pcFlags[1])
         {
-            LOG_D("[brclient_get_app_msg()] no messages to process");
-            pthread_mutex_unlock(&serverMessagesLock);
-            return 0;
+            pcFlags[0] = 1;
+            LOG_D("[brclient_get_app_msg()] yielding CPU control for listener thread to write to queue");
+            sched_yield();
         }
-        snprintf(returnMsg, MSG_CONTENT_LENGTH, Message_peek(&clientMessages)->msgContent);
+        pthread_mutex_lock(&clientMessagesLock);
+        memcpy(returnMsg, Message_peek(&clientMessages)->msgContent, MSG_CONTENT_LENGTH);
         Message_dequeue(&clientMessages);
         pthread_mutex_unlock(&clientMessagesLock);
-        LOG_D("[brclient_get_app_msg()] client message has been returned unsigned char array");
+        pcFlags[0] = 0; 
+        LOG_I("[brclient_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     }
     else 
     {
-        LOG_D("[brclient_get_app_msg()] queue is busy being locked");
+        LOG_I("[brclient_get_app_msg()] queue is empty");
         return 0;
     }
 }
