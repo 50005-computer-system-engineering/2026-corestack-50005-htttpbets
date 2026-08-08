@@ -223,6 +223,7 @@ void* clientThreadFunc(void *client)
     {
         clientStateLoops[thisClient->state](thisClient);
     }
+    pthread_exit(NULL);
 }
 
 // public functions

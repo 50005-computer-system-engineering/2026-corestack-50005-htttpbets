@@ -378,6 +378,7 @@ void* serverThreadFunc(void *server)
     if (thisServer->self->state == END)
     {
         serverStateLoops[thisServer->self->state](thisServer);
+        pthread_exit(NULL);
     }
 }
 
