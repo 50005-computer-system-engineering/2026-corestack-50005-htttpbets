@@ -49,14 +49,14 @@ uint32_t resolveTargetID(GameState *attacker, GameState *all_players[], int tota
                 candidates[count++] = all_players[i]->player_id;
             }
         }
-        if (count == 0) // Nobody left to hit
+        if (count == 0) // No valid candidates in array is given (caller only knows about itself)
         {
-            return attacker->player_id;
+            return attacker->target_player_id; // Fallback to known / locked target
         }
         return candidates[rand() % count]; // Select random candidate
     }
     case TARGET_KO: // Search all active oponents to find who is closest to losing
-        uint32_t target_id = attacker->player_id; // Fallback if no target id found
+        uint32_t target_id = attacker->target_player_id; // Fallback if no target id found
         uint32_t highest_garbage = 0;
         bool found_target = false;
         // Find player with most pending garbage lines or highest placed piece activity
