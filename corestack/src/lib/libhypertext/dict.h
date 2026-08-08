@@ -14,6 +14,6 @@ struct Dictionary {
 struct Dictionary *dict_init(int size);
 int get_dict_index(struct Dictionary dict, unsigned char *key);
 unsigned char *get_dict_val(struct Dictionary dict, unsigned char *key);
-int add_key_value_pair(struct Dictionary *dict, unsigned char *key, unsigned char *val, int idx)
+int add_key_value_pair(struct Dictionary *dict, unsigned char *key, unsigned char *val, int idx);
 
 #endif

@@ -1,5 +1,6 @@
 #include "dict.h"
 #include "utils/logger.h"
+#include <stdlib.h>
 
 /*
 Allocates appropriate memory for the new dict
