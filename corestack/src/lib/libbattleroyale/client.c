@@ -373,3 +373,20 @@ int brclient_get_app_msg(unsigned char returnMsg[512])
         return 0;
     }
 }
+
+/*
+Function returns the client id to a pointer
+returns 0 on success, -1 on failure
+*/
+int brclient_get_id(BRClient *clientPtr, uint32_t *id)
+{
+    if (clientPtr == NULL) 
+    {
+        LOG_E("[brclient_get_id()] no valid client");
+        return -1;
+    }
+    Endpoint *thisClient = clientPtr;
+    *id = thisClient->id;
+    LOG_I("[brclient_get_id()] retrieved own client id %u", id);
+    return 0;
+}
