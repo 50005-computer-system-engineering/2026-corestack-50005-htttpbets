@@ -32,31 +32,33 @@ void cycleManualTarget(GameState *attacker, GameState *all_players[], int total_
     }
 }
 
-// Resolve and return correct target ID based on attacker's mode
-int resolveTargetID(GameState *attacker, GameState *all_players[], int total_players)
+// Resolve and return correct target ID based on attacker's target mode
+uint32_t resolveTargetID(GameState *attacker, GameState *all_players[], int total_players)
 {
     switch (attacker->target_mode)
     {
     case TARGET_RANDOM:
     {
-        int candidates[total_players];
+        uint32_t candidates[total_players]; // To hold valid target IDs
         int count = 0;
         for (int i = 0; i < total_players; i++)
         {
+            // Add all living opponents into candidates array
             if (all_players[i]->player_id != attacker->player_id && !all_players[i]->game_over)
             {
                 candidates[count++] = all_players[i]->player_id;
             }
         }
-        if (count == 0) // Nobody left to hit
+        if (count == 0) // No valid candidates in array is given (caller only knows about itself)
         {
-            return attacker->player_id;
+            return attacker->target_player_id; // Fallback to known / locked target
         }
-        return candidates[rand() % count];
+        return candidates[rand() % count]; // Select random candidate
     }
-    case TARGET_KO:
-        int target_id = attacker->player_id; // Fallback if no target id found
-        int highest_garbage = -1;
+    case TARGET_KO: // Search all active oponents to find who is closest to losing
+        uint32_t target_id = attacker->target_player_id; // Fallback if no target id found
+        uint32_t highest_garbage = 0;
+        bool found_target = false;
         // Find player with most pending garbage lines or highest placed piece activity
         for (int i = 0; i < total_players; i++)
         {
@@ -69,10 +71,11 @@ int resolveTargetID(GameState *attacker, GameState *all_players[], int total_pla
                 continue;
             }
             // Target the player closest to topping out
-            if (all_players[i]->pending_garbage > highest_garbage && !all_players[i]->game_over)
+            if (!found_target || all_players[i]->pending_garbage > highest_garbage)
             {
                 highest_garbage = all_players[i]->pending_garbage;
                 target_id = all_players[i]->player_id;
+                found_target = true;
             }
         }
         return target_id;

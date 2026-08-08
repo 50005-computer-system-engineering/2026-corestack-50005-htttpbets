@@ -32,5 +32,7 @@ typedef struct
     int y; // Location on the board (y-axis)
 } Piece;
 
+// 7 pieces, 4X4 bounding box = 16 individual cells
 extern const int tetrominoes[7][16];
+
 #endif

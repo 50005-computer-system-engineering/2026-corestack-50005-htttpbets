@@ -1,7 +1,7 @@
-/* FOR EVENT BUS; PAYLOADS AND EVENTS */
-
 #ifndef TETRISU_EVENTS_H
 #define TETRISU_EVENTS_H
+
+#include <stdint.h>
 
 // Event Dictionary
 enum GameEvents
@@ -13,12 +13,12 @@ enum GameEvents
 // Data Package
 typedef struct
 {
-    int source_player; // Player that sent it
-    int target_player; // Player that recieves it
-    int lines;         // How much damage
+    uint32_t source_player; // Player that sent it
+    uint32_t target_player; // Player that recieves it
+    uint32_t lines;         // How much damage
 } AttackPayload;
 
-// Test Network Routing
+// Network Routing
 void on_attack_generated(void *args);
 
 #endif

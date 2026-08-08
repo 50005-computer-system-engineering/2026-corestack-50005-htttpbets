@@ -51,7 +51,8 @@ int freeSockets(Sockets **socks)
         return -1;
     }
     free(closingSockets);
-    closingSockets = NULL;
+    //closingSockets = NULL;
+    *socks = NULL; // Ensured caller's pointer is safely nullified
     LOG_I("[closeSockets()] freed Sockets struct in memory");
     return 0;
 }
@@ -128,9 +129,11 @@ int createEndpoint(Endpoint **endpt)
     // };
 
     *endpt = newEndpt;
+
+    LOG_I("[createEndpoint()] endpoint created successfully"); // Moved above so it executes successfully
+
     return 0;
 
-    LOG_I("[createEndpoint()] endpoint created successfully");
     fail:
     free(newEndpt);
     return -1;
@@ -150,7 +153,8 @@ int freeEndpoint(Endpoint **endpt)
 
     // free struct memeory
     free(closingEndpt);
-    closingEndpt = NULL;
+    //closingEndpt = NULL;
+    *endpt = NULL;
     
     LOG_I("[closeEndpoint()] endpoint closed successfully");
     

@@ -7,7 +7,7 @@
 
 // --- TERMINAL CONTROL (termios) ---
 // Linux in-built terminal flags
-struct termios orig_termios;
+struct termios orig_termios; // Store terminal initial settings before the game starts
 
 // Reset terminal back to normal; if not will remain broken
 void disableRawMode(void)
@@ -40,9 +40,9 @@ int kbhit(void)
     int ch;
 
     // In Linux, input is also treated as a file;
-    int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);      // Get current stdin
+    int oldf = fcntl(STDIN_FILENO, F_GETFL, 0);      // Get current fd for stdin
     fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK); // Add special flag => if no input registered, instantly return EOF and continue
-    ch = getchar();                                  // Attempt to read a chara
+    ch = getchar();                                  // Attempt to read a chara byte; if key was pressed, ch holds the value, otherwise equals EOF
     fcntl(STDIN_FILENO, F_SETFL, oldf);              // Restore normal behaviour
 
     // If a key was pressed

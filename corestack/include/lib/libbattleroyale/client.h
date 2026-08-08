@@ -13,4 +13,7 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[512]); // use d
 
 int brclient_get_app_msg(unsigned char returnMsg[512]);
 
+// TEST PATCH TO EXPOSE CLIENT ID
+uint32_t brclient_get_id(BRClient *clientPtr);
+
 #endif
