@@ -75,7 +75,7 @@ int main(void)
         }
     }
 
-    // Validate all players
+    // Validate all players -> calloc sets all elements to false (0) by default
     bool *isValidPlayer = calloc(maxId + 1, sizeof(bool)); // To check if target player ID is connected
     if (isValidPlayer == NULL)                             // Failed
     {
@@ -84,10 +84,10 @@ int main(void)
     }
     for (uint32_t i = 0; i < lobbySize; i++)
     {
-        isValidPlayer[clientIds[i]] = true; // Mark connected player IDs as valid
+        isValidPlayer[clientIds[i]] = true; // Mark connected player IDs as valid to ensure we only route attacks to real players
     }
 
-    // Array buffer for libbattleroyale message queue
+    // Array buffer for message queue
     unsigned char buffer[512] = {0};
 
     // Continuous listening loop; blocking
@@ -117,7 +117,8 @@ int main(void)
                 // Add into buffer
                 memcpy(out_buffer, &incoming, sizeof(AttackPayload));
 
-                // Send the payload via UDP
+                // Send the payload via UDP broadcast to all clients
+                // Clients will be responsible for parsing the payload and checking if they are the target
                 brserver_send_broadcast(server, out_buffer);
 
                 // Logging
