@@ -147,6 +147,7 @@ void clientGameState(Endpoint *client)
                         if (receiveMessageTCP(listenFd[i].fd, &msg) < 0)
                         {
                             LOG_E("[clientGameState()] failed to receive TCP message from %d", listenFd[i].fd);
+                            listenFd[i].fd = -1; // To prevent infinite CPU spin if server closes connection
                             continue;
                         }
                     }
@@ -155,7 +156,7 @@ void clientGameState(Endpoint *client)
                     {
                         if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
                         {
-                            LOG_E("[clientGameState()] failed to receive TCP message from %d", listenFd[i].fd);
+                            LOG_E("[clientGameState()] failed to receive UDP message from %d", listenFd[i].fd);
                             continue;
                         }
                     }
@@ -189,6 +190,7 @@ void clientGameState(Endpoint *client)
             }
         }
     }
+    free(listenFd); // Plug memory leak
     LOG_I("[clientGameState()] state change detected, CLIENT exiting GAME state");
 }
 
@@ -328,7 +330,8 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
         .sourceId = thisClient->id,
         .msgType = MSG_APP,
     };
-    snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
+    //snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
+    memcpy(msg.msgContent, content, MSG_CONTENT_LENGTH);
 
     // send via socket
     if (sendMessageTCP(thisClient->socks->tcp, msg) < 0)
@@ -372,4 +375,14 @@ int brclient_get_app_msg(unsigned char returnMsg[512])
         LOG_I("[brclient_get_app_msg()] queue is empty");
         return 0;
     }
+}
+
+// TEST PATCH TO EXPOSE CLIENT ID
+uint32_t brclient_get_id(BRClient *clientPtr)
+{
+    if (clientPtr == NULL) {
+        return 0;
+    }
+    Endpoint *thisClient = (Endpoint *)clientPtr;
+    return thisClient->id;
 }

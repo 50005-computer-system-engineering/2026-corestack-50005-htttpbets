@@ -91,11 +91,13 @@ int receiveMessageTCP(int sockfd, Message *returnPtr)
         LOG_E("[receiveMessageTCP()] failed to read message content");
         goto fail;
     }
-    snprintf(returnPtr->msgContent, MSG_CONTENT_LENGTH, buffer);
+    //snprintf(returnPtr->msgContent, MSG_CONTENT_LENGTH, buffer);
+    memcpy(returnPtr->msgContent, buffer, MSG_CONTENT_LENGTH); // Using memcpy to safely transfer binary bytes without null-byte termination issues
+    free(buffer);
     buffer = NULL;
 
-    LOG_D("[receiveMessageTCP()] received broadcast with following message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", returnPtr->sourceId, returnPtr->msgType, returnPtr->msgContent);
-    LOG_I("[receiveMessageTCP()] finsihed receiving message");
+    LOG_D("[receiveMessageTCP()] received message:\n\tsource: %u\n\ttype: %d", returnPtr->sourceId, returnPtr->msgType);
+    LOG_I("[receiveMessageTCP()] finished receiving message");
 
     return 0;
 
@@ -111,12 +113,13 @@ int receiveMessageUDP(int sockfd, Message *returnPtr)
 
     // receiving message
     int flagsSet = 0;
-    unsigned char *messageBytes = malloc(sizeof(Message)); // TODO fix the message size problem
-    if (messageBytes == NULL)
-    {
-        perror("[receiveMessageUDP()] malloc");
-        return -1;
-    }
+    //unsigned char *messageBytes = malloc(sizeof(Message)); // TODO fix the message size problem
+    unsigned char messageBytes[sizeof(Message)]; // Stack buffer to prevent memory leaks
+    //if (messageBytes == NULL)
+    //{
+        //perror("[receiveMessageUDP()] malloc");
+        //return -1;
+    //}
 
     LOG_D("[receiveMessageUDP()] waiting for bytes");
 
@@ -128,10 +131,11 @@ int receiveMessageUDP(int sockfd, Message *returnPtr)
     LOG_D("[receiveMessageUDP()] received raw message bytes");
 
     // fit bytes into message message struct
-    returnPtr = calloc(1, sizeof(Message));
+    //returnPtr = calloc(1, sizeof(Message));
+    // Copy the bytes into the memory space provided by the caller
     memcpy(returnPtr, messageBytes, sizeof(Message));
 
-    LOG_D("[receiveMessageUDP()] received broadcast with following message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", returnPtr->sourceId, returnPtr->msgType, returnPtr->msgContent);
+    LOG_D("[receiveMessageUDP()] received broadcast with following message:\n\tsource: %u\n\ttype: %d", returnPtr->sourceId, returnPtr->msgType);
     LOG_I("[receiveMessageUDP()] broadcast has been received");
 
     return 0;

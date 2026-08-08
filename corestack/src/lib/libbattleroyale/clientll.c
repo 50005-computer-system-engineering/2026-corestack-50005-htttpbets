@@ -3,10 +3,18 @@
 int initaliseList(ClientLinkedList **list)
 {
     // check pointer
-    if (*list == NULL)
+    //if (*list == NULL)
+    //{
+        //LOG_D("[initaliseList()] cleaning list");
+        //free(*list);
+    //}
+
+    // Flipped logic to avoid freeing an empty pointer
+    if (*list != NULL)
     {
         LOG_D("[initaliseList()] cleaning list");
         free(*list);
+        *list = NULL;
     }
 
     // make a new list
@@ -85,6 +93,10 @@ int removeFromList(ClientLinkedList *list, uint32_t id)
     {
         LOG_D("[removeFromList()] match is current list head");
         list->head = checking->next;
+
+        // Explicitly free Sockets struct to prevent memory leak before freeing
+        freeSockets(&(checking->client.socks));
+
         free(checking);
         checking = NULL;
         list->count--;
@@ -99,6 +111,10 @@ int removeFromList(ClientLinkedList *list, uint32_t id)
             LOG_D("[removeFromList()] match is the next client in list");
             ClientNode *removedNode = checking->next;
             checking->next = checking->next->next;
+
+            // Explicitly free Sockets struct to prevent memory leak before freeing
+            freeSockets(&(checking->client.socks));
+
             free(removedNode);
             list->count--;
             return 0;
@@ -168,7 +184,7 @@ int freeList(ClientLinkedList **listToFree)
 {
     // check for empty list
     ClientLinkedList *list = *listToFree;
-    if (list->head == NULL)
+    if (list == NULL || list->head == NULL) // Added check for list pointer itself isn't null before checking head
     {
         LOG_E("[freeList()] list is empty, freeing pointer");
         goto freeing;

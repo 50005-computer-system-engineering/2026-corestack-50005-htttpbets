@@ -80,7 +80,7 @@ int main(void)
 {
     // PATCH FIX FOR FLICKERING TERMINAL
     setvbuf(stdout, NULL, _IOFBF, 16384);
-    
+
     // Clear terminal screen
     printf("\e[1;1H\e[2J");
     fflush(stdout);
@@ -98,12 +98,13 @@ int main(void)
     }
     else
     {
-        printf("[tetrisu] Connected to lobby successfully! Assigned Player ID: P%d\n", gamestate_player.player_id);
+        printf("[tetrisu] Connected to lobby successfully!");
     }
 
     // Allow time for server to reach LOBBY_SIZE and enter GAME state
     printf("[tetrisu] Waiting for lobby to fill and game to start...\n");
-    sleep(5); // Brief delay to read connection status
+    sleep(5);                            // Brief delay to read connection status
+    printf("[tetrisu] Game started!\n"); // Game start flag
 
     // Clear terminal screen
     // Set up the terminal for the game
@@ -112,7 +113,7 @@ int main(void)
     fflush(stdout);
 
     startGame(&gamestate_player);
-    gamestate_player.player_id = 1;                                                     // Assign player ID : TO FIX
+    gamestate_player.player_id = brclient_get_id(network_client); // Replaced hardcoded initialization with server-assigned ID retrieval;
     gamestate_player.target_player_id = (gamestate_player.player_id % LOBBY_SIZE) + 1; // Starting player target -> ring routing to strictly target next numerical player ID
     gamestate_player.held_type = 0;                                                    // Initialize hold box
     gamestate_player.has_held = false;                                                 // Clear flag for hold box
@@ -135,7 +136,7 @@ int main(void)
             // Cast the raw byte buffer back into our struct
             AttackPayload incoming;
             memcpy(&incoming, net_buffer, sizeof(AttackPayload));
-            
+
             // Convert the network bytes back to readable integers
             uint32_t source_id = ntohl(incoming.source_player);
             uint32_t target_id = ntohl(incoming.target_player);

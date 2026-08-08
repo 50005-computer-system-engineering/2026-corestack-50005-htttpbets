@@ -294,7 +294,7 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
         
         // listen to each message and handle
         Message msg;
-        for (uint32_t i=0; i < serverPtr->clients->count || socketActivity > 0; i++)
+        for (uint32_t i=0; i < serverPtr->clients->count && socketActivity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
         {
             if (listenFdTCP[i].revents == POLLIN)
             {
@@ -303,9 +303,26 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
                 if (receiveMessageTCP(fd, &msg) < 0)
                 {
                     LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
+                    listenFdTCP[i].fd = -1; // Set disconnected socket to -1 to prevent triggering infinite EOF loop
                     continue;
                 }
                 LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
+            
+                // enqueue a message if its an application layer message
+                if (msg.msgType == MSG_APP) // Shifted this inside the successful TCP read block to prevent queuing stale / uninitialized messages
+                {
+                    LOG_D("[serverGameState()] Message received for application");
+                    if (pcFlags[0])
+                    {
+                        pcFlags[1] = 1;
+                        LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
+                        sched_yield();
+                    }
+                    pthread_mutex_lock(&serverMessagesLock);
+                    Message_enqueue(&serverMessages, msg);
+                    pthread_mutex_unlock(&serverMessagesLock);
+                    pcFlags[1] = 0;
+                }
             }
         }
         
@@ -318,25 +335,26 @@ void serverGameState(Server *serverPtr)    // loop where listens for unicast fro
                 continue;
             }
             LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
-        }
-        
-        // enqueue a message if its an application layer message
-        if (msg.msgType == MSG_APP)
-        {
-            LOG_D("[serverGameState()] Message received for application");
-            if (pcFlags[0])
+
+            // enqueue a message if its an application layer message
+            if (msg.msgType == MSG_APP) // Shifted this inside the successful UDP read block to prevent queuing stale / uninitialized messages
             {
-                pcFlags[1] = 1;
-                LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
-                sched_yield();
+                LOG_D("[serverGameState()] Message received for application");
+                if (pcFlags[0])
+                {
+                    pcFlags[1] = 1;
+                    LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
+                    sched_yield();
+                }
+                pthread_mutex_lock(&serverMessagesLock);
+                Message_enqueue(&serverMessages, msg);
+                pthread_mutex_unlock(&serverMessagesLock);
+                pcFlags[1] = 0;
             }
-            pthread_mutex_lock(&serverMessagesLock);
-            Message_enqueue(&serverMessages, msg);
-            pthread_mutex_unlock(&serverMessagesLock);
-            pcFlags[1] = 0;
         }
         // TODO other type message handling
     }
+    free(listenFdTCP); // free to prevent memory leaks
 }
 
 void serverEndState(Server *serverPtr)
@@ -555,20 +573,25 @@ int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clie
 
     // iterate through client linked list for clientIds
     *nClients = thisServer->clients->count;
-    uint32_t *idArray = malloc(sizeof(uint32_t)*(*nClients));
+    //uint32_t *idArray = malloc(sizeof(uint32_t)*(*nClients));
     ClientNode *client = thisServer->clients->head;
     LOG_D("[brserver_client_info()] getting ids of %u clients connected to SERVER", *nClients);  
     for (uint32_t i=0; i<*nClients; i++)
     {
-        LOG_D("\t[brserver_client_info()] SERVER has client with id %u", client->client.id) ; 
-        idArray[i] = client->client.id;
-        client = client->next;
+        if (client != NULL) // Write directly into the caller's pre-allocated clientIds array
+        {
+            LOG_D("\t[brserver_client_info()] SERVER has client with id %u", client->client.id) ; 
+            //idArray[i] = client->client.id;
+            clientIds[i] = client->client.id;
+            client = client->next;
+        }
     }
 
     // write to return pointer
-    clientIds = idArray;
+    //clientIds = idArray; -> leaked memory and failed to caller's reference because passed by value
 
     LOG_I("[brserver_client_info()] client information written to pointers");
+    return 0;
 }
 
 int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
@@ -583,7 +606,8 @@ int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned cha
         .sourceId = thisServer->self->id,
         .msgType = MSG_APP,
     };
-    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    //snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    memcpy(completeMsg.msgContent, content, MSG_CONTENT_LENGTH); // Prevent null-byte truncation of binary data
 
     // get client
     Endpoint targetClient;
@@ -616,7 +640,8 @@ int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[512])
         .sourceId = thisServer->self->id,
         .msgType = MSG_APP,
     };
-    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    //snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    memcpy(completeMsg.msgContent, content, MSG_CONTENT_LENGTH); // Prevent null-byte truncation of binary data
 
     if (sendBroadcastUDP(thisServer->self->socks->udpBroad, completeMsg))
     {
@@ -636,7 +661,8 @@ int brserver_send_to_all(BRServer *serverPtr, unsigned char content[512])
         .sourceId = thisServer->self->id,
         .msgType = MSG_APP,
     };
-    snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    //snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
+    memcpy(completeMsg.msgContent, content, MSG_CONTENT_LENGTH); // Prevent null-byte truncation of binary data
 
     if (sendBroadcastTCP(serverPtr, completeMsg))
     {
