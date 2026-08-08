@@ -377,12 +377,19 @@ int brclient_get_app_msg(unsigned char returnMsg[512])
     }
 }
 
-// TEST PATCH TO EXPOSE CLIENT ID
-uint32_t brclient_get_id(BRClient *clientPtr)
+/*
+Function returns the client id to a pointer
+returns 0 on success, -1 on failure
+*/
+int brclient_get_id(BRClient *clientPtr, uint32_t *id)
 {
-    if (clientPtr == NULL) {
-        return 0;
+    if (clientPtr == NULL) 
+    {
+        LOG_E("[brclient_get_id()] no valid client");
+        return -1;
     }
-    Endpoint *thisClient = (Endpoint *)clientPtr;
-    return thisClient->id;
+    Endpoint *thisClient = clientPtr;
+    *id = thisClient->id;
+    LOG_I("[brclient_get_id()] retrieved own client id %u", id);
+    return 0;
 }
