@@ -7,7 +7,6 @@
 #include "libbattleroyale/server.h"
 #include "libbattleroyale/client.h"
 
-#define NUM_TEST_CLIENTS 2
 
 enum TestStage {
     WAIT,
@@ -293,6 +292,11 @@ int main(void)
         
         // CLEANUP
         server_cleanup:
+        if (signalNextStage(stagingPipes, CLEANUP) < 0)
+        {
+            printf("server: failed to prompt clients to start BROADCASTING stage\n");
+            goto server_cleanup;
+        }
         if (brserver_end(testServer) < 0)
         {
             printf("server: failed to enter END state\n");
