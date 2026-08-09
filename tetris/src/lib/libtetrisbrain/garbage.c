@@ -47,6 +47,28 @@ void addGarbage(GameState *state, int lines)
     }
 }
 
+// Queue incoming garbage so it accumulates in the pending meter until it is applied
+void queueGarbage(GameState *state, int lines)
+{
+    if (lines <= 0)
+    {
+        return;
+    }
+
+    if (state == NULL)
+    {
+        return;
+    }
+
+    uint32_t pending = state->pending_garbage + (uint32_t)lines;
+    if (pending > BOARD_HEIGHT)
+    {
+        pending = BOARD_HEIGHT;
+    }
+
+    state->pending_garbage = pending;
+}
+
 // Calculate garbage based on lines cleared (following TETR.IO guideline rules)
 int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
 {

@@ -87,15 +87,15 @@ int tickGame(GameState *state)
     // Cancel incoming garbage with our attack
     if (damage > 0 && state->pending_garbage > 0) // Generated + Incoming
     {
-        if (damage >= state->pending_garbage) // Generated > Incoming
+        if (damage >= (int)state->pending_garbage) // Generated > Incoming
         {
-            damage -= state->pending_garbage; // Reduce generated
-            state->pending_garbage = 0;       // Reset Incoming
+            damage -= (int)state->pending_garbage; // Reduce generated
+            state->pending_garbage = 0;           // Reset Incoming
         }
         else
         {
-            state->pending_garbage -= damage; // Incoming > Generated
-            damage = 0;                       // Reset Generated
+            state->pending_garbage -= (uint32_t)damage; // Incoming > Generated
+            damage = 0;                                 // Reset Generated
         }
     }
     // Send remaining generated damage to opponent

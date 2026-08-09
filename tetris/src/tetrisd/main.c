@@ -174,7 +174,7 @@ int main(void)
                 continue; // No valid target, damage is dropped
             }
 
-            addGarbage(&victim->state, (int)lines);
+            queueGarbage(&victim->state, (int)lines);
             victim->state.last_attacker_id = attacker->player_id;
             victim->dirty = true; // Their board changed, push it
 

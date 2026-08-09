@@ -27,8 +27,16 @@ void test_garbage_mitigation_integration(void) {
     TEST_ASSERT_EQUAL_INT(1, damage); // 1 remaining outgoing damage
 }
 
+void test_queue_garbage_stores_in_pending_meter(void) {
+    queueGarbage(&test_state, 2);
+
+    TEST_ASSERT_EQUAL_UINT32(2, test_state.pending_garbage);
+    TEST_ASSERT_EQUAL_INT(0, test_state.board.cells[0][0]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_garbage_mitigation_integration);
+    RUN_TEST(test_queue_garbage_stores_in_pending_meter);
     return UNITY_END();
 }
