@@ -1,20 +1,37 @@
 #include <stdio.h>
-#include "lib/libeventbus.h"
+#include <string.h>
 #include "input.h"
 #include "events.h"
 #include "config.h"
 #include "input_handler.h"
-#include "lib/libtetrisbrain/engine.h"
-#include "lib/libtetrisbrain/hold.h"
-#include "lib/libtetrisbrain/targeting.h"
-#include "lib/libtetrisbrain/board_control.h"
+#include "lib/libtetrisprotocol/protocol.h"
 #include "lib/libtetrisbrain/state.h"
-#include "lib/libtetrisbrain/movement.h"
+#include "lib/libbattleroyale/client.h"
 
-// Populated from server's PACKET_ROSTER broadcast
-extern Roster lobby;
+// Instantiate network client
+extern BRClient *network_client;
+
+// Ships one requested action to the server
+static void sendAction(GameState *state, PlayerAction action)
+{
+    if (network_client == NULL)
+    {
+        return; // No connection, nothing to ask
+    }
+
+    InputPayload payload =
+        {
+            .player_id = state->player_id,
+            .action = (uint32_t)action};
+
+    unsigned char buffer[512] = {0};
+    packInput(buffer, &payload);
+
+    brclient_send_msg(network_client, buffer);
+}
 
 // Process all pending terminal inputs
+// Every branch is now a pure keybind -> action mapping
 void processInputs(GameState *state)
 {
     // Read user inputs
@@ -34,26 +51,16 @@ void processInputs(GameState *state)
                     switch (getchar())
                     {
                     case 'A': // Up arrow (rotate clockwise)
-                        rotateCurrentPiece(state);
-                        state->lock_timer = 0;
+                        sendAction(state, ACTION_ROTATE_CW);
                         break;
                     case 'D': // Left arrow
-                        if (moveLeft(state))
-                        {
-                            state->lock_timer = 0;
-                        }
+                        sendAction(state, ACTION_MOVE_LEFT);
                         break;
                     case 'C': // Right arrow
-                        if (moveRight(state))
-                        {
-                            state->lock_timer = 0;
-                        }
+                        sendAction(state, ACTION_MOVE_RIGHT);
                         break;
                     case 'B': // Down arrow (soft drop + lock delay)
-                        if (softDrop(state))
-                        {
-                            state->lock_timer = 0;
-                        }
+                        sendAction(state, ACTION_SOFT_DROP);
                         break;
                     }
                 }
@@ -61,60 +68,32 @@ void processInputs(GameState *state)
         }
         else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
         {
-            rotateCurrentPiece(state);
-            state->lock_timer = 0;
+            sendAction(state, ACTION_ROTATE_CW);
         }
         else if (key == 'z' || key == 'Z') // Rotate counterclockwise
         {
-            rotateCounterClockwise(state);
-            state->lock_timer = 0;
+            sendAction(state, ACTION_ROTATE_CCW);
         }
         else if (key == 't' || key == 'T') // Change target mode
         {
-            cycleTargetMode(state);
+            sendAction(state, ACTION_CYCLE_TARGET_MODE);
         }
         else if (key == 'r' || key == 'R') // Change target ID
         {
-            // Manually swap target directly
-            cycleManualTarget(state, &lobby);
+            sendAction(state, ACTION_CYCLE_TARGET);
         }
         else if (key == ' ') // Spacebar (hard drop)
         {
-            hardDrop(state);
-            // Calculate Garbage and send
-            tickGame(state);
-            if (state->outgoing_garbage > 0)
-            {
-                // Find target player
-                uint32_t target_victim = resolveTargetID(state, &lobby);
-                if (target_victim != 0 && target_victim != state->player_id) // Only send when target victim is known
-                {
-                    // Pack the payload
-                    AttackPayload payload =
-                        {
-                            .source_player = state->player_id,
-                            .target_player = target_victim,
-                            .lines = state->outgoing_garbage};
-                    // Trigger Event Bus
-                    event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                }
-                state->outgoing_garbage = 0; // Reset after sending
-            }
-            // Reset env variables
-            state->gravity_timer = 0;
-            state->lock_timer = 0;
+            sendAction(state, ACTION_HARD_DROP);
         }
         else if (key == 'h' || key == 'H') // H to hold
         {
-            if (!state->has_held)
-            {
-                holdPiece(state);
-                state->gravity_timer = 0;
-            }
+            sendAction(state, ACTION_HOLD);
         }
         else if (key == 'q' || key == 'Q') // Q to quit
         {
-            // Set game over state
+            // Tell the server we are leaving so it frees our slot and stops anyone from targeting us, then close down locally
+            sendAction(state, ACTION_QUIT);
             state->game_over = true;
             break; // Exit
         }

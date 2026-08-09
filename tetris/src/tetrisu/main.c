@@ -10,9 +10,7 @@
 #include "input.h"
 #include "renderer.h"
 #include "input_handler.h"
-#include "lib/libtetrisbrain/engine.h"
-#include "lib/libtetrisbrain/board_control.h"
-#include "lib/libtetrisbrain/hold.h"
+#include "lib/libtetrisprotocol/protocol.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
 #include "lib/libtetrisbrain/killfeed.h"
@@ -26,61 +24,6 @@ BRClient *network_client = NULL;
 
 // Populate lobby from server's PACKET_ROSTER broadcast at game start
 Roster lobby = {0};
-
-// Process gravity and lock delay intervals
-static void updateGameTimers(GameState *state)
-{
-    // Track current gravity of piece for lock delay
-    int current_gravity = GRAVITY_THRESHOLD_START - ((state->level - 1) * 5);
-    if (current_gravity < 5)
-    {
-        current_gravity = 5;
-    }
-
-    // Gravity + Lock Delay
-    bool is_resting = !isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1);
-    if (is_resting)
-    {
-        // Lock Timer
-        state->lock_timer++;
-        if (state->lock_timer >= LOCK_THRESHOLD_START)
-        {
-            // Calculate Garbage and send
-            tickGame(state);
-            if (state->outgoing_garbage > 0)
-            {
-                // Find target player
-                uint32_t target_victim = resolveTargetID(state, &lobby);
-                if (target_victim != 0 && target_victim != state->player_id)
-                {
-                    // Pack the payload dynamically
-                    AttackPayload payload =
-                        {
-                            .source_player = state->player_id,
-                            .target_player = target_victim,
-                            .lines = state->outgoing_garbage};
-                    // Trigger Event Bus
-                    event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
-                }
-                state->outgoing_garbage = 0; // Reset after sending
-            }
-            // Reset env variables
-            state->lock_timer = 0;
-            state->gravity_timer = 0;
-        }
-    }
-    else
-    {
-        // Gravity Timer
-        state->lock_timer = 0;
-        state->gravity_timer++;
-        if (state->gravity_timer >= current_gravity)
-        {
-            tickGame(state);
-            state->gravity_timer = 0;
-        }
-    }
-}
 
 // --- MAIN GAME LOOP ---
 int main(void)
@@ -120,17 +63,13 @@ int main(void)
     fflush(stdout);
 
     startGame(&gamestate_player);
-    if (brclient_get_id(network_client, &gamestate_player.player_id) < 0) // Replaced hardcoded initialization with server-assigned ID retrieval
+    if (brclient_get_id(network_client, &gamestate_player.player_id) < 0) // Server-assigned ID retrieval
     {
         printf("[tetrisu] Failed to retrieve player ID from server.\n");
         gamestate_player.game_over = true; // Bail out cleanly rather than run with an uninitialized ID
     }
-    gamestate_player.target_player_id = 0; // Set as unknown until populated afterwards
-    gamestate_player.last_attacker_id = 0; // Set as unknown until populated afterwards
-    gamestate_player.held_type = 0;        // Initialize hold box
-    gamestate_player.has_held = false;     // Clear flag for hold box
 
-    // Event Bus setup
+    // Event Bus setup -> drives the local kill feed
     event_bus_init(EVENT_COUNT);
     event_bus_listen(EVENT_ATTACK_GENERATED, on_attack_generated);
 
@@ -140,20 +79,27 @@ int main(void)
         // Deal with active inputs
         processInputs(&gamestate_player);
 
-        // Read directly from message queue for incoming attacks
+        // Read directly from message queue
         unsigned char net_buffer[512] = {0};
 
         if (brclient_get_app_msg(net_buffer) == 1)
         {
-            // Attach 4-byte tag to identify action
-            uint32_t tag;
-            memcpy(&tag, net_buffer, sizeof(tag));
-            tag = ntohl(tag);
+            uint32_t tag = readPacketTag(net_buffer);
 
-            if (tag == PACKET_ROSTER) // Server to populate who is in the lobby
+            if (tag == PACKET_STATE) // Authoritative board pushed by the server
+            {
+                StatePayload incoming;
+                unpackState(net_buffer, &incoming);
+
+                if (incoming.player_id == gamestate_player.player_id)
+                {
+                    applyStatePayload(&incoming, &gamestate_player);
+                }
+            }
+            else if (tag == PACKET_ROSTER) // Server to populate who is in the lobby
             {
                 RosterPayload incoming_roster;
-                memcpy(&incoming_roster, net_buffer + sizeof(tag), sizeof(RosterPayload));
+                unpackRoster(net_buffer, &incoming_roster);
 
                 lobby.count = (int)ntohl(incoming_roster.count);
                 if (lobby.count > MAX_LOBBY_PLAYERS)
@@ -165,45 +111,19 @@ int main(void)
                     lobby.ids[i] = ntohl(incoming_roster.ids[i]);
                     lobby.eliminated[i] = false; // Nobody is out yet at game start
                 }
-
-                // If no locked target, help to pick
-                if (gamestate_player.target_player_id == 0)
-                {
-                    for (int i = 0; i < lobby.count; i++)
-                    {
-                        if (lobby.ids[i] != gamestate_player.player_id)
-                        {
-                            gamestate_player.target_player_id = lobby.ids[i];
-                            break;
-                        }
-                    }
-                }
             }
-            else if (tag == PACKET_ATTACK) // Receiving garbage from opponent
+            else if (tag == PACKET_ATTACK) // Notification only, damage already applied server-side
             {
                 // Cast the raw byte buffer back into our struct
                 AttackPayload incoming;
-                memcpy(&incoming, net_buffer + sizeof(tag), sizeof(AttackPayload));
+                unpackAttack(net_buffer, &incoming);
 
-                // Convert the network bytes back to readable integers
-                uint32_t source_id = ntohl(incoming.source_player);
-                uint32_t target_id = ntohl(incoming.target_player);
-                uint32_t lines = ntohl(incoming.lines);
-
-                // Apply incoming garbage
-                if (target_id == gamestate_player.player_id && lines > 0)
-                {
-                    gamestate_player.pending_garbage += lines;
-                    gamestate_player.last_attacker_id = source_id;
-                    addKillFeed(source_id, target_id, lines);
-                }
+                // Kill feed is driven through the event bus
+                event_bus_trigger(EVENT_ATTACK_GENERATED, &incoming);
             }
         }
 
-        // Refresh internal variables
-        updateGameTimers(&gamestate_player);
-
-        // Render the boards
+        // Render whatever the server last told us
         drawBoard(&gamestate_player);
 
         // Delay frames to be visible to the human eye

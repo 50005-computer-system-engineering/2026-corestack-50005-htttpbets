@@ -119,3 +119,43 @@ int tickGame(GameState *state)
     // Return lines cleared this turn
     return cleared;
 }
+// Advances gravity and lock delay by exactly one tick
+bool updateTimers(GameState *state)
+{
+    // Track current gravity of piece for lock delay
+    int current_gravity = GRAVITY_THRESHOLD_START - ((state->level - 1) * 5);
+    if (current_gravity < 5)
+    {
+        current_gravity = 5; // Failsafe
+    }
+
+    // Gravity + Lock Delay
+    bool is_resting = !isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1);
+    if (is_resting)
+    {
+        // Lock Timer
+        state->lock_timer++;
+        if (state->lock_timer >= LOCK_THRESHOLD_START)
+        {
+            tickGame(state);
+            // Reset env variables
+            state->lock_timer = 0;
+            state->gravity_timer = 0;
+            return true; // Piece locked, board definitely changed
+        }
+    }
+    else
+    {
+        // Gravity Timer
+        state->lock_timer = 0;
+        state->gravity_timer++;
+        if (state->gravity_timer >= current_gravity)
+        {
+            tickGame(state);
+            state->gravity_timer = 0;
+            return true; // Piece fell one row
+        }
+    }
+
+    return false; // Nothing visible happened this tick
+}

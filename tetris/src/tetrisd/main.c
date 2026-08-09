@@ -6,9 +6,11 @@
 #include <arpa/inet.h>
 #include <sys/select.h>
 #include "lib/libbattleroyale/server.h"
-#include "tetrisu/events.h"
+#include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libtetrisbrain/garbage.h"
+#include "game.h"
 
-// MAX_LOBBY_SIZE defined in events.h
+// MAX_LOBBY_SIZE defined in protocol.h
 #define MIN_LOBBY_SIZE 2
 
 // Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
@@ -28,6 +30,9 @@ static bool enterPressed(void)
 
 int main(void)
 {
+    // Line-buffered so logs survive being piped to a file
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     // Initialize server connection
     BRServer *server = NULL;
     if (brserver_init(&server) < 0) // Failed
@@ -90,17 +95,13 @@ int main(void)
     {
         // Populate roster via RosterPayload
         RosterPayload roster = {0};
-        roster.count = htonl(lobbySize); // Total number of players
+        roster.count = lobbySize; // Total number of players
         for (uint32_t i = 0; i < lobbySize && i < MAX_LOBBY_SIZE; i++)
         {
-            roster.ids[i] = htonl(clientIds[i]); // Add dynamically to array
+            roster.ids[i] = clientIds[i]; // Add dynamically to array
         }
         unsigned char roster_buffer[512] = {0}; // Empty buffer
-        uint32_t tag = htonl(PACKET_ROSTER);    // Identify action once recieved
-
-        // Copy RosterPayload and prep to send via broadcast
-        memcpy(roster_buffer, &tag, sizeof(tag));
-        memcpy(roster_buffer + sizeof(tag), &roster, sizeof(RosterPayload));
+        packRoster(roster_buffer, &roster);     // Handles tag and byte order
 
         // TODO: Send setup data (explicitly uses TCP here) -> supposed to but causing deadlock so set to UDP
         if (brserver_send_broadcast(server, roster_buffer) < 0)
@@ -113,82 +114,111 @@ int main(void)
         }
     }
 
-    // Per-player garbage accumulator based on player IDs
-    // lookup table to mark which IDs are connected
-    // player - 0 is for the server, not a valid target
-    uint32_t maxId = 0;
-    for (uint32_t i = 0; i < lobbySize; i++)
-    {
-        if (clientIds[i] > maxId)
-        {
-            maxId = clientIds[i];
-        }
-    }
-
-    // Validate all players -> calloc sets all elements to false (0) by default
-    bool *isValidPlayer = calloc(maxId + 1, sizeof(bool)); // To check if target player ID is connected
-    if (isValidPlayer == NULL)                             // Failed
-    {
-        printf("[tetrisd] Failed to validate player!\n");
-        return -1;
-    }
-    for (uint32_t i = 0; i < lobbySize; i++)
-    {
-        isValidPlayer[clientIds[i]] = true; // Mark connected player IDs as valid to ensure we only route attacks to real players
-    }
+    // Build the authoritative match, one real GameState per connected player
+    // From here the server owns the boards, clients only render copies of them
+    GameSession session;
+    initSession(&session, clientIds, lobbySize);
+    printf("[tetrisd] Authoritative session started for %d player(s).\n", session.count);
 
     // Array buffer for message queue
     unsigned char buffer[512] = {0};
 
-    // Continuous listening loop; non-blocking
+    // Authoritative tick loop; non-blocking
     while (1)
     {
-        // Read message from message queue
-        if (brserver_get_app_msg(buffer) == 1)
+        /* --- Drain whatever the clients sent since the last tick --- */
+        // Bounded so a flood of packets can never starve the simulation below
+        for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++)
         {
-            // Extract 4-byte tag to identify action
-            uint32_t tag;
-            memcpy(&tag, buffer, sizeof(tag));
-            tag = ntohl(tag);
-
-            if (tag != PACKET_ATTACK)
+            if (brserver_get_app_msg(buffer) != 1)
             {
-                continue; // Ignore (should not happen)
+                break; // Queue is empty
             }
 
-            // Cast the raw byte buffer back into our struct
-            AttackPayload incoming;
-            memcpy(&incoming, buffer + sizeof(tag), sizeof(AttackPayload));
+            uint32_t tag = readPacketTag(buffer);
 
-            // Convert the network bytes back to readable integers
-            uint32_t real_source = ntohl(incoming.source_player);
-            uint32_t real_target = ntohl(incoming.target_player);
-            uint32_t real_lines = ntohl(incoming.lines);
-
-            // Logging
-            printf(" <!> EVENT ROUTED: (In-Game P%u) attacked P%u with %u lines!\n", real_source, real_target, real_lines);
-
-            // Validates that target player ID exists and actively connected
-            if (real_target <= maxId && isValidPlayer[real_target])
+            if (tag == PACKET_INPUT)
             {
-                // Prepare out buffer
-                unsigned char out_buffer[512] = {0};
-                memcpy(out_buffer, buffer, sizeof(tag) + sizeof(AttackPayload)); // Inclusive of the tag
+                InputPayload input;
+                unpackInput(buffer, &input);
 
-                // Send the payload via UDP broadcast to all clients
-                // Clients will be responsible for parsing the payload and checking if they are the target
-                brserver_send_broadcast(server, out_buffer);
-
-                // Logging
-                printf("-> [Server] Broadcasted %u garbage lines to Target P%u\n\n", real_lines, real_target);
+                // Perform the requested action on that player's real board
+                PlayerSlot *slot = findPlayer(&session, input.player_id);
+                applyAction(&session, slot, (PlayerAction)input.action);
             }
+            // Any other tag is ignored
         }
-        usleep(100000); // Poll every 100ms
+
+        /* --- Advance every board by one tick --- */
+        tickSession(&session);
+
+        /* --- Route any garbage the tick produced --- */
+        for (int i = 0; i < session.count; i++)
+        {
+            PlayerSlot *attacker = &session.players[i];
+
+            if (attacker->state.outgoing_garbage == 0)
+            {
+                continue;
+            }
+
+            uint32_t lines = attacker->state.outgoing_garbage;
+            attacker->state.outgoing_garbage = 0; // Consumed
+
+            // Resolve the victim using the server's roster
+            uint32_t victim_id = resolveTargetID(&attacker->state, &session.roster);
+            PlayerSlot *victim = findPlayer(&session, victim_id);
+
+            if (victim == NULL || victim == attacker || victim->state.game_over)
+            {
+                continue; // No valid target, damage is dropped
+            }
+
+            addGarbage(&victim->state, (int)lines);
+            victim->state.last_attacker_id = attacker->player_id;
+            victim->dirty = true; // Their board changed, push it
+
+            printf(" <!> EVENT ROUTED: P%u attacked P%u with %u lines!\n", attacker->player_id, victim_id, lines);
+
+            // Broadcast the attack itself so every client's kill feed updates
+            AttackPayload feed = {
+                .source_player = attacker->player_id,
+                .target_player = victim_id,
+                .lines = lines};
+
+            unsigned char feed_buffer[512] = {0};
+            packAttack(feed_buffer, &feed);
+            brserver_send_broadcast(server, feed_buffer);
+        }
+
+        /* --- Push state to anyone whose board changed --- */
+        // Send-on-change keeps traffic low, the keepalive repairs dropped UDP packets
+        for (int i = 0; i < session.count; i++)
+        {
+            PlayerSlot *slot = &session.players[i];
+
+            if (!slot->dirty && slot->idle_ticks < KEEPALIVE_TICKS)
+            {
+                slot->idle_ticks++;
+                continue; // Nothing new to say about this player yet
+            }
+
+            StatePayload snapshot;
+            buildStatePayload(&slot->state, &snapshot);
+
+            unsigned char state_buffer[512] = {0};
+            packState(state_buffer, &snapshot);
+            brserver_send_broadcast(server, state_buffer);
+
+            slot->dirty = false;
+            slot->idle_ticks = 0;
+        }
+
+        usleep(TICK_MICROSECONDS); // Advance at a fixed rate
     }
 
     // Clean up
     brserver_end(server);
-    free(isValidPlayer);
     printf("[tetrisd] Client disconnected or error occurred. Shutting down.\n");
     return 0;
 }
