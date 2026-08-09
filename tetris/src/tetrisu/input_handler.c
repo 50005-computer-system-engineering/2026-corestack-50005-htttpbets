@@ -11,6 +11,9 @@
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/movement.h"
 
+// Populated from server's PACKET_ROSTER broadcast
+extern Roster lobby;
+
 // Process all pending terminal inputs
 void processInputs(GameState *state)
 {
@@ -20,7 +23,7 @@ void processInputs(GameState *state)
         // Call getchar() wrapper
         int key = getchar();
 
-        // Player 2 keybinds
+        // Player keybinds
         // Linux arrow keys send 3 characters instantly => escape (27), '[', and a letter
         if (key == 27) // Escape or arrow key?
         {
@@ -73,9 +76,7 @@ void processInputs(GameState *state)
         else if (key == 'r' || key == 'R') // Change target ID
         {
             // Manually swap target directly
-            // TODO: MANUAL PATCH FIX, NEED TO CHANGE !!
-            GameState *localLobby[] = {state};
-            cycleManualTarget(state, localLobby, 1);
+            cycleManualTarget(state, &lobby);
         }
         else if (key == ' ') // Spacebar (hard drop)
         {
@@ -84,20 +85,22 @@ void processInputs(GameState *state)
             tickGame(state);
             if (state->outgoing_garbage > 0)
             {
-                // TODO: MANUAL PATCH FIX, NEED TO CHANGE !!
                 // Find target player
-                GameState *localLobby[] = {state};
-                uint32_t current_victim = resolveTargetID(state, localLobby, 1);
-                // Pack the payload
-                AttackPayload payload =
-                    {
-                        .source_player = state->player_id,
-                        .target_player = current_victim,
-                        .lines = state->outgoing_garbage};
-                // Trigger Event Bus
-                event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
+                uint32_t target_victim = resolveTargetID(state, &lobby);
+                if (target_victim != 0 && target_victim != state->player_id) // Only send when target victim is known
+                {
+                    // Pack the payload
+                    AttackPayload payload =
+                        {
+                            .source_player = state->player_id,
+                            .target_player = target_victim,
+                            .lines = state->outgoing_garbage};
+                    // Trigger Event Bus
+                    event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
+                }
                 state->outgoing_garbage = 0; // Reset after sending
             }
+            // Reset env variables
             state->gravity_timer = 0;
             state->lock_timer = 0;
         }

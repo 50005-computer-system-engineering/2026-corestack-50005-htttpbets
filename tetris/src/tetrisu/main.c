@@ -20,10 +20,12 @@
 
 // Networking purposes
 #define LOCAL_HOST "127.0.0.1"
-#define LOBBY_SIZE 2
 
 // Global network client
 BRClient *network_client = NULL;
+
+// Populate lobby from server's PACKET_ROSTER broadcast at game start
+Roster lobby = {0};
 
 // Process gravity and lock delay intervals
 static void updateGameTimers(GameState *state)
@@ -47,14 +49,19 @@ static void updateGameTimers(GameState *state)
             tickGame(state);
             if (state->outgoing_garbage > 0)
             {
-                // Pack the payload dynamically
-                AttackPayload payload =
-                    {
-                        .source_player = state->player_id,
-                        .target_player = state->target_player_id,
-                        .lines = state->outgoing_garbage};
-                // Trigger Event Bus
-                event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
+                // Find target player
+                uint32_t target_victim = resolveTargetID(state, &lobby);
+                if (target_victim != 0 && target_victim != state->player_id)
+                {
+                    // Pack the payload dynamically
+                    AttackPayload payload =
+                        {
+                            .source_player = state->player_id,
+                            .target_player = target_victim,
+                            .lines = state->outgoing_garbage};
+                    // Trigger Event Bus
+                    event_bus_trigger(EVENT_ATTACK_GENERATED, &payload);
+                }
                 state->outgoing_garbage = 0; // Reset after sending
             }
             // Reset env variables
@@ -118,9 +125,10 @@ int main(void)
         printf("[tetrisu] Failed to retrieve player ID from server.\n");
         gamestate_player.game_over = true; // Bail out cleanly rather than run with an uninitialized ID
     }
-    gamestate_player.target_player_id = (gamestate_player.player_id % LOBBY_SIZE) + 1; // Starting player target -> ring routing to strictly target next numerical player ID
-    gamestate_player.held_type = 0;                                                    // Initialize hold box
-    gamestate_player.has_held = false;                                                 // Clear flag for hold box
+    gamestate_player.target_player_id = 0; // Set as unknown until populated afterwards
+    gamestate_player.last_attacker_id = 0; // Set as unknown until populated afterwards
+    gamestate_player.held_type = 0;        // Initialize hold box
+    gamestate_player.has_held = false;     // Clear flag for hold box
 
     // Event Bus setup
     event_bus_init(EVENT_COUNT);
@@ -137,20 +145,58 @@ int main(void)
 
         if (brclient_get_app_msg(net_buffer) == 1)
         {
-            // Cast the raw byte buffer back into our struct
-            AttackPayload incoming;
-            memcpy(&incoming, net_buffer, sizeof(AttackPayload));
+            // Attach 4-byte tag to identify action
+            uint32_t tag;
+            memcpy(&tag, net_buffer, sizeof(tag));
+            tag = ntohl(tag);
 
-            // Convert the network bytes back to readable integers
-            uint32_t source_id = ntohl(incoming.source_player);
-            uint32_t target_id = ntohl(incoming.target_player);
-            uint32_t lines = ntohl(incoming.lines);
-
-            // Apply incoming garbage
-            if (target_id == gamestate_player.player_id && lines > 0)
+            if (tag == PACKET_ROSTER) // Server to populate who is in the lobby
             {
-                gamestate_player.pending_garbage += lines;
-                addKillFeed(source_id, target_id, lines);
+                RosterPayload incoming_roster;
+                memcpy(&incoming_roster, net_buffer + sizeof(tag), sizeof(RosterPayload));
+
+                lobby.count = (int)ntohl(incoming_roster.count);
+                if (lobby.count > MAX_LOBBY_PLAYERS)
+                {
+                    lobby.count = MAX_LOBBY_PLAYERS; // Failsafe (technically shouldn't happen)
+                }
+                for (int i = 0; i < lobby.count; i++)
+                {
+                    lobby.ids[i] = ntohl(incoming_roster.ids[i]);
+                    lobby.eliminated[i] = false; // Nobody is out yet at game start
+                }
+
+                // If no locked target, help to pick
+                if (gamestate_player.target_player_id == 0)
+                {
+                    for (int i = 0; i < lobby.count; i++)
+                    {
+                        if (lobby.ids[i] != gamestate_player.player_id)
+                        {
+                            gamestate_player.target_player_id = lobby.ids[i];
+                            break;
+                        }
+                    }
+                }
+            }
+            else if (tag == PACKET_ATTACK) // Receiving garbage from opponent
+            {
+                // Cast the raw byte buffer back into our struct
+                AttackPayload incoming;
+                memcpy(&incoming, net_buffer + sizeof(tag), sizeof(AttackPayload));
+
+                // Convert the network bytes back to readable integers
+                uint32_t source_id = ntohl(incoming.source_player);
+                uint32_t target_id = ntohl(incoming.target_player);
+                uint32_t lines = ntohl(incoming.lines);
+
+                // Apply incoming garbage
+                if (target_id == gamestate_player.player_id && lines > 0)
+                {
+                    gamestate_player.pending_garbage += lines;
+                    gamestate_player.last_attacker_id = source_id;
+                    addKillFeed(source_id, target_id, lines);
+                }
             }
         }
 

@@ -6,7 +6,7 @@
 #include "lib/libtetrisbrain/killfeed.h"
 #include "lib/libbattleroyale/client.h"
 
-// Instantiate libhtttp
+// Instantiate network client
 extern BRClient *network_client;
 
 // Network Routing
@@ -29,8 +29,11 @@ void on_attack_generated(void *args)
 
         // Package into the buffer
         unsigned char buffer[512] = {0};
+        // Add tag to signify attack
+        uint32_t tag = htonl(PACKET_ATTACK);
         // Copy into the buffer
-        memcpy(buffer, &net_payload, sizeof(AttackPayload));
+        memcpy(buffer, &tag, sizeof(tag));
+        memcpy(buffer + sizeof(tag), &net_payload, sizeof(AttackPayload));
 
         // Send message
         brclient_send_msg(network_client, buffer);

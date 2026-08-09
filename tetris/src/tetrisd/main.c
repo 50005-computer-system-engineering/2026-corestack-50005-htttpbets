@@ -4,10 +4,27 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 #include "lib/libbattleroyale/server.h"
 #include "tetrisu/events.h"
 
-#define LOBBY_SIZE 2
+// MAX_LOBBY_SIZE defined in events.h
+#define MIN_LOBBY_SIZE 2
+
+// Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
+static bool enterPressed(void)
+{
+    fd_set fds;
+    struct timeval tv = {0, 0};
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0)
+    {
+        int c = getchar();
+        return c == '\n';
+    }
+    return false;
+}
 
 int main(void)
 {
@@ -29,23 +46,29 @@ int main(void)
 
     // Pre-allocation for clients
     uint32_t lobbySize = 0;
-    uint32_t clientIds[16] = {0};
+    uint32_t clientIds[MAX_LOBBY_SIZE] = {0};
 
     // Wait dynamically for lobby to fill
-    printf("[tetrisd] Lobby created successfully! %u player(s) connected:\n", lobbySize);
-    printf("[tetrisd] Waiting for %u connections...\n", LOBBY_SIZE);
-    while (lobbySize < LOBBY_SIZE)
+    printf("[tetrisd] Lobby open! Need at least %d player(s).\n", MIN_LOBBY_SIZE);
+    printf("[tetrisd] Press ENTER at any time once ready to start the game.\n");
+    while (1)
     {
         brserver_client_info(server, &lobbySize, clientIds);
+        printf("\r[tetrisd] %u player(s) connected...\n", lobbySize);
+        fflush(stdout);
+
+        if (lobbySize >= MIN_LOBBY_SIZE && enterPressed())
+        {
+            printf("\n[tetrisd] Starting game with %u players!\n", lobbySize);
+            break;
+        }
+        if (lobbySize >= MAX_LOBBY_SIZE)
+        {
+            printf("\n[tetrisd] Lobby full (%u), starting automatically.\n", lobbySize);
+            break;
+        }
         usleep(100000); // Poll every 100ms
     }
-
-    // Print all layers for tracking purposes -> TO REMOVE AFTERWARDS
-    for (uint32_t i = 0; i < lobbySize; i++)
-    {
-        printf(" P%u", clientIds[i]);
-    }
-    printf("\n");
 
     // Once lobby is full
     printf("[tetrisd] Lobby filled! %u player(s) connected:", lobbySize);
@@ -62,6 +85,33 @@ int main(void)
         return -1;
     }
     printf("[tetrisd] Server is now in GAME state. Awaiting events...\n");
+
+    // Tell every client the players in the lobby
+    {
+        // Populate roster via RosterPayload
+        RosterPayload roster = {0};
+        roster.count = htonl(lobbySize); // Total number of players
+        for (uint32_t i = 0; i < lobbySize && i < MAX_LOBBY_SIZE; i++)
+        {
+            roster.ids[i] = htonl(clientIds[i]); // Add dynamically to array
+        }
+        unsigned char roster_buffer[512] = {0}; // Empty buffer
+        uint32_t tag = htonl(PACKET_ROSTER);    // Identify action once recieved
+
+        // Copy RosterPayload and prep to send via broadcast
+        memcpy(roster_buffer, &tag, sizeof(tag));
+        memcpy(roster_buffer + sizeof(tag), &roster, sizeof(RosterPayload));
+
+        // TODO: Send setup data (explicitly uses TCP here) -> supposed to but causing deadlock so set to UDP
+        if (brserver_send_broadcast(server, roster_buffer) < 0)
+        {
+            printf("[tetrisd] Warning: failed to broadcast player roster.\n");
+        }
+        else
+        {
+            printf("[tetrisd] Roster broadcast to all %u players.\n", lobbySize);
+        }
+    }
 
     // Per-player garbage accumulator based on player IDs
     // lookup table to mark which IDs are connected
@@ -90,15 +140,25 @@ int main(void)
     // Array buffer for message queue
     unsigned char buffer[512] = {0};
 
-    // Continuous listening loop; blocking
+    // Continuous listening loop; non-blocking
     while (1)
     {
         // Read message from message queue
         if (brserver_get_app_msg(buffer) == 1)
         {
+            // Extract 4-byte tag to identify action
+            uint32_t tag;
+            memcpy(&tag, buffer, sizeof(tag));
+            tag = ntohl(tag);
+
+            if (tag != PACKET_ATTACK)
+            {
+                continue; // Ignore (should not happen)
+            }
+
             // Cast the raw byte buffer back into our struct
             AttackPayload incoming;
-            memcpy(&incoming, buffer, sizeof(AttackPayload));
+            memcpy(&incoming, buffer + sizeof(tag), sizeof(AttackPayload));
 
             // Convert the network bytes back to readable integers
             uint32_t real_source = ntohl(incoming.source_player);
@@ -113,9 +173,7 @@ int main(void)
             {
                 // Prepare out buffer
                 unsigned char out_buffer[512] = {0};
-
-                // Add into buffer
-                memcpy(out_buffer, &incoming, sizeof(AttackPayload));
+                memcpy(out_buffer, buffer, sizeof(tag) + sizeof(AttackPayload)); // Inclusive of the tag
 
                 // Send the payload via UDP broadcast to all clients
                 // Clients will be responsible for parsing the payload and checking if they are the target
@@ -125,6 +183,7 @@ int main(void)
                 printf("-> [Server] Broadcasted %u garbage lines to Target P%u\n\n", real_lines, real_target);
             }
         }
+        usleep(100000); // Poll every 100ms
     }
 
     // Clean up

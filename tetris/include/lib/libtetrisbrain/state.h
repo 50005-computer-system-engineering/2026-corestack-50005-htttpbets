@@ -35,6 +35,7 @@ typedef struct
     bool last_action_rotation;
     uint32_t pending_garbage;
     uint32_t outgoing_garbage;
+    uint32_t last_attacker_id;
     int score;
     int lines_cleared;
     int combo;
