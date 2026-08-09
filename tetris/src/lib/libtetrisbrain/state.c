@@ -20,6 +20,7 @@ void startGame(GameState *state)
     // Reset game variables
     state->held_type = 0;
     state->t_spins = 0;
+    state->tetrises = 0;
     state->last_action_rotation = false;
     state->score = 0;
     state->game_over = 0;

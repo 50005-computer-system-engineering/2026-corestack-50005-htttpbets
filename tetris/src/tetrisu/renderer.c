@@ -168,7 +168,7 @@ void drawBoard(GameState *state)
     //Header & Primary Game Stats
     printf("<!>====================<!>\n");
     printf(" Lvl: %-2d   Score: %-5d\n", state->level, state->score);
-    printf(" Lines: %-3d  T-Spins: %-2d\n", state->lines_cleared, state->t_spins);
+    printf(" Lines: %-3d  T-Spins: %-2d  Tetrises: %-2d\n", state->lines_cleared, state->t_spins, state->tetrises);
     // Combo & B2B Indicators
     printf(" Status: ");
     // B2B Indicator

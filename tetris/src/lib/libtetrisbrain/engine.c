@@ -77,6 +77,10 @@ int tickGame(GameState *state)
     lockPiece(state);                // Bake into the board grid
     state->pieces_placed++;          // Increment coutner
     int cleared = clearLines(state); // Clear full rows and store amount in counter
+    if (cleared == 4)
+    {
+        state->tetrises++; // Increment counter
+    }
 
     // Dealing with Garbage
     int damage = calculateGarbage(state, cleared, tspin); // Number of garbage lines generated in total for this turn
