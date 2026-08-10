@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "dict.h"
+#include "utils/logger.h"
 
 // buffer constants
 #define HT_MAX_SIZE 512
@@ -16,15 +17,10 @@
 
 // HyperText structs
 typedef unsigned char HyperText[HT_MAX_SIZE];
-typedef struct {
-    unsigned char *version;
-    unsigned char *req_method;
-    unsigned char *req_path;
-    struct Dictionary *headers;
-    struct Dictionary *body;
-} ParsedHT;
 
 // functions
-ParsedHT parse_hypertext(const HyperText ht);
+int helper_counter(unsigned char *s, unsigned char *sep);
+int count_headers(unsigned char *s);
+struct Dictionary *parse_hypertext_headers(char *headers_tok);
 
 #endif

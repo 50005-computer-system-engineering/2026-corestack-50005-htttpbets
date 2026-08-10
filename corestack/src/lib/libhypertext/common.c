@@ -1,5 +1,4 @@
 #include "common.h"
-#include "utils/logger.h"
 
 int helper_counter(unsigned char *s, unsigned char *sep)
 {
@@ -48,87 +47,33 @@ int count_body_members(unsigned char *s)
 }
 
 /*
-Function parses raw HyperText from a message
-Returns a ParsedHT struct
-If invalid HyperText, all members will be NULL
+Function parses header section passed as parameter and returns a dictionary pointer
+Used as helper in parse_hypertext_request and parse_hypertext_response
 */
-ParsedHT parse_hypertext(const HyperText ht)
+struct Dictionary *parse_hypertext_headers(char *headers_tok)
 {
-    // parse by sections
-    ParsedHT parser_result;
-    char *sect_tok;
-    char *part_tok;
-
-    // part 1: method, path, version
-    sect_tok = strtok(ht, END_SECT);
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok == NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.req_method = part_tok;
-    }
- 
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok != NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.req_path = part_tok;
-    }
-
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok != NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.version = part_tok;
-    }
-
-    // part 2: headers
-    sect_tok = strtok(ht, END_SECT);
     char *field;
     char *value;
-    int n_headers = count_headers(sect_tok);
-    parser_result.headers = dict_init(n_headers);
-    part_tok = strtok(sect_tok, END_LINE);
+    int n_headers = count_headers(headers_tok);
+    struct Dictionary *parsed_headers = dict_init(n_headers);
+    char *part_tok = strtok(headers_tok, END_LINE);
 
     for (int i; i<n_headers; i++)
     {
         field = strtok(part_tok, KEY_VAL_SEP);
         value = strtok(part_tok, KEY_VAL_SEP);
-        if (add_key_value_pair(parser_result.headers, field, value, i) < 0)
+        if (add_key_value_pair(parsed_headers, field, value, i) < 0)
         {
-            LOG_E("[parse_hypertext()] could not write parsed headers");
-            goto bad_hypertext;
+            LOG_E("[parse_hypertext_headers()] could not write parsed headers");
+            return NULL;
         }
+        part_tok = strtok(headers_tok, END_LINE);
     }
+
     field = NULL;
     value = NULL;
 
-    // part 3: body
-    sect_tok = strtok(ht, END_SECT);
-    char *member;
-    int n_members = count_body_members(sect_tok);
-    parser_result.body = dict_init(n_members);
-    part_tok = strtok(sect_tok, BODY_SEP);
+    LOG_I("[parse_hypertext_headers()] finished parsing and returning dictionary with %d headers", parsed_headers->n_items);
 
-    for (int i; i<n_members; i++)
-    {
-        member = strtok(part_tok, KEY_VAL_SEP);
-        field = strtok(part_tok, KEY_VAL_SEP);
-        if (add_key_value_pair(parser_result.headers, member, value, i) < 0)
-        {
-            LOG_E("[parse_hypertext()] could not write parsed body");
-            goto bad_hypertext;
-        }
-    }
-    member = NULL;
-    value = NULL;
-
-    LOG_I("[parse_hypertext()] successfully parsed a message");
-
-    return parser_result;
-
-    // returning error
-    bad_hypertext:
-    LOG_E("[parse_hypertext()] could not parse the hypertext message, bad format:\n=====BAD MESSAGE====\n%s\n=====BAD MESSAGE====", ht);
-    return (ParsedHT) {.version = NULL, .req_method = NULL, .req_path = NULL, .headers = NULL, .body = NULL};
+    return parsed_headers;
 }
