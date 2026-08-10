@@ -10,41 +10,32 @@ ParsedRequestHT parse_hypertext_req(const HyperText ht)
 {
     // parse by sections
     ParsedRequestHT parser_result;
-    char *sect_tok;
-    char *part_tok;
+    char *parser_ptr = ht;
+    
+    // section 1: request line
+    parser_result.req_method = parser_ptr;
+    parser_ptr = strstr(parser_ptr, " ");
+    *parser_ptr = "\0";
+    parser_ptr++;
+    parser_result.req_path = parser_ptr;
+    parser_ptr = strstr(parser_ptr, " ");
+    *parser_ptr = "\0";
+    parser_ptr++;
+    parser_result.version = parser_ptr;
+    parser_ptr = strstr(parser_ptr, END_SECT);
+    *parser_ptr = "\0";
+    parser_ptr += 2; // matches the sep length
 
-    // part 1: request line
-    sect_tok = strtok(ht, END_SECT);
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok == NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.req_method = part_tok;
-    }
- 
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok != NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.req_path = part_tok;
-    }
+    // section 2: headers
+    parser_result.headers = parse_hypertext_headers(&parser_ptr);
+    // parse_hypertext_headers will set the ptr to start of next section
 
-    part_tok = strtok(sect_tok, " ");
-    if (part_tok != NULL) goto bad_hypertext;
-    else
-    {
-        parser_result.version = part_tok;
-    }
+    // section 3: body
+    parser_result.body = parser_ptr;
 
-    // part 2: headers
-    sect_tok = strtok(ht, END_SECT);
-    parser_result.headers = parse_hypertext_headers(sect_tok);
+    parser_ptr = NULL;
 
-    // part 3: body
-    sect_tok = strtok(ht, END_SECT);
-    parser_result.body = sect_tok;
-
-    LOG_I("[parse_hypertext_req()] successfully parsed a request");
+    LOG_I("[parse_hypertext_res()] response parsed successfully");
 
     return parser_result;
 

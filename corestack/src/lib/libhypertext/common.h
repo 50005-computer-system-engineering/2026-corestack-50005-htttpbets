@@ -21,6 +21,6 @@ typedef unsigned char HyperText[HT_MAX_SIZE];
 // functions
 int helper_counter(unsigned char *s, unsigned char *sep);
 int count_headers(unsigned char *s);
-struct Dictionary *parse_hypertext_headers(char *headers_tok);
+struct Dictionary *parse_hypertext_headers(char **headers);
 
 #endif
