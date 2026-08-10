@@ -1,5 +1,4 @@
 #include "response.h"
-#include "common.h"
 
 /*
 Almost identacal to request, with different response line ordering instead
@@ -18,7 +17,7 @@ ParsedResponseHT parse_hypertext_res(const HyperText ht)
     parser_ptr = strstr(parser_ptr, " ");
     *parser_ptr = '\0';
     parser_ptr++;
-    parser_result.res_code = atoi(strdup(parser_ptr, sizeof(ResponseCodeHT)));  // converting to integer
+    *parser_result.res_code = atoi(strndup(parser_ptr, sizeof(ResponseCodeHT)));  // converting to integer
     parser_ptr = strstr(parser_ptr, " ");
     *parser_ptr = '\0';
     parser_ptr++;
