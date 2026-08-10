@@ -16,15 +16,15 @@ ParsedResponseHT parse_hypertext_res(const HyperText ht)
     // section 1: request line
     parser_result.version = parser_ptr;
     parser_ptr = strstr(parser_ptr, " ");
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr++;
     parser_result.res_code = atoi(strdup(parser_ptr, sizeof(ResponseCodeHT)));  // converting to integer
     parser_ptr = strstr(parser_ptr, " ");
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr++;
     parser_result.res_reason = parser_ptr;
     parser_ptr = strstr(parser_ptr, END_SECT);
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr += 2; // matches the sep length
 
     // section 2: headers
@@ -44,10 +44,4 @@ ParsedResponseHT parse_hypertext_res(const HyperText ht)
     bad_hypertext:
     LOG_E("[parse_hypertext_res()] could not parse the hypertext response, bad format:\n=====BAD RESPONSE====\n%s\n=====BAD RESPONSE====", ht);
     return (ParsedResponseHT) {.version = NULL, .res_code = NULL, .res_reason = NULL, .headers = NULL, .body = NULL};
-}
-
-
-HyperText form_hypertext_res(const int code, const struct Dictionary *headers, const unsigned char *body)
-{
-
 }

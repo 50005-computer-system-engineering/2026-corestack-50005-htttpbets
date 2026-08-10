@@ -15,15 +15,15 @@ ParsedRequestHT parse_hypertext_req(const HyperText ht)
     // section 1: request line
     parser_result.req_method = parser_ptr;
     parser_ptr = strstr(parser_ptr, " ");
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr++;
     parser_result.req_path = parser_ptr;
     parser_ptr = strstr(parser_ptr, " ");
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr++;
     parser_result.version = parser_ptr;
     parser_ptr = strstr(parser_ptr, END_SECT);
-    *parser_ptr = "\0";
+    *parser_ptr = '\0';
     parser_ptr += 2; // matches the sep length
 
     // section 2: headers
@@ -35,12 +35,12 @@ ParsedRequestHT parse_hypertext_req(const HyperText ht)
 
     parser_ptr = NULL;
 
-    LOG_I("[parse_hypertext_res()] response parsed successfully");
+    LOG_I("[parse_hypertext_req()] response parsed successfully");
 
     return parser_result;
 
     // returning error
     bad_hypertext:
-    LOG_E("[parse_hypertext()] could not parse the hypertext request, bad format:\n=====BAD REQUEST====\n%s\n=====BAD REQUEST====", ht);
+    LOG_E("[parse_hypertext_req()] could not parse the hypertext request, bad format:\n=====BAD REQUEST====\n%s\n=====BAD REQUEST====", ht);
     return (ParsedRequestHT) {.version = NULL, .req_method = NULL, .req_path = NULL, .headers = NULL, .body = NULL};
 }

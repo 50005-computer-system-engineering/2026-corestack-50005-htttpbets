@@ -65,7 +65,7 @@ struct Dictionary *parse_hypertext_headers(char **headers)
         *parser_ptr = '\0';
         parser_ptr += 2;
         value = parser_ptr;
-        parser_ptr = strstr(parser_prt, END_LINE);
+        parser_ptr = strstr(parser_ptr, END_LINE);
         *parser_ptr = '\0';
         parser_ptr += 2;
 
