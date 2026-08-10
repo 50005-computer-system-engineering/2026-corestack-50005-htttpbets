@@ -1,6 +1,10 @@
 #ifndef LIBHT_RES_H
 #define LIBHT_RES_H
 
+#include <stdlib.h>
+
+#include "common.h"
+
 typedef enum {
     LIB_ERROR = 0,
     HT_OK = 200,
@@ -23,7 +27,5 @@ typedef struct {
 } ParsedResponseHT;
 
 ParsedResponseHT parse_hypertext_res(const HyperText ht);
-
-HyperText form_hypertext_res(const ResponseCodeHT code, const struct Dictionary *headers, const unsigned char *body);
 
 #endif

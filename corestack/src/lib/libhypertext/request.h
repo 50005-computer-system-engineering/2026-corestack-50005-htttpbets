@@ -1,6 +1,8 @@
 #ifndef LIBHT_REQ_H
 #define LIBHT_REQ_H
 
+#include "common.h"
+
 typedef struct {
     unsigned char *version;
     unsigned char *req_method;
