@@ -1,7 +1,6 @@
 #ifndef LIBHT_REQ_H
 #define LIBHT_REQ_H
 
-
 typedef struct {
     unsigned char *version;
     unsigned char *req_method;

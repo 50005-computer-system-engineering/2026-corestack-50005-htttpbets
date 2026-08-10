@@ -44,12 +44,12 @@ ParsedRequestHT parse_hypertext_req(const HyperText ht)
     sect_tok = strtok(ht, END_SECT);
     parser_result.body = sect_tok;
 
-    LOG_I("[parse_hypertext()] successfully parsed a message");
+    LOG_I("[parse_hypertext_req()] successfully parsed a request");
 
     return parser_result;
 
     // returning error
     bad_hypertext:
-    LOG_E("[parse_hypertext()] could not parse the hypertext message, bad format:\n=====BAD MESSAGE====\n%s\n=====BAD MESSAGE====", ht);
+    LOG_E("[parse_hypertext()] could not parse the hypertext request, bad format:\n=====BAD REQUEST====\n%s\n=====BAD REQUEST====", ht);
     return (ParsedRequestHT) {.version = NULL, .req_method = NULL, .req_path = NULL, .headers = NULL, .body = NULL};
 }
