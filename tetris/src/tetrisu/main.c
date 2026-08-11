@@ -16,14 +16,24 @@
 #include "lib/libtetrisbrain/killfeed.h"
 #include "lib/libbattleroyale/client.h"
 
-// Networking purposes
-#define LOCAL_HOST "127.0.0.1"
+// How long to wait for the host to start the match before giving up (1 minutes)
+#define LOBBY_WAIT_TIMEOUT_MS (60 * 1000)
 
 // Global network client
 BRClient *network_client = NULL;
 
 // Populate lobby from server's PACKET_ROSTER broadcast at game start
 Roster lobby = {0};
+
+// Helper function to trim \n
+static void trim_newline(char *s)
+{
+    size_t len = strlen(s);
+    if (len > 0 && s[len - 1] == '\n')
+    {
+        s[len - 1] = '\0';
+    }
+}
 
 // --- MAIN GAME LOOP ---
 int main(void)
@@ -36,24 +46,76 @@ int main(void)
     fflush(stdout);
 
     // Network Client Initialization
-    if (brclient_init(&network_client) < 0) // Failed
+    char server_ip[INET_ADDRSTRLEN + 2] = {0}; // To store server IPV4 addr
+    while (true)
+    {
+        printf("Enter server IP (default 127.0.0.1): ");
+        fflush(stdout); // Prompt must abbear before we block on input
+        
+        // Get user input for server IPV4 address
+        if (fgets(server_ip, sizeof(server_ip), stdin) == NULL) // Failed
+        {
+            printf("[tetrisu] Input error.\n");
+            return -1;
+        }
+
+        // Oversized input leaves the rest of the line in stdin, throw it away so it cannot leak into the next prompt
+        if (strchr(server_ip, '\n') == NULL)
+        {
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF)
+            {
+                // Discard
+            }
+        }
+
+        trim_newline(server_ip); // Remove \n from input
+        if (server_ip[0] == '\0') // No input detected
+        {
+            strcpy(server_ip, "127.0.0.1"); // Set as local host
+            break;
+        }
+
+        struct in_addr addr;
+        if (inet_pton(AF_INET, server_ip, &addr) == 1) // Verify input if is actual IPV4 addr
+        {
+            break;
+        }
+        printf("[tetrisu] Invalid IP address '%s'. Please enter a valid IPv4 address.\n", server_ip); // Otherwise invalid input, prompt to retry
+    }
+
+    if (brclient_init(&network_client) < 0)
     {
         printf("[tetrisu] Failed to create network client.\n");
-        network_client = NULL;
+        return -1;
     }
-    else if (brclient_join(network_client, LOCAL_HOST) < 0)
+    else if (brclient_join(network_client, server_ip) < 0)
     {
-        printf("[tetrisu] Failed to join lobby.\n");
+        printf("[tetrisu] Failed to join lobby at %s.\n", server_ip);
+        printf("[tetrisu] Check the server is running and the IP is correct.\n");
         network_client = NULL;
     }
     else
     {
-        printf("[tetrisu] Connected to lobby successfully!");
+        printf("[tetrisu] Connected to lobby at %s successfully!\n", server_ip);
     }
 
+    // Wait for host to start the match
     // Allow time for server to reach LOBBY_SIZE and enter GAME state
     printf("[tetrisu] Waiting for lobby to fill and game to start...\n");
-    sleep(5);                            // Brief delay to read connection status
+    int waited_ms = 0;
+    while (brclient_get_state(network_client) != BRCLIENT_STATE_GAME) // Player is not in a game yet
+    {
+        usleep(100000); // Wait for 100ms before polling again
+        waited_ms += 100;
+
+        // To prevent client from hanging forever
+        if (waited_ms >= LOBBY_WAIT_TIMEOUT_MS)
+        {
+            printf("[tetrisu] Timed out after %d seconds waiting for the game to start.\n", LOBBY_WAIT_TIMEOUT_MS / 1000);
+            return -1;
+        }
+    }
     printf("[tetrisu] Game started!\n"); // Game start flag
 
     // Clear terminal screen

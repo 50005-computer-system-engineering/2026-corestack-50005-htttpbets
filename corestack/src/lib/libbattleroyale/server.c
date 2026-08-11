@@ -408,7 +408,7 @@ SERVER will start in IDLE state and await a state change triggered by user progr
 int brserver_init(BRServer **serverPtr)
 {
     // allocate memory for it
-    Server *newServer = malloc(sizeof(Server));
+    Server *newServer = calloc(1, sizeof(Server));
     if (newServer == NULL)
     {
         perror("server malloc");

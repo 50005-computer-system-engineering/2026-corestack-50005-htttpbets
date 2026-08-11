@@ -320,6 +320,18 @@ int brclient_join(BRClient *clientPtr, char *ipAddress)
     return 0;
 }
 
+// Client state getter
+int brclient_get_state(BRClient *clientPtr)
+{
+    if (clientPtr == NULL) // Check for valid client
+    {
+        LOG_E("[brclient_get_state()] no valid client");
+        return -1;
+    }
+    Endpoint *thisClient = clientPtr;
+    return thisClient->state;
+}
+
 // message functions
 int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
 {

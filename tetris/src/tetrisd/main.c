@@ -5,13 +5,16 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include "lib/libbattleroyale/server.h"
 #include "lib/libtetrisprotocol/protocol.h"
 #include "lib/libtetrisbrain/garbage.h"
 #include "game.h"
 
 // MAX_LOBBY_SIZE defined in protocol.h
-#define MIN_LOBBY_SIZE 2
+#define MIN_LOBBY_SIZE 1
 
 // Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
 static bool enterPressed(void)
@@ -35,7 +38,50 @@ int main(void)
 
     // Initialize server connection
     BRServer *server = NULL;
-    if (brserver_init(&server) < 0) // Failed
+
+    // Helper: select first non-loopback IPv4 address
+    char host_ip[INET_ADDRSTRLEN] = {0}; // Init to store potential IPV4 addr -> for display only!!
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == 0) // Queries and returns a linked list of all the network interfaces currently active
+    {
+        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) // Start at the first network interface, keep looping until reach end of chain
+        {
+            if (ifa->ifa_addr == NULL) // Active network interface but no IP addr
+            {
+                continue;
+            }
+            if (ifa->ifa_addr->sa_family != AF_INET) // Not IPV4 format
+            {
+                continue;
+            }
+            if (ifa->ifa_flags & IFF_LOOPBACK) // Skip loopback interface
+            {
+                continue;
+            }
+
+            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr; // Cast to sockaddr_in (IPV4) to process
+            if (inet_ntop(AF_INET, &sa->sin_addr, host_ip, INET_ADDRSTRLEN) != NULL) // Convert binary address into readable texts
+            {
+                break; // First candidate found
+            }
+        }
+        freeifaddrs(ifaddr); // To prevent memory leak
+    }
+
+    int init_res = brserver_init(&server); // Always bind to every interface, so both LAN And clients are reachable
+    // Tell the host which IPV4 addr to hand out to other players
+    if (host_ip[0] != '\0') // Valid IP addr found
+    {
+        printf("[tetrisd] Players on this network should enter: %s\n", host_ip);
+    }
+    else
+    {
+        // No IPV4 addr found, only local play is possible
+        printf("[tetrisd] No non-loopback IPv4 found, local play only (127.0.0.1).\n");
+    }
+    printf("[tetrisd] Players on this machine can use the default 127.0.0.1\n");
+
+    if (init_res < 0) // Failed
     {
         printf("[tetrisd] Could not create server!\n");
         return -1;
@@ -103,8 +149,8 @@ int main(void)
         unsigned char roster_buffer[512] = {0}; // Empty buffer
         packRoster(roster_buffer, &roster);     // Handles tag and byte order
 
-        // TODO: Send setup data (explicitly uses TCP here) -> supposed to but causing deadlock so set to UDP
-        if (brserver_send_broadcast(server, roster_buffer) < 0)
+        // Send setup data (explicitly uses TCP here)
+        if (brserver_send_to_all(server, roster_buffer) < 0)
         {
             printf("[tetrisd] Warning: failed to broadcast player roster.\n");
         }
