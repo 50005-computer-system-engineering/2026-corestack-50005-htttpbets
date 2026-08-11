@@ -71,3 +71,39 @@ bool is_legal_request(ParsedRequestHT *req)
     // checks complete, up to application to validate information and act
     return true;
 }
+
+/*
+Function parses a path and returns a dictionary
+*/
+struct Dictionary *parse_htttp_req_path(ParsedRequestHT *req)
+{
+    unsigned char *path = strdup(req->req_path);
+    int n_dir = 0;
+    unsigned char *ptr = path;
+    
+    // count directories
+    while (*ptr = '\0')
+    {
+        if (*ptr = '/') n_dir++;
+        ptr++;
+    }
+
+    // create an array
+    unsigned char *dir[n_dir];
+    char *path_tok = strtok(path, '/');
+    for (int i=0; i<n_dir; i++)
+    {
+        dir[i] = path_tok;
+        path_tok = strtok(NULL, '/');
+    }
+
+    // make dictionary
+    struct Dictionary *parsed_path = dict_init(n_dir / 2);
+    for (int i=0; i<n_dir; i+=2)
+    {
+        add_key_value_pair(parsed_path, dir[i], dir[i+1]; 
+    }
+
+    // return the new dictionary
+    return parsed_path;
+}
