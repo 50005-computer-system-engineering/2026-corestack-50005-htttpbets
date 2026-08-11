@@ -186,3 +186,18 @@ void tickSession(GameSession *session)
         }
     }
 }
+
+/* ----- MATCH END ----- */
+// A player counts as alive only while they are still connected AND not topped out
+int countAlivePlayers(const GameSession *session)
+{
+    int alive = 0;
+    for (int i = 0; i < session->count; i++)
+    {
+        if (session->players[i].active && !session->players[i].state.game_over)
+        {
+            alive++;
+        }
+    }
+    return alive;
+}

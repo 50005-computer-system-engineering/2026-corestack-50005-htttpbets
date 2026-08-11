@@ -93,7 +93,7 @@ int main(void)
     {
         printf("[tetrisu] Failed to join lobby at %s.\n", server_ip);
         printf("[tetrisu] Check the server is running and the IP is correct.\n");
-        network_client = NULL;
+        return -1;
     }
     else
     {
@@ -144,7 +144,7 @@ int main(void)
         // Read directly from message queue
         unsigned char net_buffer[512] = {0};
 
-        if (brclient_get_app_msg(net_buffer) == 1)
+        while (brclient_get_app_msg(net_buffer) == 1)
         {
             uint32_t tag = readPacketTag(net_buffer);
 
@@ -170,7 +170,7 @@ int main(void)
                 }
                 for (int i = 0; i < lobby.count; i++)
                 {
-                    lobby.ids[i] = ntohl(incoming_roster.ids[i]);
+                    lobby.ids[i] = incoming_roster.ids[i];
                     lobby.eliminated[i] = false; // Nobody is out yet at game start
                 }
             }
@@ -199,6 +199,7 @@ int main(void)
     printf("<!>       GAME OVER!       <!>\n");
     printf("<!> ====================== <!>\n");
     printf("\nPress any key to exit...\n");
+    fflush(stdout);
 
     while (!kbhit())
     {

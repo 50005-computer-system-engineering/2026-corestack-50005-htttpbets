@@ -49,4 +49,8 @@ void applyAction(GameSession *session, PlayerSlot *slot, PlayerAction action);
 // Advances gravity and lock delay for every active player by one tick
 void tickSession(GameSession *session);
 
+// Counts players who are still connected and not topped out
+// Drives the match end condition in tetrisd's main loop
+int countAlivePlayers(const GameSession *session);
+
 #endif
