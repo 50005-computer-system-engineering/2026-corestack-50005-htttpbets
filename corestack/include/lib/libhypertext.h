@@ -39,4 +39,9 @@ typedef struct {
 char *next_token(char *s, char *delim);
 int parse_hypertext(HyperText ht, ParsedMsgHT *parser_result);
 
+int req_init(ParsedMsgHT *new_req, const char *method, const char *path, const char *ver);
+int res_init(ParsedMsgHT *new_res, const char *ver, const char *code, const char *reason);
+int msg_add_header(ParsedMsgHT *msg, const char *field, const char *value);
+int msg_add_body(ParsedMsgHT *msg, const char *body);
+
 #endif
