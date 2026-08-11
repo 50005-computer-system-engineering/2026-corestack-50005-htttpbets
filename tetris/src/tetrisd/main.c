@@ -305,6 +305,7 @@ int main(void)
         }
 
         slot->state.game_over = true;
+        slot->state.winner_id = winner_id;
 
         StatePayload snapshot;
         buildStatePayload(&slot->state, &snapshot);

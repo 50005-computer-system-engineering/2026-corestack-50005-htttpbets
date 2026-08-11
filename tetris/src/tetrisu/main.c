@@ -198,6 +198,25 @@ int main(void)
     printf("<!> ====================== <!>\n");
     printf("<!>       GAME OVER!       <!>\n");
     printf("<!> ====================== <!>\n");
+
+    // Showcase Winner Segment
+    if (gamestate_player.winner_id != 0) // Winner has been decided
+    {
+        if (gamestate_player.winner_id == gamestate_player.player_id) // For player that is the winner
+        {
+            printf("\n*** CONGRATULATIONS! You won as P%u! ***\n", gamestate_player.winner_id);
+        }
+        else
+        {
+            // Everyone else
+            printf("\n*** Winner: P%u ***\n", gamestate_player.winner_id);
+        }
+    }
+    else
+    {
+        // Draw
+        printf("\n*** No survivors. Match ended with no winner. ***\n");
+    }
     printf("\nPress any key to exit...\n");
     fflush(stdout);
 
