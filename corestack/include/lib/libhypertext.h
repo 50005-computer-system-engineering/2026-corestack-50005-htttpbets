@@ -44,4 +44,6 @@ int res_init(ParsedMsgHT *new_res, const char *ver, const char *code, const char
 int msg_add_header(ParsedMsgHT *msg, const char *field, const char *value);
 int msg_add_body(ParsedMsgHT *msg, const char *body);
 
+int convert_to_hypertext(ParsedMsgHT *msg, HyperText converted_ht);
+
 #endif
