@@ -135,11 +135,10 @@ int res_init(ParsedMsgHT *new_res, const char *ver, const char *code, const char
     return msg_init(new_res, ver, code, reason);
 }
 
-const char *ILLEGAL_CHARS = "\r\n:";
-
 /*
 helper function which checks for illegal characters in a string
 */
+const char *ILLEGAL_CHARS = "\r\n:";
 bool has_illegal_chars(const char *s)
 {
     return strpbrk(s, ILLEGAL_CHARS) != NULL;
@@ -182,5 +181,35 @@ int msg_add_body(ParsedMsgHT *msg, const char *body)
     
     // assign
     msg->body = body;
+    return 0;
+}
+
+// conversion function
+int convert_to_hypertext(ParsedMsgHT *msg, HyperText converted_ht)
+{
+    // initalise to null bytes
+    memset(converted_ht, 0, MAX_BUF);
+
+    int offset = 0;
+    // request line
+    offset += snprintf(converted_ht+offset, MAX_BUF-offset, "%s %s %s\r\n", msg->token1, msg->token2, msg->token3);
+    
+    // headers
+    for (int i=0; i<msg->n_headers || offset<MAX_BUF; i++)
+    {
+        offset += snprintf(converted_ht+offset, MAX_BUF-offset, "%s: %s\r\n", msg->headers[i].field, msg->headers[i].value);
+    }
+
+    // body
+    offset += snprintf(converted_ht+offset, MAX_BUF-offset, "\r\n%s", msg->body);
+
+    // check if total length exceeds allowed buffer
+    if (offset > MAX_BUF)
+    {
+        LOG_E("[convert_to_hypertext()] msg is too long to be sent in a single message");
+        return -1;
+    }
+    
+    LOG_I("[convert_to_hypertext()] msg is %d long, ready for sending", offset);
     return 0;
 }
