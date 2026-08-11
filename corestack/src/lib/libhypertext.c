@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h> 
 #include <string.h> 
@@ -108,4 +109,78 @@ int parse_hypertext(HyperText ht, ParsedMsgHT *parser_result)
 
     fail:
     return -1;
+}
+
+// builder functions
+/*
+function initialises a ParsedMsgHT struct
+*/
+int msg_init(ParsedMsgHT *new_msg, const char *t1, const char *t2, const char *t3)
+{
+    // assign values;
+    new_msg->token1 = t1;
+    new_msg->token2 = t2;
+    new_msg->token3 = t3;
+
+    return 0;
+}
+
+int req_init(ParsedMsgHT *new_req, const char *method, const char *path, const char *ver)
+{
+    return msg_init(new_req, method, path, ver);
+}
+
+int res_init(ParsedMsgHT *new_res, const char *ver, const char *code, const char *reason)
+{
+    return msg_init(new_res, ver, code, reason);
+}
+
+const char *ILLEGAL_CHARS = "\r\n:";
+
+/*
+helper function which checks for illegal characters in a string
+*/
+bool has_illegal_chars(const char *s)
+{
+    return strpbrk(s, ILLEGAL_CHARS) != NULL;
+}
+
+/*
+Function adds header to the message if there are no illegal characters
+*/
+int msg_add_header(ParsedMsgHT *msg, const char *field, const char *value)
+{
+    // check for illegal characters
+    if (has_illegal_chars(field) || has_illegal_chars(value))
+    {
+        LOG_E("[msg_add_header()] field name or value has illegal characters");
+        return -1;
+    }
+    
+    // find index suitable for new header
+    int idx = msg->n_headers++;
+
+    // assign new header
+    msg->headers[idx].field = field;
+    msg->headers[idx].value = value;
+
+    LOG_I("[msg_add_header()] added new header {%s: %s}, now has %d headers", field, value, msg->n_headers);
+    return 0;
+}
+
+/*
+Function adds body to message if it does not drastically exceed the maximum buffer size
+*/
+int msg_add_body(ParsedMsgHT *msg, const char *body)
+{
+    // check if definitely too long
+    if (strlen(body) >= MAX_BUF)
+    {
+        LOG_E("[msg_add_body()] body passed well exceeds total message size");
+        return -1;
+    }
+    
+    // assign
+    msg->body = body;
+    return 0;
 }
