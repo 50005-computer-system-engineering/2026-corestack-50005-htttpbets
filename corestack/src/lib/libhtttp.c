@@ -84,24 +84,26 @@ struct Dictionary *parse_htttp_req_path(ParsedRequestHT *req)
     // count directories
     while (*ptr = '\0')
     {
-        if (*ptr = '/') n_dir++;
+        if (*ptr == "/") n_dir++;
         ptr++;
     }
 
     // create an array
     unsigned char *dir[n_dir];
-    char *path_tok = strtok(path, '/');
+    char *path_tok = strtok(path, "/");
     for (int i=0; i<n_dir; i++)
     {
         dir[i] = path_tok;
-        path_tok = strtok(NULL, '/');
+        path_tok = strtok(NULL, "/");
     }
 
     // make dictionary
     struct Dictionary *parsed_path = dict_init(n_dir / 2);
+    int index = 0;
     for (int i=0; i<n_dir; i+=2)
     {
-        add_key_value_pair(parsed_path, dir[i], dir[i+1]; 
+        add_key_value_pair(parsed_path, dir[i], dir[i+1], index);
+        index++; 
     }
 
     // return the new dictionary
