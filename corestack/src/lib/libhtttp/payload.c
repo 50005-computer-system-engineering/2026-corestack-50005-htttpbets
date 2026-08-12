@@ -14,7 +14,7 @@ void payload_decode_attack(const char *buffer, AttackPayload *payload)
 
 void payload_encode_roster(char *buffer, const RosterPayload *payload)
 {
-    int offset = sprintf(buffer, "{count: %u, ids: [ ", payload->count);
+    int offset = sprintf(buffer, "{count: %u, ids: [", payload->count);
     for (uint32_t i=0; i<payload->count; i++)
     {
         offset += sprintf(buffer+offset, "%u ", payload->ids[i]);
