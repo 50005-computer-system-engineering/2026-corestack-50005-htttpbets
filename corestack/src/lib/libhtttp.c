@@ -1,11 +1,23 @@
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h> 
 #include <string.h> 
 #include <strings.h>
+#include <time.h>
 
 #include "lib/libhtttp.h"
 #include "utils/logger.h"
+
+/*
+Function generates date
+*/
+void get_date_str(char *buf) {
+    time_t now = time(NULL);
+    struct tm tm_utc;
+    gmtime_r(&now, &tm_utc);
+    strftime(buf, 30, "%a, %d %b %Y %H:%M:%S GMT", &tm_utc);
+}
 
 /*
 Function finds the correct HTTTP method
