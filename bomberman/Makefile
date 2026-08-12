@@ -89,6 +89,8 @@ RAYLIB_VERSION := 6.0
 RAYLIB_URL     := https://github.com/raysan5/raylib/archive/refs/tags/$(RAYLIB_VERSION).tar.gz
 RAYLIB_LOCAL   := $(DEPS_DIR)/raylib-$(RAYLIB_VERSION)
 RAYLIB_STATIC  := $(RAYLIB_LOCAL)/src/libraylib.a
+RAYLIB_BINS := bombapp
+CFLAGS += $(RAYLIB_CFLAGS)
 
 # Platform-specific system libraries raylib depends on when linking statically.
 # (pkg-config --libs includes these automatically for system installs.)
@@ -194,9 +196,9 @@ define LIB_template =
 $(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c)
 $(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
              $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
-$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
+$(1)_CFLAGS := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
 
-$(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c
+$(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c | $$(RAYLIB_DEP)
 	@mkdir -p $$(dir $$@)
 	$(CC) $$($(1)_CFLAGS)  -c $$< -o $$@
 
@@ -215,9 +217,9 @@ $(foreach lib,$(LIB_NAMES),$(eval $(call LIB_template,$(lib))))
 # 2) Archive the single .o into .a
 # 3) Append built archive to running list of libraries to build
 define FLAT_LIB_template =
-$(OBJ_DIR)/$(1).o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1).c
+$(OBJ_DIR)/$(1).o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1).c | $$(RAYLIB_DEP)
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) -c $$< -o $$@
+	$(CC) $(CFLAGS) $(RAYLIB_CFLAGS) -c $$< -o $$@
 
 $(LIB_OUT)/$(1).a: $(OBJ_DIR)/$(1).o
 	@mkdir -p $(LIB_OUT)
@@ -331,14 +333,19 @@ INT_DIR   := $(TESTS_DIR)/integration
 UNITY_DIR := $(TESTS_DIR)/unity
 UNIT_BIN  := $(UNIT_DIR)/bin
 
+# New variables for the Fuzzer
+FUZZ_DIR  := $(TESTS_DIR)/fuzz
+FUZZ_BIN  := $(FUZZ_DIR)/bin
+
 UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
 UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
 
 # Tests never link raylib — test game logic through libbombbrain directly.
-TEST_CFLAGS  := $(CFLAGS) -I$(UNITY_DIR)
+TEST_CFLAGS  := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(UNITY_DIR)
 TEST_LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB) -lpthread
 TEST_LDLIBS  := $(LDLIBS)
 
+# --- Unit Tests ---
 $(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $(UNIT_BIN)
 	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
@@ -354,6 +361,7 @@ unit: $(UNIT_BINS)
 	echo "Unit tests: $$pass passed, $$fail failed"; \
 	test $$fail -eq 0
 
+# --- Integration Tests ---
 integration: all
 	@echo "==> Running bomberman integration tests"
 	@pass=0; fail=0; \
@@ -366,7 +374,20 @@ integration: all
 	echo "Integration tests: $$pass passed, $$fail failed"; \
 	test $$fail -eq 0
 
-test: unit integration
+
+# --- Fuzzing & Valgrind Memory Checks ---
+$(FUZZ_BIN)/fuzz_harness: $(FUZZ_DIR)/fuzz_harness.c | $(ALL_LIB_ARCHIVES)
+	@mkdir -p $(FUZZ_BIN)
+	$(CC) $(TEST_CFLAGS) $< -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS) $(RAYLIB_LDFLAGS)
+
+fuzz: $(FUZZ_BIN)/fuzz_harness
+	@echo "==> Executing State Consistency Fuzzer"
+	./$(FUZZ_BIN)/fuzz_harness
+	@echo "==> Executing Valgrind Memory Safety Profiler"
+	valgrind --leak-check=full --track-origins=yes ./$(FUZZ_BIN)/fuzz_harness
+
+# --- Master Test Target ---
+test: unit integration fuzz
 
 # ----------------------------------------------------------------------
 # Cleaning
@@ -377,6 +398,5 @@ clean:
 	rm -f $(TARGET)
 
 # Remove /deps and build artifacts
-distclean: 
-	clean clean-deps
+distclean: clean
 	rm -rf $(DEPS_DIR)
