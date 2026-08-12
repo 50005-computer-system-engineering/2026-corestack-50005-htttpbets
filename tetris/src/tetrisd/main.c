@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
@@ -11,10 +12,14 @@
 #include "lib/libbattleroyale/server.h"
 #include "lib/libtetrisprotocol/protocol.h"
 #include "lib/libtetrisbrain/garbage.h"
+#include "lib/libtetrislog/logclient.h"
 #include "game.h"
 
 // MAX_LOBBY_SIZE defined in protocol.h
 #define MIN_LOBBY_SIZE 1
+
+// Instantiate logger
+static LogClient logClient;
 
 // Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
 static bool enterPressed(void)
@@ -31,10 +36,28 @@ static bool enterPressed(void)
     return false;
 }
 
+static void logMessage(LogLevel level, const char *fmt, ...)
+{
+    char message[LOG_MSG_LENGTH];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+
+    printf("%s\n", message);                   // Unchanged terminal output
+    logClientPush(&logClient, level, message); // Forwarded, non-blocking, may be dropped
+}
+
 int main(void)
 {
     // Line-buffered so logs survive being piped to a file
     setvbuf(stdout, NULL, _IOLBF, 0);
+
+    // Setup Logger
+    if (!logClientInit(&logClient, LOG_DEFAULT_IPC_PATH, "tetrisd"))
+    {
+        printf("[tetrisd] Warning: could not set up logging client, continuing without it.\n");
+    }
 
     // Initialize server connection
     BRServer *server = NULL;
@@ -206,6 +229,7 @@ int main(void)
 
         /* --- Advance every board by one tick --- */
         tickSession(&session);
+        logClientDrain(&logClient, LOG_CLIENT_DRAIN_BATCH);
 
         /* --- Route any garbage the tick produced --- */
         for (int i = 0; i < session.count; i++)
@@ -314,6 +338,10 @@ int main(void)
         packState(state_buffer, &snapshot);
         brserver_send_broadcast(server, state_buffer);
     }
+
+    logMessage(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", logClientGetDroppedCount(&logClient));
+    logClientDrain(&logClient, LOG_CLIENT_DRAIN_BATCH); // Send that very last line too
+    logClientClose(&logClient);
 
     // Give the final broadcast a moment to land before tearing down the sockets
     usleep(500000); // 500ms

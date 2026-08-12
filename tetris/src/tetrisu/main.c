@@ -51,7 +51,7 @@ int main(void)
     {
         printf("Enter server IP (default 127.0.0.1): ");
         fflush(stdout); // Prompt must abbear before we block on input
-        
+
         // Get user input for server IPV4 address
         if (fgets(server_ip, sizeof(server_ip), stdin) == NULL) // Failed
         {
@@ -69,7 +69,7 @@ int main(void)
             }
         }
 
-        trim_newline(server_ip); // Remove \n from input
+        trim_newline(server_ip);  // Remove \n from input
         if (server_ip[0] == '\0') // No input detected
         {
             strcpy(server_ip, "127.0.0.1"); // Set as local host
@@ -163,7 +163,7 @@ int main(void)
                 RosterPayload incoming_roster;
                 unpackRoster(net_buffer, &incoming_roster);
 
-                lobby.count = (int)ntohl(incoming_roster.count);
+                lobby.count = incoming_roster.count;
                 if (lobby.count > MAX_LOBBY_PLAYERS)
                 {
                     lobby.count = MAX_LOBBY_PLAYERS; // Failsafe (technically shouldn't happen)

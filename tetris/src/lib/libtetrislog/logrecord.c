@@ -9,8 +9,8 @@
 // Sequence counter for tracking
 static uint32_t next_seq = 0;
 
-// Copies into a fixed char array and always terminates
-// Helper function in the event len of source > len of dest then no \0 added
+// Helper function that copies into a fixed char array and always terminates
+// In the event len of source > len of dest then no \0 added
 static void copyFixed(char *dest, const char *src, size_t dest_size)
 {
     if (src == NULL) // Invalid
@@ -19,10 +19,11 @@ static void copyFixed(char *dest, const char *src, size_t dest_size)
         return;
     }
     strncpy(dest, src, dest_size - 1); // Copy up to dest_size - 1
-    dest[dest_size - 1] = '\0'; // Add null terminator to prevent buffer over-reads later
+    dest[dest_size - 1] = '\0';        // Add null terminator
 }
 
 /* ----- PACK / UNPACK ----- */
+// Network Serialization
 void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record)
 {
     // Reset entire buffer before doing anything
@@ -35,7 +36,7 @@ void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record)
         htonl(record->level),
         htonl(record->pid),
         htonl(record->seq)};
-    
+
     // Copy into buffer using manual offset
     size_t offset = 0;
     memcpy(buffer + offset, fields, sizeof(fields));
@@ -45,6 +46,7 @@ void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record)
     memcpy(buffer + offset, record->message, LOG_MSG_LENGTH);
 }
 
+// Network Deserialization
 void unpackLogRecord(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord *record)
 {
     uint32_t fields[5]; // 5 fields to fill
@@ -65,6 +67,7 @@ void unpackLogRecord(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord *recor
     offset += LOG_SOURCE_LENGTH;
     memcpy(record->message, buffer + offset, LOG_MSG_LENGTH);
 
+    // Extract the specified strings
     // Force last byte to \0 to prevent crashes
     record->source[LOG_SOURCE_LENGTH - 1] = '\0';
     record->message[LOG_MSG_LENGTH - 1] = '\0';
@@ -76,7 +79,7 @@ void buildLogRecord(LogRecord *record, LogLevel level, const char *source, const
 {
     // Reset entire buffer before doing anything
     memset(record, 0, sizeof(LogRecord));
-    
+
     // CLOCK_REALTIME -> actual system clock; ts to store output
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -106,7 +109,7 @@ const char *logLevelName(LogLevel level)
     case LOG_LEVEL_ERROR:
         return "ERROR";
     default:
-        return "UNKNOWN";
+        return "UNKNOWN"; // Explicitly cannot return NULL pointer, so route to UNKNOWN
     }
 }
 
@@ -129,7 +132,7 @@ void formatLogLine(const LogRecord *record, char *out, size_t out_size)
         copyFixed(timestamp, "0000-00-00 00:00:00", sizeof(timestamp));
     }
 
-    // %-5s pads the level so the columns line up when grepping the file
+    // %-5s pads the level so the columns line up
     snprintf(out, out_size, "%s.%03u [%-5s] %s[%u] #%u %s\n",
              timestamp,
              record->time_msec,

@@ -13,9 +13,9 @@
 #include "lib/libtetrislog/logrecord.h"
 
 /* ----- CONFIG DEFAULTS ----- */
-#define DEFAULT_LOG_PATH "var/log/tetris.log"    // Path to store generated log files
-#define DEFAULT_LOG_IPC "var/run/tetrislog.sock" // IPC
-#define DEFAULT_RC_PATH "../.tetrishrc"          // TODO: replace with tetrish's real path once it exists
+#define DEFAULT_LOG_PATH "var/log/tetris.log" // Path to store generated log files
+#define DEFAULT_LOG_IPC LOG_DEFAULT_IPC_PATH  // IPC path, shared with logclient.c
+#define DEFAULT_RC_PATH "../.tetrishrc"       // TODO: replace with tetrish's real path once it exists
 
 // For reading the .tetrishrc file
 #define CONFIG_PATH_LENGTH 256
@@ -52,7 +52,7 @@ typedef struct
     bool seen; // False until this pid's first record arrives, so we don't treat "0" as a gap
 } SenderTracker;
 
-// Finds this pid's slot, creating one if this is the first record seen from it
+// Finds this pid's slot, create one if this is the first record seen from it
 static SenderTracker *findTracker(SenderTracker trackers[], int *count, uint32_t pid)
 {
     for (int i = 0; i < *count; i++)
@@ -102,7 +102,7 @@ static void loadConfig(const char *rc_path, char *log_path, size_t log_path_size
         // Replace any \r \n with \0
         line[strcspn(line, "\r\n")] = '\0';
 
-        // Manual split on '='
+        // Manual split on '=' -> splits into key and value without having to malloc
         char *eq = strchr(line, '=');
         if (eq == NULL) // Blank or malformed line, skip it
         {
@@ -149,9 +149,10 @@ static void loadConfig(const char *rc_path, char *log_path, size_t log_path_size
 }
 
 /* ----- PATH SETUP ----- */
-// Need to create the directories first if they don't exist if not fopen() and bind() would not work
+// Need to create the directories first; if they don't exist if not fopen() and bind() would not work
 static void ensureParentDirExists(const char *file_path)
 {
+    // Copies the path
     char path[CONFIG_PATH_LENGTH];
     strncpy(path, file_path, sizeof(path) - 1);
     path[sizeof(path) - 1] = '\0';
@@ -181,13 +182,14 @@ static void ensureParentDirExists(const char *file_path)
 /* ----- MAIN FUNCTION ----- */
 int main(int argc, char *argv[])
 {
-    // Line-buffered so console output stays in true chronological order when
-    // piped to a file or projected during a live demo
+    // Print line-by-line instantly, rather than buffering in large chunks
     setvbuf(stdout, NULL, _IOLBF, 0);
 
+    // Setting paths + their lengths
     char log_path[CONFIG_PATH_LENGTH];
     char log_ipc[CONFIG_PATH_LENGTH];
 
+    // Load the configuration desired
     loadConfig(DEFAULT_RC_PATH, log_path, sizeof(log_path), log_ipc, sizeof(log_ipc));
 
     // TO REMOVE: CLI flags override the config file, useful for testing without a .tetrishrc at all
@@ -205,8 +207,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    // sockaddr_un.sun_path has a small fixed size (108 bytes on Linux), a long
-    // path here would silently truncate inside bind() otherwise
+    // Kernel limit check -> limits socket paths to 108 bytes
+    // Preventing silent truncation of long paths
     struct sockaddr_un check_size;
     if (strlen(log_ipc) >= sizeof(check_size.sun_path))
     {
@@ -217,11 +219,10 @@ int main(int argc, char *argv[])
     printf("[tetrislogd] log_path=%s\n", log_path);
     printf("[tetrislogd] log_ipc=%s\n", log_ipc);
 
-    // Register signal handlers before opening anything, so a signal arriving
-    // during startup can't be missed
+    // Register the signals
     signal(SIGTERM, handleSigterm);
     signal(SIGHUP, handleSighup);
-    signal(SIGPIPE, SIG_IGN); // A dead peer must not kill us, matches tetrisd's own convention
+    signal(SIGPIPE, SIG_IGN); // Tells OS to not kill the daemon if client programs dies halfway while talking
 
     ensureParentDirExists(log_path);
     ensureParentDirExists(log_ipc);
@@ -230,7 +231,7 @@ int main(int argc, char *argv[])
     int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sock < 0)
     {
-        perror("[tetrislogd] socket");
+        perror("[tetrislogd] Socket unable to be created!");
         return 1;
     }
 
@@ -243,15 +244,16 @@ int main(int argc, char *argv[])
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
-        perror("[tetrislogd] bind");
+        perror("[tetrislogd] Binding failed!");
         close(sock);
         return 1;
     }
 
+    // Open file in append mode
     FILE *log_file = fopen(log_path, "a");
     if (log_file == NULL)
     {
-        perror("[tetrislogd] fopen log_path");
+        perror("[tetrislogd] Unable to open log file!");
         close(sock);
         unlink(log_ipc);
         return 1;
@@ -265,24 +267,25 @@ int main(int argc, char *argv[])
 
     printf("[tetrislogd] listening on %s, writing to %s\n", log_ipc, log_path);
 
+    // Main Event Loop
     while (running)
     {
-        // SIGHUP was requested by a signal handler, actually perform the reopen here
+        // SIGHUP was requested by a signal handler, reopen
         if (reopen_requested)
         {
             fclose(log_file);
             log_file = fopen(log_path, "a");
             if (log_file == NULL)
             {
-                perror("[tetrislogd] fopen on reopen");
-                break; // Cannot recover from this, exit rather than silently drop everything
+                perror("[tetrislogd] Logfile does not exist!");
+                break;
             }
             reopen_requested = 0;
             fprintf(stderr, "[tetrislogd] log file reopened on SIGHUP\n");
         }
 
-        // select() with a 1s timeout so the loop wakes up periodically even
-        // with no traffic, to check signal flags and print the summary line
+        // Async sleep with select() and 1s timeout
+        // Wakes up exactly when a log arrives, or after 1 second (whichever comes first)
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(sock, &fds);
@@ -295,15 +298,18 @@ int main(int argc, char *argv[])
             {
                 continue; // Interrupted by a signal, loop back around and recheck flags
             }
-            perror("[tetrislogd] select");
+            perror("[tetrislogd] Select interrupted!");
             break;
         }
 
+        // Reading and Writing
         if (activity > 0 && FD_ISSET(sock, &fds))
         {
+            // Read the raw bytes from the socket
             unsigned char buffer[LOG_WIRE_SIZE];
             ssize_t n = recvfrom(sock, buffer, sizeof(buffer), 0, NULL, NULL);
 
+            // Only take packets that are the correct size
             if (n == (ssize_t)LOG_WIRE_SIZE)
             {
                 LogRecord record;
@@ -314,8 +320,7 @@ int main(int argc, char *argv[])
                 {
                     if (t->seen && record.seq != t->last_seq + 1 && record.seq > t->last_seq)
                     {
-                        // record.seq > t->last_seq excludes a restarted sender whose
-                        // seq reset to 0, that is a new process, not a mid-stream gap
+                        // Calculates number of dropped packets over a specified period by comparing seq number against the tracker
                         uint32_t gap = record.seq - t->last_seq - 1;
                         channel_dropped_total += gap;
                         channel_dropped_period += gap;
@@ -324,13 +329,13 @@ int main(int argc, char *argv[])
                     t->seen = true;
                 }
 
+                // Convert into something readable
                 char line[LOG_LINE_LENGTH];
                 formatLogLine(&record, line, sizeof(line));
                 fputs(line, log_file);
-                fflush(log_file); // Correctness over throughput, a crash must not lose the last lines
+                fflush(log_file); // Push output instantly, don't want to risk losing logs
             }
-            // A wrong-sized datagram is ignored rather than crashing on it,
-            // this socket path only carries LogRecords, so garbage is discarded
+            // Ignore if datagram is the wrong size
         }
 
         time_t now = time(NULL);
@@ -346,6 +351,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    // When SIGTERM sets running = 0; clean up
     fprintf(stderr, "[tetrislogd] shutting down, total channel-drops observed: %u\n", channel_dropped_total);
     fflush(log_file);
     fclose(log_file);
