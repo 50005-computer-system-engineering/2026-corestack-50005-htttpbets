@@ -1,8 +1,8 @@
 #ifndef LIBHT_H
 #define LIBHT_H
 
-#define MAX_BUF 512
-#define MAX_HEADERS 16
+#define MAX_BUF 1024     // kinda arbritrary rn
+#define MAX_HEADERS 16  // kinda arbritrary rn
 
 // hypertext separators
 #define HT_END_LINE "\r\n"

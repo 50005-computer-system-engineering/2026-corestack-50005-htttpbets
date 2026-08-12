@@ -43,8 +43,6 @@ void payload_decode_input(const char *buffer, InputPayload *payload)
     sscanf(buffer, "{action-id: %u}", &payload->action);
 }
 
-// board cells are a single decimal digit (0-9), so they're packed with no
-// separators; the rest of the fields are positional (comma-separated, no labels)
 void payload_encode_state(char *buffer, const StatePayload *payload)
 {
     int offset = 0;

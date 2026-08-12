@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#define MSG_CONTENT_LENGTH 512
+#define MSG_CONTENT_LENGTH 1024
 
 typedef enum {
     MSG_JOIN,
