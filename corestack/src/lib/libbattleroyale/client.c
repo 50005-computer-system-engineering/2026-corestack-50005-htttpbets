@@ -333,7 +333,7 @@ int brclient_get_state(BRClient *clientPtr)
 }
 
 // message functions
-int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
+int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024])
 {
     Endpoint *thisClient = clientPtr;
 
@@ -364,7 +364,7 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brclient_get_app_msg(unsigned char returnMsg[512])
+int brclient_get_app_msg(unsigned char returnMsg[1024])
 {
     if (!Message_empty(&clientMessages))
     {

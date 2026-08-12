@@ -19,9 +19,9 @@ int brclient_join(BRClient *clientPtr, char *ipAddress);
 int brclient_get_state(BRClient *clientPtr);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
-int brclient_send_msg(BRClient *clientPtr, unsigned char content[512]); // use defined value instead of explicit number
+int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024]); // use defined value instead of explicit number
 
-int brclient_get_app_msg(unsigned char returnMsg[512]);
+int brclient_get_app_msg(unsigned char returnMsg[1024]);
 
 int brclient_get_id(BRClient *clientPtr, uint32_t *id); // returns 0 on success, -1 on failure; writes id via out-param
 

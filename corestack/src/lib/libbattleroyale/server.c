@@ -594,7 +594,7 @@ int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clie
     return 0;
 }
 
-int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned char content[512]) // use defined value instead of explicit number
+int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned char content[1024]) // use defined value instead of explicit number
 {
     LOG_I("[brserver_send_to_target()] sending broadcast to cliets...");
 
@@ -631,7 +631,7 @@ int brserver_send_to_target(BRServer *serverPtr, uint32_t targetId, unsigned cha
     return 0;
 }
 
-int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[512])
+int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[1024])
 {
     Server *thisServer = serverPtr;
 
@@ -652,7 +652,7 @@ int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[512])
     LOG_I("[brserver_send_broadcast()] message has been sent");
 }
 
-int brserver_send_to_all(BRServer *serverPtr, unsigned char content[512])
+int brserver_send_to_all(BRServer *serverPtr, unsigned char content[1024])
 {
     Server *thisServer = serverPtr;
 
@@ -677,7 +677,7 @@ int brserver_send_to_all(BRServer *serverPtr, unsigned char content[512])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brserver_get_app_msg(unsigned char returnMsg[512])
+int brserver_get_app_msg(unsigned char returnMsg[1024])
 {
     if (!Message_empty(&serverMessages))
     {
