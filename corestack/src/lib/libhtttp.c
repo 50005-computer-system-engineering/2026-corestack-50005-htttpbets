@@ -132,7 +132,7 @@ void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, P
     msg_add_header(formatted_msg, "Content-Length", content_len);
 }
 
-void req_create_state(uint32_t id, StatePayload payload, ParsedMsgHT *formattedMsg)
+void req_create_state(uint32_t id, StatePayload *payload, ParsedMsgHT *formattedMsg)
 {
     // request line
     formattedMsg->token1 = method_to_string(REQ_STATE);
@@ -152,7 +152,34 @@ void req_create_state(uint32_t id, StatePayload payload, ParsedMsgHT *formattedM
 
     // body
     char *body = malloc(MAX_BUF);
-    payload_encode_state(body, &payload);
+    payload_encode_state(body, payload);
+    msg_add_body(formattedMsg, body);
+    char *content_len = malloc(16);
+    sprintf(content_len, "%u", (unsigned)strlen(body));
+    msg_add_header(formattedMsg, "Content-Length", content_len);
+}
+
+void req_create_attack(uint32_t id, AttackPayload *payload, ParsedMsgHT *formattedMsg)
+{
+    // request line
+    formattedMsg->token1 = method_to_string(REQ_ATTACK);
+    char *path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
+    formattedMsg->token2 = path;
+    formattedMsg->token3 = CURRENT_VER;
+    
+    // headers
+    char *id_str = malloc(16);
+    sprintf(id_str, "%u", id);
+    msg_add_header(formattedMsg, "Player-Id", id_str);
+    msg_add_header(formattedMsg, "Content-Type", "application/state-payload");
+    char *date_str = malloc(30);
+    get_date_str(date_str);
+    msg_add_header(formattedMsg, "Date", date_str);
+
+    // body
+    char *body = malloc(MAX_BUF);
+    payload_encode_attack(body, payload);
     msg_add_body(formattedMsg, body);
     char *content_len = malloc(16);
     sprintf(content_len, "%u", (unsigned)strlen(body));
