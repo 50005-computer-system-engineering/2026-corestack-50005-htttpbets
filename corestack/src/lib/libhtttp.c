@@ -95,7 +95,7 @@ bool is_legal_header_field(char *s)
     for (int i=0; i<N_HTTTP_HEADERS; i++)
     {
         // matching string in legal headers
-        if (strcmp(s, HTTTP_HEADERS) == 0)
+        if (strcmp(s, HTTTP_HEADERS[i]) == 0)
         {
             LOG_I("[is_legal_header_field()] string \"%s\" is a header", s);
             return true;
