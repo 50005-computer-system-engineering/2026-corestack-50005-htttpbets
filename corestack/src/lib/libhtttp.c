@@ -105,3 +105,56 @@ bool is_legal_header_field(char *s)
     return false;
 }
 
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formatted_msg)
+{
+    // request line
+    formatted_msg->token1 = method_to_string(method);
+    char *path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
+    formatted_msg->token2 = path;
+    formatted_msg->token3 = CURRENT_VER;
+
+    // headers
+    char *id_str = malloc(16);
+    sprintf(id_str, "%u", id);
+    msg_add_header(formatted_msg, "Player-Id", id_str);
+    msg_add_header(formatted_msg, "Content-Type", "application/input-payload");
+    char *date_str = malloc(30);
+    get_date_str(date_str);
+    msg_add_header(formatted_msg, "Date", date_str);
+
+    // body
+    char *body = malloc(MAX_BUF);
+    payload_encode_input(body, payload);
+    msg_add_body(formatted_msg, body);
+    char *content_len = malloc(16);
+    sprintf(content_len, "%u", (unsigned)strlen(body));
+    msg_add_header(formatted_msg, "Content-Length", content_len);
+}
+
+void req_create_state(uint32_t id, StatePayload payload, ParsedMsgHT *formattedMsg)
+{
+    // request line
+    formattedMsg->token1 = method_to_string(REQ_STATE);
+    char *path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
+    formattedMsg->token2 = path;
+    formattedMsg->token3 = CURRENT_VER;
+
+    // headers
+    char *id_str = malloc(16);
+    sprintf(id_str, "%u", id);
+    msg_add_header(formattedMsg, "Player-Id", id_str);
+    msg_add_header(formattedMsg, "Content-Type", "application/state-payload");
+    char *date_str = malloc(30);
+    get_date_str(date_str);
+    msg_add_header(formattedMsg, "Date", date_str);
+
+    // body
+    char *body = malloc(MAX_BUF);
+    payload_encode_state(body, &payload);
+    msg_add_body(formattedMsg, body);
+    char *content_len = malloc(16);
+    sprintf(content_len, "%u", (unsigned)strlen(body));
+    msg_add_header(formattedMsg, "Content-Length", content_len);
+}
