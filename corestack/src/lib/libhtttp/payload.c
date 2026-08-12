@@ -24,11 +24,11 @@ void payload_encode_roster(char *buffer, const RosterPayload *payload)
 
 void payload_decode_roster(const char *buffer, RosterPayload *payload)
 {
-    sscanf(buffer, "{count: %u, ids: [", payload->count);
-    char *ptr = strstr(buffer, "ids: [") + stlen("ids: [");
+    sscanf(buffer, "{count: %u, ids: [", &payload->count);
+    char *ptr = strstr(buffer, "ids: [") + strlen("ids: [");
     for (uint32_t i=0; i<payload->count; i++)
     {
-        sprintf(buffer+offset, "%u ", payload->ids[i]);
+        sscanf(ptr, "%u ", &payload->ids[i]);
         ptr = strstr(ptr, " ") + 1;
     }
 }
@@ -40,6 +40,46 @@ void payload_encode_input(char *buffer, const InputPayload *payload)
 
 void payload_decode_input(const char *buffer, InputPayload *payload)
 {
-    sscanf(buffer, "{action-id: %u}", payload->action);
+    sscanf(buffer, "{action-id: %u}", &payload->action);
+}
+
+// board cells are a single decimal digit (0-9), so they're packed with no
+// separators; the rest of the fields are positional (comma-separated, no labels)
+void payload_encode_state(char *buffer, const StatePayload *payload)
+{
+    int offset = 0;
+    for (int row = 0; row < 20; row++)
+    {
+        for (int col = 0; col < 10; col++)
+        {
+            buffer[offset++] = '0' + payload->board[row][col];
+        }
+    }
+
+    sprintf(buffer+offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u",
+            payload->current_type, payload->current_rot, payload->current_x, payload->current_y, payload->next_type,
+            payload->preview[0], payload->preview[1], payload->preview[2],
+            payload->held_type, payload->has_held,
+            payload->player_id, payload->score, payload->level, payload->lines_cleared, payload->combo, payload->b2b, payload->t_spins, payload->tetrises, payload->pending_garbage,
+            payload->target_player_id, payload->target_mode, payload->game_over);
+}
+
+void payload_decode_state(const char *buffer, StatePayload *payload)
+{
+    int offset = 0;
+    for (int row = 0; row < 20; row++)
+    {
+        for (int col = 0; col < 10; col++)
+        {
+            payload->board[row][col] = (uint8_t)(buffer[offset++] - '0');
+        }
+    }
+
+    sscanf(buffer+offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u",
+           &payload->current_type, &payload->current_rot, &payload->current_x, &payload->current_y, &payload->next_type,
+           &payload->preview[0], &payload->preview[1], &payload->preview[2],
+           &payload->held_type, &payload->has_held,
+           &payload->player_id, &payload->score, &payload->level, &payload->lines_cleared, &payload->combo, &payload->b2b, &payload->t_spins, &payload->tetrises, &payload->pending_garbage,
+           &payload->target_player_id, &payload->target_mode, &payload->game_over);
 }
 
