@@ -57,6 +57,29 @@ bool is_legal_method(char *s)
 }
 
 /*
+Function returns the string corresponding to method enum value
+*/
+char *method_to_string(MethodHTTTP v)
+{
+    // case where string is empty
+    if (v == UNKNOWN)
+    {
+        LOG_E("[string_to_method()] string not found");
+        return NULL;
+    }
+    
+    // iterate until matching string
+    for (int i=0; i<N_HTTTP_METHODS; i++)
+    {
+        // matching string in legal methods
+        if (v == HTTTP_METHODS[i].method)
+        {
+            return HTTTP_METHODS[i].string;
+        }
+    }
+}
+
+/*
 Returns if header is legal
 */
 bool is_legal_header_field(char *s)
