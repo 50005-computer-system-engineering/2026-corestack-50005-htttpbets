@@ -4,10 +4,13 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* ----- DEFAULT IPC PATH ----- */
+#define LOG_DEFAULT_IPC_PATH "var/run/tetrislog.sock" // Default location to listen for incoming logs
+
 /* ----- SIZES ----- */
-#define LOG_SOURCE_LENGTH 16  // Log Source (bytes)
-#define LOG_MSG_LENGTH 256    // Actual Message Text; anything longer will be truncated (bytes)
-#define LOG_LINE_LENGTH 384   // Max length of the entire string being written
+#define LOG_SOURCE_LENGTH 16 // Log Source (bytes)
+#define LOG_MSG_LENGTH 256   // Actual Message Text; max length, anything longer will be truncated (bytes)
+#define LOG_LINE_LENGTH 384  // Max length of the entire string being written
 
 /* ----- LEVELS ----- */
 // Mirrors corestack's LOG_D / LOG_I / LOG_W / LOG_E macros
@@ -23,13 +26,13 @@ typedef enum
 // One log entry, exactly one of these travels per datagram
 typedef struct
 {
-    uint32_t time_sec;               // Timestamp (seconds since epoch)
-    uint32_t time_msec;              // Milliseconds remainder (for easier sorting)
-    uint32_t level;                  // LogLevel
-    uint32_t pid;                    // Process ID -> to distinguish new instance
-    uint32_t seq;                    // Sequence number -> increments with every log sent via same PID
-    char source[LOG_SOURCE_LENGTH];  // Source
-    char message[LOG_MSG_LENGTH];    // Log Payload
+    uint32_t time_sec;              // Timestamp (seconds since epoch)
+    uint32_t time_msec;             // Milliseconds remainder (for easier sorting)
+    uint32_t level;                 // LogLevel
+    uint32_t pid;                   // Process ID -> to distinguish new instance
+    uint32_t seq;                   // Sequence number -> increments with every log sent via same PID
+    char source[LOG_SOURCE_LENGTH]; // Source
+    char message[LOG_MSG_LENGTH];   // Log Payload
 } LogRecord;
 
 // Exact number of bytes on the wire, one datagram is always this size
@@ -48,8 +51,8 @@ void buildLogRecord(LogRecord *record, LogLevel level, const char *source, const
 // "DEBUG" / "INFO" / "WARN" / "ERROR"
 const char *logLevelName(LogLevel level);
 
-// Renders one record into the line written to disk, defined here so producer and consumer can never disagree on the format
-// Format: 2026-08-12 14:23:01.042 [INFO ] tetrisd[1234] #42 message text
+// Renders one record into the line written to disk
+// Format: YYYY-MM-DD HH:MM:SS [INFO ] tetrisd[1234] #42 message text
 void formatLogLine(const LogRecord *record, char *out, size_t out_size);
 
 #endif
