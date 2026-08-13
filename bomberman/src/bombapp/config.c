@@ -1,4 +1,4 @@
-#include <raylib.h>
+#include "raylib.h"
 #include "config.h"
 
 const int PLAYER_FPS = 10;

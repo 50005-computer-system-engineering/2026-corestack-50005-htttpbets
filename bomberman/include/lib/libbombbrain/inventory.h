@@ -1,6 +1,6 @@
 #ifndef INVENTORY_H
 #define INVENTORY_H
-#include <raylib.h>
+#include "raylib.h"
 
 typedef struct {
     int remaining_bombs;

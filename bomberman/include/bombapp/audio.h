@@ -1,6 +1,6 @@
 #ifndef BOMBAPP_AUDIO_H
 #define BOMBAPP_AUDIO_H
-#include <raylib.h>
+#include "raylib.h"
 
 typedef enum {
     BGM_TITLE,

@@ -1,7 +1,7 @@
 #include "camera.h"
 #include "config.h"
 #include "lib/libbombbrain/map.h"
-#include <raylib.h>
+#include "raylib.h"
 #include <raymath.h>
 
 // Number of tiles to offset from actual border of map, so we can see the outside a little

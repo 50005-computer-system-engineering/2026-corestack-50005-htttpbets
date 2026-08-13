@@ -1,6 +1,6 @@
 #ifndef BOMBERMAN_H
 #define BOMBERMAN_H
-#include <raylib.h>
+#include "raylib.h"
 #include "lib/libbombbrain/collision.h"
 #include "spritesheet.h"
 #include "lib/libbombbrain/inventory.h"

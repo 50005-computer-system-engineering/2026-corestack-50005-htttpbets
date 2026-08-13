@@ -37,8 +37,7 @@ _CS_DIR_LIBS  := $(patsubst lib%,-l%,$(notdir $(_CS_LIB_DIRS)))
 # Flat file libs  e.g. src/lib/libeventbus.c
 _CS_FLAT_SRCS := $(wildcard $(CORESTACK_DIR)/src/lib/*.c)
 _CS_FLAT_LIBS := $(patsubst lib%,-l%,$(notdir $(_CS_FLAT_SRCS:.c=)))
-
-CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS)
+CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS) $(SYS_LDLIBS)
 
 # Compiler flags shared across all projects
 #
@@ -46,5 +45,4 @@ CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS)
 # -g            	embed debug symbols for gdb/valgrind
 # -pthread      	tell the compiler (and linker) to enable POSIX thread support.
 #                 	Needed for pthreads, mutexes, and condition vars.
-# -lcrypto      	link against libcrypto for SSL/TLS
-COMMON_CFLAGS := -Wall -Wextra -g -pthread -lcrypto
+COMMON_CFLAGS := -Wall -Wextra -g -pthread
