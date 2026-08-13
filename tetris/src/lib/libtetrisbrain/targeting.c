@@ -61,7 +61,7 @@ uint32_t resolve_target_id(GameState* attacker, const Roster* roster)
         if (attacker->last_attacker_id != 0 && attacker->last_attacker_id != attacker->player_id) // Valid previous attacker that is not self
         {
             for (int i = 0; i < roster->count; i++) {
-                // Verify iff previous attack is still in the game
+                // Verify iff previous attacker is still in the game
                 if (roster->ids[i] == attacker->last_attacker_id && !roster->eliminated[i]) {
                     return attacker->last_attacker_id;
                 }

@@ -66,6 +66,7 @@ int calculate_garbage(GameState* state, int lines_cleared, bool is_t_spin)
 {
     // Fake gamestate
     (void)state;
+    
     // No lines cleared = 0 damage
     if (lines_cleared == 0) {
         state->combo = -1; // Reset combo counter

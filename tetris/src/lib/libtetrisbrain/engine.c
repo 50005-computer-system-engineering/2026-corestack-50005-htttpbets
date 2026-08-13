@@ -48,9 +48,8 @@ int tick_game(GameState* state)
         state->current.y++; // If possible, fall for one row
         return 0;           // 0 lines cleared
     }
-
-    // Game Over Check 1
-    if (!is_valid_pos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1)) {
+    else
+    {
         // Lock Out
         if (state->current.y < 0) {
             state->game_over = true;
@@ -88,11 +87,12 @@ int tick_game(GameState* state)
     }
     // Send remaining generated damage to opponent
     state->outgoing_garbage = damage;
+
     // Taking damage
     if (cleared == 0 && state->pending_garbage > 0) // No generated to cancel out incoming
     {
         add_garbage(state, state->pending_garbage); // Push to bottom of the board
-        state->pending_garbage = 0;                 // Reset buffer
+        state->pending_garbage = 0;                 // Reset
     }
 
     // Spawn a new piece at the top AFTER garbage has been settled
@@ -106,6 +106,7 @@ int tick_game(GameState* state)
     // Return lines cleared this turn
     return cleared;
 }
+
 // Advances gravity and lock delay by exactly one tick
 bool update_timers(GameState* state)
 {
