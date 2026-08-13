@@ -1,3 +1,6 @@
+#ifndef LIBHTTTP_H
+#define LIBHTTTP_H
+
 #include "libhypertext.h"
 #include "libhtttp/payload.h"
 
@@ -40,3 +43,4 @@ const int N_HTTTP_HEADERS = sizeof(htttp_headers) / sizeof(char*);
 void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg);
 void req_create_state(uint32_t id, StatePayload* payload, ParsedMsgHT* formatted_msg);
 void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatted_msg);
+#endif
