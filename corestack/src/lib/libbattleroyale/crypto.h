@@ -73,51 +73,6 @@
 #define SESSION_KEY_LEN (HMAC_KEY_LEN + AES_KEY_LEN)
 
 /* ======================================================================
- * Protocol message types
- * ====================================================================== */
-#define MSG_FILENAME 0
-#define MSG_FILE_DATA 1
-#define MSG_CLOSE 2
-#define MSG_AUTH 3
-#define MSG_SYMKEY 4 /* CP2 only: symmetric key exchange */
-
-/* ======================================================================
- * Integer <-> byte conversion
- * ====================================================================== */
-
-/**
- * Converts a 64-bit unsigned integer to an 8-byte big-endian buffer.
- */
-void int_to_bytes(uint64_t x, unsigned char buf[INT_BYTES]);
-
-/**
- * Converts an 8-byte big-endian buffer to a 64-bit unsigned integer.
- */
-uint64_t bytes_to_int(const unsigned char buf[INT_BYTES]);
-
-/* ======================================================================
- * Socket helpers
- * ====================================================================== */
-
-/**
- * Reads exactly 'length' bytes from 'sockfd' into a newly malloc'd buffer.
- * Returns pointer to buffer on success, NULL on failure.
- * Caller must free() the returned buffer.
- */
-unsigned char *read_bytes(int sockfd, uint64_t length);
-
-/**
- * Sends exactly 'length' bytes from 'buf' over 'sockfd'.
- * Returns 0 on success, -1 on failure.
- */
-int send_all(int sockfd, const unsigned char *buf, uint64_t length);
-
-/**
- * Convenience: sends an 8-byte big-endian integer over the socket.
- */
-int send_int(int sockfd, uint64_t value);
-
-/* ======================================================================
  * OpenSSL key/cert loading
  * ====================================================================== */
 
