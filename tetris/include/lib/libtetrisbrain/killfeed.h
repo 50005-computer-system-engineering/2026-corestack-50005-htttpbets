@@ -15,9 +15,9 @@ typedef struct
 } KillFeedEntry;
 
 // Add an attack to the kill feed
-void addKillFeed(uint32_t source_player, uint32_t target_player, uint32_t lines);
+void add_kill_feed(uint32_t source_player, uint32_t target_player, uint32_t lines);
 
 // Render the kill feed
-void drawKillFeed(void);
+void draw_kill_feed(void);
 
 #endif

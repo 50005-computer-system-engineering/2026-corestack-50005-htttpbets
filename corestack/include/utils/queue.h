@@ -26,26 +26,26 @@
     } NAME##Queue;                                                       \
                                                                          \
     /* Function to initialize the queue */                               \
-    static IGNORE_UNUSED void NAME##_init(NAME##Queue *q)                \
+    static IGNORE_UNUSED void NAME##_init(NAME##Queue* q)                \
     {                                                                    \
         q->front = -1;                                                   \
         q->rear = 0;                                                     \
     }                                                                    \
                                                                          \
     /* Function to check if the queue is empty*/                         \
-    static IGNORE_UNUSED bool NAME##_empty(NAME##Queue *q)               \
+    static IGNORE_UNUSED bool NAME##_empty(NAME##Queue* q)               \
     {                                                                    \
         return q->front == q->rear - 1;                                  \
     }                                                                    \
                                                                          \
     /* Function to check if the queue is full */                         \
-    static IGNORE_UNUSED bool NAME##_full(NAME##Queue *q)                \
+    static IGNORE_UNUSED bool NAME##_full(NAME##Queue* q)                \
     {                                                                    \
         return q->rear == MAX_SIZE;                                      \
     }                                                                    \
                                                                          \
     /* Function to add an element to the queue */                        \
-    static IGNORE_UNUSED bool NAME##_enqueue(NAME##Queue *q, TYPE value) \
+    static IGNORE_UNUSED bool NAME##_enqueue(NAME##Queue* q, TYPE value) \
     {                                                                    \
         if (NAME##_full(q))                                              \
             return false;                                                \
@@ -54,13 +54,12 @@
     }                                                                    \
                                                                          \
     /* Function to remove an element from the queue */                   \
-    static IGNORE_UNUSED bool NAME##_dequeue(NAME##Queue *q)             \
+    static IGNORE_UNUSED bool NAME##_dequeue(NAME##Queue* q)             \
     {                                                                    \
         if (NAME##_empty(q))                                             \
             return false;                                                \
         q->front++;                                                      \
-        if (q->front == q->rear - 1)                                     \
-        {                                                                \
+        if (q->front == q->rear - 1) {                                   \
             q->front = -1;                                               \
             q->rear = 0;                                                 \
         };                                                               \
@@ -68,7 +67,7 @@
     }                                                                    \
                                                                          \
     /* Function to get the element at the front of the queue */          \
-    static IGNORE_UNUSED TYPE *NAME##_peek(NAME##Queue *q)               \
+    static IGNORE_UNUSED TYPE* NAME##_peek(NAME##Queue* q)               \
     {                                                                    \
         if (NAME##_empty(q))                                             \
             return NULL;                                                 \

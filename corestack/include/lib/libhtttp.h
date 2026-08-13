@@ -15,7 +15,7 @@ typedef enum {
 
 // mapping to string
 typedef struct {
-    char *string;
+    char* string;
     MethodHTTTP method;
 } MethodMapping;
 
@@ -25,20 +25,18 @@ const MethodMapping HTTTP_METHODS[] = {
     {"DROP", REQ_DROP},
     {"ROTATE", REQ_ROTATE},
     {"STATE", REQ_STATE},
-    {"ATTACK", REQ_ATTACK}
-};
+    {"ATTACK", REQ_ATTACK}};
 const int N_HTTTP_METHODS = sizeof(HTTTP_METHODS) / sizeof(MethodMapping);
 
 // HTTTP header fields
-const char *HTTTP_HEADERS[] = {
+const char* htttp_headers[] = {
     "Content-Length",
     "Content-Type",
     "Player-Id",
-    "Date"
-};
-const int N_HTTTP_HEADERS = sizeof(HTTTP_HEADERS) / sizeof(char *);
+    "Date"};
+const int N_HTTTP_HEADERS = sizeof(htttp_headers) / sizeof(char*);
 
 // important request builders
-void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formattedMsg);
-void req_create_state(uint32_t id, StatePayload *payload, ParsedMsgHT *formattedMsg);
-void req_create_attack(uint32_t id, AttackPayload *payload, ParsedMsgHT *formattedMsg);
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg);
+void req_create_state(uint32_t id, StatePayload* payload, ParsedMsgHT* formatted_msg);
+void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatted_msg);

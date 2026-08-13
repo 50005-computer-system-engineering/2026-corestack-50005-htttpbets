@@ -16,13 +16,13 @@ typedef struct
 } Roster;
 
 // Cycle target mode selection
-void cycleTargetMode(GameState *player);
+void cycle_target_mode(GameState* player);
 
 // Cycle manual target selection
 // Skips own player ID and anyone marked eliminated => lands on first valid hit
-void cycleManualTarget(GameState *attacker, const Roster *roster);
+void cycle_manual_target(GameState* attacker, const Roster* roster);
 
 // Resolve and return correct target ID based on attacker's targeting mode
-uint32_t resolveTargetID(GameState *attacker, const Roster *roster);
+uint32_t resolve_target_id(GameState* attacker, const Roster* roster);
 
 #endif

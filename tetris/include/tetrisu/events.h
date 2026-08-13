@@ -5,13 +5,12 @@
 #include "lib/libtetrisprotocol/protocol.h"
 
 // Event Dictionary
-enum GameEvents
-{
+enum GameEvents {
     EVENT_ATTACK_GENERATED,
     EVENT_COUNT
 };
 
 // Network Routing
-void on_attack_generated(void *args);
+void on_attack_generated(void* args);
 
 #endif

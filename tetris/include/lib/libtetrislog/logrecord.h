@@ -14,8 +14,7 @@
 
 /* ----- LEVELS ----- */
 // Mirrors corestack's LOG_D / LOG_I / LOG_W / LOG_E macros
-typedef enum
-{
+typedef enum {
     LOG_LEVEL_DEBUG = 0,
     LOG_LEVEL_INFO,
     LOG_LEVEL_WARN,
@@ -40,19 +39,19 @@ typedef struct
 #define LOG_WIRE_SIZE (5 * sizeof(uint32_t) + LOG_SOURCE_LENGTH + LOG_MSG_LENGTH)
 
 /* ----- PACK / UNPACK -----*/
-void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record);
-void unpackLogRecord(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord *record);
+void pack_log_record(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord* record);
+void unpack_log_record(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord* record);
 
 /* ----- HELPERS ----- */
 // Fills in time, pid and seq automatically, and truncates safely
 // Callers only supply what they actually know: level, source, message
-void buildLogRecord(LogRecord *record, LogLevel level, const char *source, const char *message);
+void build_log_record(LogRecord* record, LogLevel level, const char* source, const char* message);
 
 // "DEBUG" / "INFO" / "WARN" / "ERROR"
-const char *logLevelName(LogLevel level);
+const char* log_level_name(LogLevel level);
 
 // Renders one record into the line written to disk
 // Format: YYYY-MM-DD HH:MM:SS [INFO ] tetrisd[1234] #42 message text
-void formatLogLine(const LogRecord *record, char *out, size_t out_size);
+void format_log_line(const LogRecord* record, char* out, size_t out_size);
 
 #endif

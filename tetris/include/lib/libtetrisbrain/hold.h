@@ -4,6 +4,6 @@
 #include "state.h"
 
 // Hold piece
-void holdPiece(GameState *state);
+void hold_piece(GameState* state);
 
 #endif

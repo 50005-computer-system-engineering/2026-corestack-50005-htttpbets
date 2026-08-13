@@ -38,19 +38,19 @@ typedef struct
 } GameSession;
 
 // Builds authoritative state for every connected player
-void initSession(GameSession *session, const uint32_t *clientIds, uint32_t lobbySize);
+void init_session(GameSession* session, const uint32_t* client_ids, uint32_t lobby_size);
 
 // Finds a player's slot by ID, returns NULL if that ID is not in the match
-PlayerSlot *findPlayer(GameSession *session, uint32_t player_id);
+PlayerSlot* find_player(GameSession* session, uint32_t player_id);
 
 // Performs one requested action on that player's authoritative board
-void applyAction(GameSession *session, PlayerSlot *slot, PlayerAction action);
+void apply_action(GameSession* session, PlayerSlot* slot, PlayerAction action);
 
 // Advances gravity and lock delay for every active player by one tick
-void tickSession(GameSession *session);
+void tick_session(GameSession* session);
 
 // Counts players who are still connected and not topped out
 // Drives the match end condition in tetrisd's main loop
-int countAlivePlayers(const GameSession *session);
+int count_alive_players(const GameSession* session);
 
 #endif

@@ -14,59 +14,54 @@
  * OpenSSL key/cert loading
  * ====================================================================== */
 
-EVP_PKEY *load_private_key(const char *filename)
+EVP_PKEY* load_private_key(const char* filename)
 {
     /**
      * Reads a PEM private key file and returns an EVP_PKEY*.
      */
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) {
         fprintf(stderr, "Cannot open private key file: %s\n", filename);
         return NULL;
     }
-    EVP_PKEY *pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     fclose(fp);
-    if (!pkey)
-    {
+    if (!pkey) {
         print_ssl_error("load_private_key");
     }
     return pkey;
 }
 
-X509 *load_cert_file(const char *filename)
+X509* load_cert_file(const char* filename)
 {
     /**
      * Loads an X.509 certificate from a PEM file on disk.
      */
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) {
         fprintf(stderr, "Cannot open certificate file: %s\n", filename);
         return NULL;
     }
-    X509 *cert = PEM_read_X509(fp, NULL, NULL, NULL);
+    X509* cert = PEM_read_X509(fp, NULL, NULL, NULL);
     fclose(fp);
-    if (!cert)
-    {
+    if (!cert) {
         print_ssl_error("load_cert_file");
     }
     return cert;
 }
 
-X509 *load_cert_bytes(const unsigned char *data, int len)
+X509* load_cert_bytes(const unsigned char* data, int len)
 {
     /**
      * Parses an X.509 certificate from a PEM-encoded byte buffer received
      * over the network.
      */
-    BIO *bio = BIO_new_mem_buf(data, len);
+    BIO* bio = BIO_new_mem_buf(data, len);
     if (!bio)
         return NULL;
-    X509 *cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+    X509* cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
     BIO_free(bio);
-    if (!cert)
-    {
+    if (!cert) {
         print_ssl_error("load_cert_bytes");
     }
     return cert;
@@ -76,7 +71,7 @@ X509 *load_cert_bytes(const unsigned char *data, int len)
  * Certificate verification
  * ====================================================================== */
 
-int verify_server_cert(X509 *server_cert, const char *ca_cert_path)
+int verify_server_cert(X509* server_cert, const char* ca_cert_path)
 {
     /**
      * Verifies that server_cert was signed by the CA, and checks validity.
@@ -88,14 +83,13 @@ int verify_server_cert(X509 *server_cert, const char *ca_cert_path)
     int ret = 0;
 
     /* Load CA certificate */
-    X509 *ca_cert = load_cert_file(ca_cert_path);
+    X509* ca_cert = load_cert_file(ca_cert_path);
     if (!ca_cert)
         return 0;
 
     /* Print validity period  */
-    BIO *bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
-    if (bio_out)
-    {
+    BIO* bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
+    if (bio_out) {
         printf("Server cert not valid before: ");
         ASN1_TIME_print(bio_out, X509_get0_notBefore(server_cert));
         printf("\n");
@@ -106,15 +100,14 @@ int verify_server_cert(X509 *server_cert, const char *ca_cert_path)
     }
 
     /* Create a certificate store and add the CA cert as trusted */
-    X509_STORE *store = X509_STORE_new();
+    X509_STORE* store = X509_STORE_new();
     if (!store)
         goto cleanup;
     X509_STORE_add_cert(store, ca_cert);
 
     /* Create a verification context */
-    X509_STORE_CTX *ctx = X509_STORE_CTX_new();
-    if (!ctx)
-    {
+    X509_STORE_CTX* ctx = X509_STORE_CTX_new();
+    if (!ctx) {
         X509_STORE_free(store);
         goto cleanup;
     }
@@ -122,13 +115,10 @@ int verify_server_cert(X509 *server_cert, const char *ca_cert_path)
     X509_STORE_CTX_init(ctx, store, server_cert, NULL);
 
     /* Verify the certificate chain (checks signature AND validity period) */
-    if (X509_verify_cert(ctx) == 1)
-    {
+    if (X509_verify_cert(ctx) == 1) {
         printf("Server certificate verified successfully.\n");
         ret = 1;
-    }
-    else
-    {
+    } else {
         int err = X509_STORE_CTX_get_error(ctx);
         fprintf(stderr, "Certificate verification failed: %s\n",
                 X509_verify_cert_error_string(err));
@@ -146,19 +136,19 @@ cleanup:
  * RSA-PSS signing and verification
  * ====================================================================== */
 
-unsigned char *sign_message_pss(EVP_PKEY *priv_key,
-                                const unsigned char *msg, size_t msg_len,
-                                size_t *sig_len)
+unsigned char* sign_message_pss(EVP_PKEY* priv_key,
+                                const unsigned char* msg, size_t msg_len,
+                                size_t* sig_len)
 {
     /**
      * Signs a message using RSA-PSS with SHA-256 and maximum salt length.
      */
-    unsigned char *sig = NULL;
-    EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
+    unsigned char* sig = NULL;
+    EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
     if (!md_ctx)
         return NULL;
 
-    EVP_PKEY_CTX *pkey_ctx = NULL;
+    EVP_PKEY_CTX* pkey_ctx = NULL;
 
     if (EVP_DigestSignInit(md_ctx, &pkey_ctx, EVP_sha256(), NULL, priv_key) <= 0)
         goto fail;
@@ -180,8 +170,7 @@ unsigned char *sign_message_pss(EVP_PKEY *priv_key,
     if (!sig)
         goto fail;
 
-    if (EVP_DigestSignFinal(md_ctx, sig, sig_len) <= 0)
-    {
+    if (EVP_DigestSignFinal(md_ctx, sig, sig_len) <= 0) {
         free(sig);
         sig = NULL;
         goto fail;
@@ -194,26 +183,25 @@ fail:
     return sig;
 }
 
-int verify_message_pss(X509 *cert,
-                       const unsigned char *sig, size_t sig_len,
-                       const unsigned char *msg, size_t msg_len)
+int verify_message_pss(X509* cert,
+                       const unsigned char* sig, size_t sig_len,
+                       const unsigned char* msg, size_t msg_len)
 {
     /**
      * Verifies an RSA-PSS signature.
      */
     int ret = 0;
-    EVP_PKEY *pub_key = X509_get_pubkey(cert);
+    EVP_PKEY* pub_key = X509_get_pubkey(cert);
     if (!pub_key)
         return 0;
 
-    EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
-    if (!md_ctx)
-    {
+    EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+    if (!md_ctx) {
         EVP_PKEY_free(pub_key);
         return 0;
     }
 
-    EVP_PKEY_CTX *pkey_ctx = NULL;
+    EVP_PKEY_CTX* pkey_ctx = NULL;
 
     if (EVP_DigestVerifyInit(md_ctx, &pkey_ctx, EVP_sha256(), NULL, pub_key) <= 0)
         goto done;
@@ -242,17 +230,16 @@ done:
 int generate_session_key(unsigned char key_out[SESSION_KEY_LEN])
 {
     /** Generate a cryptographically secure random session key. */
-    if (RAND_bytes(key_out, SESSION_KEY_LEN) != 1)
-    {
+    if (RAND_bytes(key_out, SESSION_KEY_LEN) != 1) {
         print_ssl_error("generate_session_key");
         return -1;
     }
     return 0;
 }
 
-unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
-                               const unsigned char *plain, size_t plain_len,
-                               size_t *out_len)
+unsigned char* session_encrypt(const unsigned char key[SESSION_KEY_LEN],
+                               const unsigned char* plain, size_t plain_len,
+                               size_t* out_len)
 {
     /**
      * Encrypts plaintext using AES-128-CBC with PKCS7 padding, then appends
@@ -260,13 +247,12 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
      *
      * Output layout: IV (16) || ciphertext || HMAC (32)
      */
-    const unsigned char *hmac_key = key;               /* first 16 bytes */
-    const unsigned char *aes_key = key + HMAC_KEY_LEN; /* last 16 bytes */
+    const unsigned char* hmac_key = key;               /* first 16 bytes */
+    const unsigned char* aes_key = key + HMAC_KEY_LEN; /* last 16 bytes */
 
     /* Generate random IV */
     unsigned char iv[AES_IV_LEN];
-    if (RAND_bytes(iv, AES_IV_LEN) != 1)
-    {
+    if (RAND_bytes(iv, AES_IV_LEN) != 1) {
         print_ssl_error("session_encrypt: RAND_bytes");
         return NULL;
     }
@@ -274,7 +260,7 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
     /* Allocate output: IV + ciphertext (at most plain_len + AES_BLOCK for padding) + HMAC */
     size_t max_ct_len = plain_len + AES_BLOCK; /* worst case with padding */
     size_t max_out = AES_IV_LEN + max_ct_len + HMAC_LEN;
-    unsigned char *output = malloc(max_out);
+    unsigned char* output = malloc(max_out);
     if (!output)
         return NULL;
 
@@ -282,20 +268,18 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
     memcpy(output, iv, AES_IV_LEN);
 
     /* Encrypt with AES-128-CBC (OpenSSL applies PKCS7 padding by default) */
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx)
-    {
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
         free(output);
         return NULL;
     }
 
     int ct_len = 0, final_len = 0;
-    unsigned char *ct_start = output + AES_IV_LEN;
+    unsigned char* ct_start = output + AES_IV_LEN;
 
     if (EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, aes_key, iv) != 1 ||
         EVP_EncryptUpdate(ctx, ct_start, &ct_len, plain, (int)plain_len) != 1 ||
-        EVP_EncryptFinal_ex(ctx, ct_start + ct_len, &final_len) != 1)
-    {
+        EVP_EncryptFinal_ex(ctx, ct_start + ct_len, &final_len) != 1) {
         print_ssl_error("session_encrypt");
         EVP_CIPHER_CTX_free(ctx);
         free(output);
@@ -307,11 +291,10 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
 
     /* Compute HMAC-SHA256 over (IV || ciphertext) */
     unsigned int hmac_out_len = 0;
-    unsigned char *hmac_ptr = output + AES_IV_LEN + total_ct;
+    unsigned char* hmac_ptr = output + AES_IV_LEN + total_ct;
     if (!HMAC(EVP_sha256(), hmac_key, HMAC_KEY_LEN,
               output, AES_IV_LEN + total_ct,
-              hmac_ptr, &hmac_out_len))
-    {
+              hmac_ptr, &hmac_out_len)) {
         print_ssl_error("session_encrypt: HMAC");
         free(output);
         return NULL;
@@ -321,53 +304,49 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
     return output;
 }
 
-unsigned char *session_decrypt(const unsigned char key[SESSION_KEY_LEN],
-                               const unsigned char *token, size_t token_len,
-                               size_t *out_len)
+unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
+                               const unsigned char* token, size_t token_len,
+                               size_t* out_len)
 {
     /**
      * Decrypts a token produced by session_encrypt().
      * Verifies HMAC first, then decrypts AES-128-CBC.
      */
-    const unsigned char *hmac_key = key;
-    const unsigned char *aes_key = key + HMAC_KEY_LEN;
+    const unsigned char* hmac_key = key;
+    const unsigned char* aes_key = key + HMAC_KEY_LEN;
 
     /* Minimum token size: IV (16) + at least 1 block ciphertext (16) + HMAC (32) = 64 */
-    if (token_len < AES_IV_LEN + AES_BLOCK + HMAC_LEN)
-    {
+    if (token_len < AES_IV_LEN + AES_BLOCK + HMAC_LEN) {
         fprintf(stderr, "session_decrypt: token too short\n");
         return NULL;
     }
 
     size_t ct_len = token_len - AES_IV_LEN - HMAC_LEN;
-    const unsigned char *iv = token;
-    const unsigned char *ct = token + AES_IV_LEN;
-    const unsigned char *hmac_received = token + AES_IV_LEN + ct_len;
+    const unsigned char* iv = token;
+    const unsigned char* ct = token + AES_IV_LEN;
+    const unsigned char* hmac_received = token + AES_IV_LEN + ct_len;
 
     /* Verify HMAC over (IV || ciphertext) */
     unsigned char hmac_computed[HMAC_LEN];
     unsigned int hmac_out_len = 0;
     if (!HMAC(EVP_sha256(), hmac_key, HMAC_KEY_LEN,
               token, AES_IV_LEN + ct_len,
-              hmac_computed, &hmac_out_len))
-    {
+              hmac_computed, &hmac_out_len)) {
         print_ssl_error("session_decrypt: HMAC compute");
         return NULL;
     }
-    if (CRYPTO_memcmp(hmac_computed, hmac_received, HMAC_LEN) != 0)
-    {
+    if (CRYPTO_memcmp(hmac_computed, hmac_received, HMAC_LEN) != 0) {
         fprintf(stderr, "session_decrypt: HMAC verification failed!\n");
         return NULL;
     }
 
     /* Decrypt AES-128-CBC */
-    unsigned char *plain = malloc(ct_len); /* at most ct_len bytes after removing padding */
+    unsigned char* plain = malloc(ct_len); /* at most ct_len bytes after removing padding */
     if (!plain)
         return NULL;
 
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx)
-    {
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
         free(plain);
         return NULL;
     }
@@ -375,8 +354,7 @@ unsigned char *session_decrypt(const unsigned char key[SESSION_KEY_LEN],
     int pt_len = 0, final_len = 0;
     if (EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, aes_key, iv) != 1 ||
         EVP_DecryptUpdate(ctx, plain, &pt_len, ct, (int)ct_len) != 1 ||
-        EVP_DecryptFinal_ex(ctx, plain + pt_len, &final_len) != 1)
-    {
+        EVP_DecryptFinal_ex(ctx, plain + pt_len, &final_len) != 1) {
         print_ssl_error("session_decrypt");
         EVP_CIPHER_CTX_free(ctx);
         free(plain);
@@ -392,11 +370,10 @@ unsigned char *session_decrypt(const unsigned char key[SESSION_KEY_LEN],
  * Utility
  * ====================================================================== */
 
-void print_ssl_error(const char *context)
+void print_ssl_error(const char* context)
 {
     unsigned long err = ERR_get_error();
-    if (err)
-    {
+    if (err) {
         char buf[256];
         ERR_error_string_n(err, buf, sizeof(buf));
         fprintf(stderr, "[OpenSSL] %s: %s\n", context, buf);

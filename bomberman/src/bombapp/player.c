@@ -14,16 +14,17 @@
 Bomberman* curr_bm;
 float active_speed;
 
-void on_move_performing(void *args) {
-    MoveEventArgs *a = (MoveEventArgs *)args;
+void on_move_performing(void* args)
+{
+    MoveEventArgs* a = (MoveEventArgs*)args;
 
     // Normalise direction, this fixes diagonal movement being twice as fast
     // Note that up is negative, hence -=
-    Vector2 moveVec = (Vector2){a->x, -a->y};
-    moveVec = Vector2Normalize(moveVec);
+    Vector2 move_vec = (Vector2){a->x, -a->y};
+    move_vec = Vector2Normalize(move_vec);
 
     // Update position
-    move_box(&curr_bm->box, Vector2Scale(moveVec, active_speed * GetFrameTime()));
+    move_box(&curr_bm->box, Vector2Scale(move_vec, active_speed * GetFrameTime()));
 
     // Update direction
     if (a->y > 0) // Up (highest prio)
@@ -43,25 +44,25 @@ void on_move_performing(void *args) {
         for (int tx = tiles.x; tx < tiles.y; tx++) {
             TileType tile = map[tx][ty];
             switch (tile) {
-                case EXPLOSION:
-                    // Die :(
-                    break;
+            case EXPLOSION:
+                // Die :(
+                break;
 
-                case POWERUP_FIRE: // Consume Powerup
-                    map[tx][ty] = EMPTY;
-                    curr_bm->inventory.num_fires++;
-                    play_sound(SFX_POWERUP_FIRE);
-                    break;
+            case POWERUP_FIRE: // Consume Powerup
+                map[tx][ty] = EMPTY;
+                curr_bm->inventory.num_fires++;
+                play_sound(SFX_POWERUP_FIRE);
+                break;
 
-                case POWERUP_BOMB: // Consume Powerup
-                    map[tx][ty] = EMPTY;
-                    curr_bm->inventory.num_bombs++;
-                    curr_bm->inventory.remaining_bombs++;
-                    play_sound(SFX_POWERUP_BOMB);
-                    break;
+            case POWERUP_BOMB: // Consume Powerup
+                map[tx][ty] = EMPTY;
+                curr_bm->inventory.num_bombs++;
+                curr_bm->inventory.remaining_bombs++;
+                play_sound(SFX_POWERUP_BOMB);
+                break;
 
-                default:
-                    break;
+            default:
+                break;
             }
         }
     }
@@ -69,17 +70,20 @@ void on_move_performing(void *args) {
     curr_bm->is_moving = true;
 }
 
-void on_move_released(void *args) {
+void on_move_released(void* args)
+{
     (void)args; // Unused
     curr_bm->is_moving = false;
 }
 
-void on_sprint_toggled(void *args) {
-    SprintEventArgs *a = (SprintEventArgs *)args;
+void on_sprint_toggled(void* args)
+{
+    SprintEventArgs* a = (SprintEventArgs*)args;
     active_speed = a->toggled ? CONFIG.PHYSICS.PLAYER_SPRINT_SPEED : CONFIG.PHYSICS.PLAYER_SPEED;
 }
 
-void on_bomb_pressed(void *args) {
+void on_bomb_pressed(void* args)
+{
     (void)args; // Unused
 
     // TODO: Move me to bombd
@@ -88,7 +92,8 @@ void on_bomb_pressed(void *args) {
         play_sound(SFX_PLACEBOMB);
 }
 
-void player_init(Bomberman* bm) {
+void player_init(Bomberman* bm)
+{
     curr_bm = bm;
 
     // Listen for input

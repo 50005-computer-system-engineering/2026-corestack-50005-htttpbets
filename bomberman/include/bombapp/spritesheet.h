@@ -4,11 +4,11 @@
 #include <raylib.h>
 
 typedef struct {
-    char* path; 
-    int cols; 
-    int rows; 
-    float scale; 
-    int fps; 
+    char* path;
+    int cols;
+    int rows;
+    float scale;
+    int fps;
     bool should_loop;
 
 } SpritesheetAsset;
@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
     // Initialised
     Texture2D texture;
-    bool should_loop; 
+    bool should_loop;
     int columns; // No need to store rows since we can calculate everything from col
     float scale; // Scale factor
 
@@ -40,23 +40,23 @@ typedef struct {
  * @param fps Frames per second for the animation
  * @param should_loop Whether we should loop the animation
  */
-void spritesheet_init(Spritesheet *s, const SpritesheetAsset asset);
- 
+void spritesheet_init(Spritesheet* s, const SpritesheetAsset ASSET);
+
 // Restart animation from the first frame
-void spritesheet_restart(Spritesheet *s);
- 
+void spritesheet_restart(Spritesheet* s);
+
 // Advance the animation
-void spritesheet_update(Spritesheet *s);
- 
+void spritesheet_update(Spritesheet* s);
+
 /**
  * @brief Draw the current frame centred on a position.
  * @param position World position, sprite is centered on this
  * @param rotation Rotation in degrees (0 for none)
  * @param tint Color tint (WHITE for no tint)
  */
-void spritesheet_draw(Spritesheet *s, Vector2 position, Vector2 origin_scale, float rotation, Color tint);
- 
+void spritesheet_draw(Spritesheet* s, Vector2 position, Vector2 origin_scale, float rotation, Color tint);
+
 // Unload the texture from GPU memory
 // ALWAYS remember to call this!!! or memory leak :(
-void spritesheet_free(Spritesheet *s);
+void spritesheet_free(Spritesheet* s);
 #endif

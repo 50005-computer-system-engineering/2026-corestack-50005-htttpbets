@@ -20,21 +20,21 @@ typedef enum {
 } MessageType;
 
 typedef struct {
-    uint32_t sourceId;
-    MessageType msgType;
-    unsigned char msgContent[MSG_CONTENT_LENGTH];
+    uint32_t source_id;
+    MessageType msg_type;
+    unsigned char msg_content[MSG_CONTENT_LENGTH];
 } Message;
 
 DEFINE_QUEUE(Message, Message, 500);
 
 // byte reading functions
-int readBytes(int sockfd, unsigned char **returnBuf, uint64_t length);
-int sendBytes(int sockfd, const unsigned char *buf, uint64_t length);
+int read_bytes(int sockfd, unsigned char** return_buf, uint64_t length);
+int send_bytes(int sockfd, const unsigned char* buf, uint64_t length);
 
 // messaging functions
-int receiveMessageTCP(int sockfd, Message *returnPtr);
-int receiveMessageUDP(int sockfd, Message *returnPtr);
-int sendMessageTCP(int sockfd, const Message completeMsg);
-int sendBroadcastUDP(int sockfd, const Message completeMsg);
+int receive_message_tcp(int sockfd, Message* return_ptr);
+int receive_message_udp(int sockfd, Message* return_ptr);
+int send_message_tcp(int sockfd, const Message COMPLETE_MSG);
+int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG);
 
 #endif

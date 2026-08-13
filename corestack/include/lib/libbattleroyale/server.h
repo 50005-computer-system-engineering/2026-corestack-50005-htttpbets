@@ -5,17 +5,17 @@
 
 typedef void BRServer;
 
-int brserver_init(BRServer **serverPtr);
-int brserver_open(BRServer *serverPtr);
-int brserver_start(BRServer *serverPtr);
-int brserver_end(BRServer *serverPtr);
+int brserver_init(BRServer** server_ptr);
+int brserver_open(BRServer* server_ptr);
+int brserver_start(BRServer* server_ptr);
+int brserver_end(BRServer* server_ptr);
 
-int brserver_client_info(BRServer *serverPtr, uint32_t *nClients, uint32_t *clientIds);
+int brserver_client_info(BRServer* server_ptr, uint32_t* n_clients, uint32_t* client_ids);
 
-int brserver_send_to_target(BRServer *serverPtr, uint32_t clientId, unsigned char content[1024]); // use defined value instead of explicit number
-int brserver_send_broadcast(BRServer *serverPtr, unsigned char content[1024]);
-int brserver_send_to_all(BRServer *serverPtr, unsigned char content[1024]);
+int brserver_send_to_target(BRServer* server_ptr, uint32_t client_id, unsigned char content[1024]); // use defined value instead of explicit number
+int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024]);
+int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024]);
 
-int brserver_get_app_msg(unsigned char returnMsg[1024]);
+int brserver_get_app_msg(unsigned char return_msg[1024]);
 
 #endif

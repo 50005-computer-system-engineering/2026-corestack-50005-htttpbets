@@ -13,7 +13,8 @@
 // TODO: Dynamically spawn and assign me!
 Bomberman player_bm;
 
-void initalise() {
+void initalise()
+{
     // Initialise event bus
     event_bus_init(EVENT_COUNT);
 
@@ -21,7 +22,7 @@ void initalise() {
     tiles_init();
 
     // Initialise player
-    player_bm = bomberman_create_default((Vector2) {1, 1});
+    player_bm = bomberman_create_default((Vector2){1, 1});
     player_init(&player_bm);
 
     // Init Camera after player
@@ -35,10 +36,10 @@ void initalise() {
 
     // Start playing battle music
     play_bgm(BGM_BATTLE);
-
 }
 
-void update_loop() {
+void update_loop()
+{
     // Update audio
     audio_update();
 
@@ -55,15 +56,16 @@ void update_loop() {
     camera_update(player_bm.box.position);
 }
 
-void draw_loop() {
+void draw_loop()
+{
     BeginDrawing();
     ClearBackground(SKYBLUE);
 
     // World-Space Renders
     BeginMode2D(camera);
-        tiles_draw();
-        bombs_draw();
-        bomberman_draw(&player_bm, WHITE);
+    tiles_draw();
+    bombs_draw();
+    bomberman_draw(&player_bm, WHITE);
     EndMode2D();
 
     // Static UI Renders
@@ -71,7 +73,8 @@ void draw_loop() {
     EndDrawing();
 }
 
-void cleanup() {
+void cleanup()
+{
     // Free event bus
     event_bus_free();
 
@@ -88,19 +91,19 @@ void cleanup() {
     audio_cleanup();
 }
 
-
-int main() {
+int main()
+{
     // (1) Init App
     // Force the program to look in the directory where the executable is running
-    ChangeDirectory(GetApplicationDirectory()); 
-    
+    ChangeDirectory(GetApplicationDirectory());
+
     // TODO: Uncomment during final release for fullscreen mode
     SetConfigFlags(FLAG_FULLSCREEN_MODE);
     InitWindow(0, 0, "Bombs Away! \U0001F4A3"); // bomb emoji
-    SetExitKey(KEY_NULL); // Prevent exit via escape key
-    
+    SetExitKey(KEY_NULL);                       // Prevent exit via escape key
+
     // Windowed mode for debugging purposes
-    //InitWindow(1200, 675, "Bombs Away! \U0001F4A3");
+    // InitWindow(1200, 675, "Bombs Away! \U0001F4A3");
     SetTargetFPS(60);
 
     initalise();

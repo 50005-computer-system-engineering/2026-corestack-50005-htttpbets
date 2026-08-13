@@ -17,19 +17,19 @@ typedef struct {
 // Asset paths
 typedef struct {
     const SpritesheetAsset PLAYER_STAND[4]; // Up, Down, Left, Right
-    const SpritesheetAsset PLAYER_WALK[4]; // Up, Down, Left, Right
+    const SpritesheetAsset PLAYER_WALK[4];  // Up, Down, Left, Right
     const SpritesheetAsset PLAYER_WIN;
 
-    const char* TILE_EMPTY;
-    const char* TILE_BREAKABLE;
-    const char* TILE_WALL;
-    const char* TILE_BOMB;
-    const char* TILE_POWERUP_BOMB;
-    const char* TILE_POWERUP_FIRE;
+    const char* const TILE_EMPTY;
+    const char* const TILE_BREAKABLE;
+    const char* const TILE_WALL;
+    const char* const TILE_BOMB;
+    const char* const TILE_POWERUP_BOMB;
+    const char* const TILE_POWERUP_FIRE;
 
-    const char* TILE_EXPLODE_CORE;
-    const char* TILE_EXPLODE_MID;
-    const char* TILE_EXPLODE_CAP;
+    const char* const TILE_EXPLODE_CORE;
+    const char* const TILE_EXPLODE_MID;
+    const char* const TILE_EXPLODE_CAP;
 } Assets;
 
 typedef struct {
@@ -45,10 +45,10 @@ typedef struct {
 } DefaultSettings;
 
 typedef struct {
-    Keybindings KEYS;
-    Assets ASSETS;
-    Physics PHYSICS;
-    DefaultSettings SETTINGS;
+    const Keybindings KEYS;
+    const Assets ASSETS;
+    const Physics PHYSICS;
+    const DefaultSettings SETTINGS;
 } Config;
 
 // Single global instance

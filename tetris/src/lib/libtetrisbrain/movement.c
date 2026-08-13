@@ -1,10 +1,9 @@
 #include "movement.h"
 #include "board_control.h"
 
-bool moveLeft(GameState *state)
+bool move_left(GameState* state)
 {
-    if (isValidPos(state, state->current.type, state->current.rot, state->current.x - 1, state->current.y))
-    {
+    if (is_valid_pos(state, state->current.type, state->current.rot, state->current.x - 1, state->current.y)) {
         state->current.x--;
         state->last_action_rotation = false;
         return true;
@@ -12,10 +11,9 @@ bool moveLeft(GameState *state)
     return false;
 }
 
-bool moveRight(GameState *state)
+bool move_right(GameState* state)
 {
-    if (isValidPos(state, state->current.type, state->current.rot, state->current.x + 1, state->current.y))
-    {
+    if (is_valid_pos(state, state->current.type, state->current.rot, state->current.x + 1, state->current.y)) {
         state->current.x++;
         state->last_action_rotation = false;
         return true;
@@ -23,10 +21,9 @@ bool moveRight(GameState *state)
     return false;
 }
 
-bool softDrop(GameState *state)
+bool soft_drop(GameState* state)
 {
-    if (isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1))
-    {
+    if (is_valid_pos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1)) {
         state->current.y++;
         state->last_action_rotation = false;
         return true;
@@ -34,11 +31,10 @@ bool softDrop(GameState *state)
     return false;
 }
 
-int hardDrop(GameState *state)
+int hard_drop(GameState* state)
 {
     int rows = 0;
-    while (isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1))
-    {
+    while (is_valid_pos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1)) {
         state->current.y++;
         rows++;
     }

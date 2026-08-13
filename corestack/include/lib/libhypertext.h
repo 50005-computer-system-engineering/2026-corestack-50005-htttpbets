@@ -1,8 +1,8 @@
 #ifndef LIBHT_H
 #define LIBHT_H
 
-#define MAX_BUF 1024     // kinda arbritrary rn
-#define MAX_HEADERS 16  // kinda arbritrary rn
+#define MAX_BUF 1024   // kinda arbritrary rn
+#define MAX_HEADERS 16 // kinda arbritrary rn
 
 // hypertext separators
 #define HT_END_LINE "\r\n"
@@ -13,17 +13,17 @@
 typedef char HyperText[MAX_BUF];
 
 typedef struct {
-    const char *field;
-    const char *value;
+    const char* field;
+    const char* value;
 } HeaderHT;
 
 typedef struct {
-    const char *token1;
-    const char *token2; 
-    const char *token3;
+    const char* token1;
+    const char* token2;
+    const char* token3;
     int n_headers;
     HeaderHT headers[MAX_HEADERS];
-    const char *body;
+    const char* body;
 } ParsedMsgHT;
 
 /* macros to get version, method, path for requests */
@@ -36,14 +36,14 @@ typedef struct {
 #define HT_RES_CODE(req) ((req)->token2)
 #define HT_RES_REASON(req) ((req)->token3)
 
-char *next_token(char *s, char *delim);
-int parse_hypertext(HyperText ht, ParsedMsgHT *parser_result);
+char* next_token(char* s, char* delim);
+int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result);
 
-int req_init(ParsedMsgHT *new_req, const char *method, const char *path, const char *ver);
-int res_init(ParsedMsgHT *new_res, const char *ver, const char *code, const char *reason);
-int msg_add_header(ParsedMsgHT *msg, const char *field, const char *value);
-int msg_add_body(ParsedMsgHT *msg, const char *body);
+int req_init(ParsedMsgHT* new_req, const char* method, const char* path, const char* ver);
+int res_init(ParsedMsgHT* new_res, const char* ver, const char* code, const char* reason);
+int msg_add_header(ParsedMsgHT* msg, const char* field, const char* value);
+int msg_add_body(ParsedMsgHT* msg, const char* body);
 
-int convert_to_hypertext(ParsedMsgHT *msg, HyperText converted_ht);
+int convert_to_hypertext(ParsedMsgHT* msg, HyperText converted_ht);
 
 #endif

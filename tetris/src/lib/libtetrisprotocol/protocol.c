@@ -7,7 +7,7 @@
 
 /* ----- INTERNAL HELPERS ----- */
 // Writes the packet tag at offset 0 and returns where the payload should start
-static unsigned char *writeTag(unsigned char buffer[512], PacketType type)
+static unsigned char* write_tag(unsigned char buffer[512], PacketType type)
 {
     uint32_t tag = htonl(type);
     memset(buffer, 0, 512); // Clear any stale bytes from a previous send
@@ -16,13 +16,13 @@ static unsigned char *writeTag(unsigned char buffer[512], PacketType type)
 }
 
 // Mirror of writeTag for the receiving side
-static const unsigned char *payloadStart(const unsigned char buffer[512])
+static const unsigned char* payload_start(const unsigned char buffer[512])
 {
     return buffer + TAG_SIZE;
 }
 
 /* ----- TAG ----- */
-uint32_t readPacketTag(const unsigned char buffer[512])
+uint32_t read_packet_tag(const unsigned char buffer[512])
 {
     uint32_t tag;
     memcpy(&tag, buffer, TAG_SIZE);
@@ -30,9 +30,9 @@ uint32_t readPacketTag(const unsigned char buffer[512])
 }
 
 /* ----- ATTACK ----- */
-void packAttack(unsigned char buffer[512], const AttackPayload *payload)
+void pack_attack(unsigned char buffer[512], const AttackPayload* payload)
 {
-    unsigned char *out = writeTag(buffer, PACKET_ATTACK);
+    unsigned char* out = write_tag(buffer, PACKET_ATTACK);
 
     // Convert every field into network byte order before it leaves client
     AttackPayload net = {
@@ -43,10 +43,10 @@ void packAttack(unsigned char buffer[512], const AttackPayload *payload)
     memcpy(out, &net, sizeof(AttackPayload));
 }
 
-void unpackAttack(const unsigned char buffer[512], AttackPayload *payload)
+void unpack_attack(const unsigned char buffer[512], AttackPayload* payload)
 {
     AttackPayload net;
-    memcpy(&net, payloadStart(buffer), sizeof(AttackPayload));
+    memcpy(&net, payload_start(buffer), sizeof(AttackPayload));
 
     // Convert back into readable host integers
     payload->source_player = ntohl(net.source_player);
@@ -55,36 +55,34 @@ void unpackAttack(const unsigned char buffer[512], AttackPayload *payload)
 }
 
 /* ----- ROSTER ----- */
-void packRoster(unsigned char buffer[512], const RosterPayload *payload)
+void pack_roster(unsigned char buffer[512], const RosterPayload* payload)
 {
-    unsigned char *out = writeTag(buffer, PACKET_ROSTER);
+    unsigned char* out = write_tag(buffer, PACKET_ROSTER);
 
     RosterPayload net = {0};
     net.count = htonl(payload->count);
-    for (uint32_t i = 0; i < MAX_LOBBY_SIZE; i++)
-    {
+    for (uint32_t i = 0; i < MAX_LOBBY_SIZE; i++) {
         net.ids[i] = htonl(payload->ids[i]);
     }
 
     memcpy(out, &net, sizeof(RosterPayload));
 }
 
-void unpackRoster(const unsigned char buffer[512], RosterPayload *payload)
+void unpack_roster(const unsigned char buffer[512], RosterPayload* payload)
 {
     RosterPayload net;
-    memcpy(&net, payloadStart(buffer), sizeof(RosterPayload));
+    memcpy(&net, payload_start(buffer), sizeof(RosterPayload));
 
     payload->count = ntohl(net.count);
-    for (uint32_t i = 0; i < MAX_LOBBY_SIZE; i++)
-    {
+    for (uint32_t i = 0; i < MAX_LOBBY_SIZE; i++) {
         payload->ids[i] = ntohl(net.ids[i]);
     }
 }
 
 /* ----- INPUT ----- */
-void packInput(unsigned char buffer[512], const InputPayload *payload)
+void pack_input(unsigned char buffer[512], const InputPayload* payload)
 {
-    unsigned char *out = writeTag(buffer, PACKET_INPUT);
+    unsigned char* out = write_tag(buffer, PACKET_INPUT);
 
     InputPayload net = {
         .player_id = htonl(payload->player_id),
@@ -93,19 +91,19 @@ void packInput(unsigned char buffer[512], const InputPayload *payload)
     memcpy(out, &net, sizeof(InputPayload));
 }
 
-void unpackInput(const unsigned char buffer[512], InputPayload *payload)
+void unpack_input(const unsigned char buffer[512], InputPayload* payload)
 {
     InputPayload net;
-    memcpy(&net, payloadStart(buffer), sizeof(InputPayload));
+    memcpy(&net, payload_start(buffer), sizeof(InputPayload));
 
     payload->player_id = ntohl(net.player_id);
     payload->action = ntohl(net.action);
 }
 
 /* ----- STATE ----- */
-void packState(unsigned char buffer[512], const StatePayload *payload)
+void pack_state(unsigned char buffer[512], const StatePayload* payload)
 {
-    unsigned char *out = writeTag(buffer, PACKET_STATE);
+    unsigned char* out = write_tag(buffer, PACKET_STATE);
 
     StatePayload net;
 
@@ -117,8 +115,7 @@ void packState(unsigned char buffer[512], const StatePayload *payload)
     net.current_rot = htonl(payload->current_rot);
     net.current_x = (int32_t)htonl((uint32_t)payload->current_x);
     net.current_y = (int32_t)htonl((uint32_t)payload->current_y);
-    for (int i = 0; i < 3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         net.preview[i] = htonl(payload->preview[i]);
     }
     net.held_type = (int32_t)htonl((uint32_t)payload->held_type);
@@ -140,10 +137,10 @@ void packState(unsigned char buffer[512], const StatePayload *payload)
     memcpy(out, &net, sizeof(StatePayload));
 }
 
-void unpackState(const unsigned char buffer[512], StatePayload *payload)
+void unpack_state(const unsigned char buffer[512], StatePayload* payload)
 {
     StatePayload net;
-    memcpy(&net, payloadStart(buffer), sizeof(StatePayload));
+    memcpy(&net, payload_start(buffer), sizeof(StatePayload));
 
     memcpy(payload->board, net.board, sizeof(payload->board));
 
@@ -151,8 +148,7 @@ void unpackState(const unsigned char buffer[512], StatePayload *payload)
     payload->current_rot = ntohl(net.current_rot);
     payload->current_x = (int32_t)ntohl((uint32_t)net.current_x);
     payload->current_y = (int32_t)ntohl((uint32_t)net.current_y);
-    for (int i = 0; i < 3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         payload->preview[i] = ntohl(net.preview[i]);
     }
     payload->held_type = (int32_t)ntohl((uint32_t)net.held_type);
@@ -174,7 +170,7 @@ void unpackState(const unsigned char buffer[512], StatePayload *payload)
 
 /* ----- GAMESTATE <-> STATEPAYLOAD ----- */
 // Server side, flattens the authoritative board into something sendable
-void buildStatePayload(const GameState *state, StatePayload *payload)
+void build_state_payload(const GameState* state, StatePayload* payload)
 {
     memcpy(payload->board, state->board.cells, sizeof(payload->board));
 
@@ -184,8 +180,7 @@ void buildStatePayload(const GameState *state, StatePayload *payload)
     payload->current_y = (int32_t)state->current.y;
 
     // Pull the same 3 pieces the client's preview box will draw
-    for (int i = 0; i < 3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         payload->preview[i] = (uint32_t)state->bag[(state->bag_index + i) % 14];
     }
 
@@ -210,7 +205,7 @@ void buildStatePayload(const GameState *state, StatePayload *payload)
 
 // Client side, copies a received snapshot into the local GameState render mirror
 // Only the fields the renderer reads are touched
-void applyStatePayload(const StatePayload *payload, GameState *state)
+void apply_state_payload(const StatePayload* payload, GameState* state)
 {
     memcpy(state->board.cells, payload->board, sizeof(payload->board));
 
@@ -218,12 +213,11 @@ void applyStatePayload(const StatePayload *payload, GameState *state)
     state->current.rot = (Rotation)payload->current_rot;
     state->current.x = (int)payload->current_x;
     state->current.y = (int)payload->current_y;
-    
+
     // Rebuild just enough of the bag for the preview box to read normally
     // Index is pinned to 0 so bag[0], bag[1], bag[2] line up with the 3 sent pieces
     state->bag_index = 0;
-    for (int i = 0; i < 3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         state->bag[i] = (int)payload->preview[i];
     }
 

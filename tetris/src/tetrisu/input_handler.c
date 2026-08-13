@@ -9,13 +9,12 @@
 #include "lib/libbattleroyale/client.h"
 
 // Instantiate network client
-extern BRClient *network_client;
+extern BRClient* network_client;
 
 // Ships one requested action to the server
-static void sendAction(GameState *state, PlayerAction action)
+static void send_action(GameState* state, PlayerAction action)
 {
-    if (network_client == NULL)
-    {
+    if (network_client == NULL) {
         return; // No connection, nothing to ask
     }
 
@@ -25,18 +24,17 @@ static void sendAction(GameState *state, PlayerAction action)
             .action = (uint32_t)action};
 
     unsigned char buffer[512] = {0};
-    packInput(buffer, &payload);
+    pack_input(buffer, &payload);
 
     brclient_send_msg(network_client, buffer);
 }
 
 // Process all pending terminal inputs
 // Every branch is now a pure keybind -> action mapping
-void processInputs(GameState *state)
+void process_inputs(GameState* state)
 {
     // Read user inputs
-    while (kbhit())
-    {
+    while (kbhit()) {
         // Call getchar() wrapper
         int key = getchar();
 
@@ -48,52 +46,44 @@ void processInputs(GameState *state)
             {
                 if (kbhit()) // Decide output based on letter
                 {
-                    switch (getchar())
-                    {
+                    switch (getchar()) {
                     case 'A': // Up arrow (rotate clockwise)
-                        sendAction(state, ACTION_ROTATE_CW);
+                        send_action(state, ACTION_ROTATE_CW);
                         break;
                     case 'D': // Left arrow
-                        sendAction(state, ACTION_MOVE_LEFT);
+                        send_action(state, ACTION_MOVE_LEFT);
                         break;
                     case 'C': // Right arrow
-                        sendAction(state, ACTION_MOVE_RIGHT);
+                        send_action(state, ACTION_MOVE_RIGHT);
                         break;
                     case 'B': // Down arrow (soft drop + lock delay)
-                        sendAction(state, ACTION_SOFT_DROP);
+                        send_action(state, ACTION_SOFT_DROP);
                         break;
                     }
                 }
             }
-        }
-        else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
+        } else if (key == 'x' || key == 'X') // Rotate clockwise (alternate key)
         {
-            sendAction(state, ACTION_ROTATE_CW);
-        }
-        else if (key == 'z' || key == 'Z') // Rotate counterclockwise
+            send_action(state, ACTION_ROTATE_CW);
+        } else if (key == 'z' || key == 'Z') // Rotate counterclockwise
         {
-            sendAction(state, ACTION_ROTATE_CCW);
-        }
-        else if (key == 't' || key == 'T') // Change target mode
+            send_action(state, ACTION_ROTATE_CCW);
+        } else if (key == 't' || key == 'T') // Change target mode
         {
-            sendAction(state, ACTION_CYCLE_TARGET_MODE);
-        }
-        else if (key == 'r' || key == 'R') // Change target ID
+            send_action(state, ACTION_CYCLE_TARGET_MODE);
+        } else if (key == 'r' || key == 'R') // Change target ID
         {
-            sendAction(state, ACTION_CYCLE_TARGET);
-        }
-        else if (key == ' ') // Spacebar (hard drop)
+            send_action(state, ACTION_CYCLE_TARGET);
+        } else if (key == ' ') // Spacebar (hard drop)
         {
-            sendAction(state, ACTION_HARD_DROP);
-        }
-        else if (key == 'h' || key == 'H') // H to hold
+            send_action(state, ACTION_HARD_DROP);
+        } else if (key == 'h' || key == 'H') // H to hold
         {
-            sendAction(state, ACTION_HOLD);
-        }
-        else if (key == 'q' || key == 'Q') // Q to quit
+            send_action(state, ACTION_HOLD);
+        } else if (key == 'q' || key == 'Q') // Q to quit
         {
             // Tell the server we are leaving so it frees our slot and stops anyone from targeting us, then close down locally
-            sendAction(state, ACTION_QUIT);
+            send_action(state, ACTION_QUIT);
             state->game_over = true;
             break; // Exit
         }

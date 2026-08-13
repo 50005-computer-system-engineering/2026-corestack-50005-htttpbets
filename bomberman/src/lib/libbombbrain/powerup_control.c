@@ -7,7 +7,8 @@
 
 TileType** powerups_to_spawn;
 
-void powerup_init() {
+void powerup_init()
+{
     powerups_to_spawn = (TileType**)malloc(map_size * sizeof(TileType*));
     // Allocate space for each individual row
     for (int i = 0; i < map_size; i++) {
@@ -19,7 +20,8 @@ void powerup_init() {
     }
 }
 
-void powerup_free() {
+void powerup_free()
+{
     if (powerups_to_spawn == NULL)
         return;
 
@@ -32,7 +34,8 @@ void powerup_free() {
     powerups_to_spawn = NULL;
 }
 
-void spawn_pending_powerups(ExplosionInfo* explosion) {
+void spawn_pending_powerups(ExplosionInfo* explosion)
+{
     if (powerups_to_spawn == NULL)
         return;
 
@@ -48,7 +51,8 @@ void spawn_pending_powerups(ExplosionInfo* explosion) {
 }
 
 // Assume that we only call this when the tile is valid!
-void randomise_powerup(int x, int y) {
+void randomise_powerup(int x, int y)
+{
     // (1) Check spawn rate
     int rng = rand() % 100;
     if (rng > POWERUP_CHANCE)

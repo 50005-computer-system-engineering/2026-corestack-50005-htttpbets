@@ -46,4 +46,5 @@ CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS)
 # -g            	embed debug symbols for gdb/valgrind
 # -pthread      	tell the compiler (and linker) to enable POSIX thread support.
 #                 	Needed for pthreads, mutexes, and condition vars.
-COMMON_CFLAGS := -Wall -Wextra -g -pthread
+# -lcrypto      	link against libcrypto for SSL/TLS
+COMMON_CFLAGS := -Wall -Wextra -g -pthread -lcrypto
