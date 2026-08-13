@@ -257,7 +257,7 @@ int main(void)
 
             unsigned char feed_buffer[512] = {0};
             pack_attack(feed_buffer, &feed);
-            brserver_send_broadcast(server, feed_buffer);
+            brserver_send_to_all(server, feed_buffer);
         }
 
         /* --- Push state to anyone whose board changed --- */
@@ -320,7 +320,7 @@ int main(void)
 
         unsigned char state_buffer[512] = {0};
         pack_state(state_buffer, &snapshot);
-        brserver_send_broadcast(server, state_buffer);
+        brserver_send_to_all(server, state_buffer);
     }
 
     log_message(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", log_client_get_dropped_count(&log_client));
