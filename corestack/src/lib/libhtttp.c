@@ -185,3 +185,8 @@ void req_create_attack(uint32_t id, AttackPayload *payload, ParsedMsgHT *formatt
     sprintf(content_len, "%u", (unsigned)strlen(body));
     msg_add_header(formattedMsg, "Content-Length", content_len);
 }
+
+void req_extract_info(ParsedMsgHT formatted_msg, MethodHTTTP *method, uint32_t *id, char **body)
+{
+    
+}
