@@ -308,7 +308,7 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all init deps run unit integration test clean clean-deps distclean
+.PHONY: all init deps run unit integration test clean clean-deps distclean lint
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
@@ -380,3 +380,10 @@ clean:
 distclean: 
 	clean clean-deps
 	rm -rf $(DEPS_DIR)
+
+# Fix variable naming via clang-tidy, 
+# then running clang-format to fix layout (spacing & brackets)
+# tidy > format as renames can change line lengths
+lint: init # Generate compile_commands.json first
+	clang-tidy -p . --fix --fix-errors ${SOURCES}; \
+	clang-format -i ${SOURCES}; \
