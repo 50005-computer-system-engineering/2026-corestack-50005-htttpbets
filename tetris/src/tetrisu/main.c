@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <signal.h>
 #include "lib/libeventbus.h"
 #include "config.h"
 #include "events.h"
@@ -34,11 +35,23 @@ static void trim_newline(char* s)
     }
 }
 
+// Intercepts SIGINT (CTRL + C) for graceful exit
+static void handle_sigint(int sig)
+{
+    (void)sig;
+    
+    // Normal Termination
+    exit(0);
+}
+
 // --- MAIN GAME LOOP ---
 int main(void)
 {
     // PATCH FIX FOR FLICKERING TERMINAL
     setvbuf(stdout, NULL, _IOFBF, 16384);
+
+    // SIGINT Handler
+    signal(SIGINT, handle_sigint);
 
     // Clear terminal screen
     printf("\e[1;1H\e[2J");
