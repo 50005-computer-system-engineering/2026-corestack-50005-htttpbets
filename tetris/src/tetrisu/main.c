@@ -16,7 +16,7 @@
 #include "lib/libtetrisbrain/killfeed.h"
 #include "lib/libbattleroyale/client.h"
 
-// How long to wait for the host to start the match before giving up (1 minutes)
+// How long to wait for the host to start the match before giving up (1 minute)
 #define LOBBY_WAIT_TIMEOUT_MS (60 * 1000)
 
 // Global network client
@@ -48,7 +48,7 @@ int main(void)
     char server_ip[INET_ADDRSTRLEN + 2] = {0}; // To store server IPV4 addr
     while (true) {
         printf("Enter server IP (default 127.0.0.1): ");
-        fflush(stdout); // Prompt must abbear before we block on input
+        fflush(stdout); // Prompt must appear before we block on input
 
         // Get user input for server IPV4 address
         if (fgets(server_ip, sizeof(server_ip), stdin) == NULL) // Failed
@@ -127,6 +127,7 @@ int main(void)
 
     // --- THE GAME LOOP ---
     while (!gamestate_player.game_over) {
+
         // Deal with active inputs
         process_inputs(&gamestate_player);
 
@@ -134,6 +135,7 @@ int main(void)
         unsigned char net_buffer[512] = {0};
 
         while (brclient_get_app_msg(net_buffer) == 1) {
+            
             uint32_t tag = read_packet_tag(net_buffer);
 
             if (tag == PACKET_STATE) // Authoritative board pushed by the server

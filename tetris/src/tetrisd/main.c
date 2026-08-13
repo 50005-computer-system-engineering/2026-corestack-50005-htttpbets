@@ -232,6 +232,7 @@ int main(void)
         /* --- Advance every board by one tick --- */
         tick_session(&session);
         log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH);
+        
         // Elimination Check
         for (int i = 0; i < session.count; i++) {
             PlayerSlot* slot = &session.players[i];

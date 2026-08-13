@@ -20,10 +20,12 @@ void draw_board(GameState* state)
     }
 
     for (int y = 0; y < BOARD_HEIGHT; y++) {
+        
         // Draw the Left Wall
         printf("<|>");
 
         for (int x = 0; x < BOARD_WIDTH; x++) {
+
             // Check if the active piece is hovering over this exact (X, Y)
             bool is_active_piece_here = false;
             bool is_ghost_piece_here = false;

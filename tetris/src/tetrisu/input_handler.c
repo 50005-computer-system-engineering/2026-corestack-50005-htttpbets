@@ -35,6 +35,7 @@ void process_inputs(GameState* state)
 {
     // Read user inputs
     while (kbhit()) {
+        
         // Call getchar() wrapper
         int key = getchar();
 
