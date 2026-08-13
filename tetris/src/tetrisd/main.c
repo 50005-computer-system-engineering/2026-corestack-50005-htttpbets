@@ -59,7 +59,7 @@ int main(void)
                 continue;
             }
 
-            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr; // Cast to sockaddr_in (IPV4) to process
+            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;            // Cast to sockaddr_in (IPV4) to process
             if (inet_ntop(AF_INET, &sa->sin_addr, host_ip, INET_ADDRSTRLEN) != NULL) // Convert binary address into readable texts
             {
                 break; // First candidate found
@@ -102,11 +102,16 @@ int main(void)
     // Wait dynamically for lobby to fill
     printf("[tetrisd] Lobby open! Need at least %d player(s).\n", MIN_LOBBY_SIZE);
     printf("[tetrisd] Press ENTER at any time once ready to start the game.\n");
+    uint32_t lastReported = UINT32_MAX;
     while (1)
     {
         brserver_client_info(server, &lobbySize, clientIds);
-        printf("\r[tetrisd] %u player(s) connected...\n", lobbySize);
-        fflush(stdout);
+        // Only announce on actual change
+        if (lobbySize != lastReported)
+        {
+            printf("[tetrisd] %u player(s) connected...\n", lobbySize);
+            lastReported = lobbySize;
+        }
 
         if (lobbySize >= MIN_LOBBY_SIZE && enterPressed())
         {
@@ -169,8 +174,12 @@ int main(void)
     // Array buffer for message queue
     unsigned char buffer[512] = {0};
 
+    // A battle royale ends when only one player is left standing. A solo match
+    // (single player testing on localhost) instead runs until that player tops out
+    int min_alive = (session.count > 1) ? 2 : 1;
+
     // Authoritative tick loop; non-blocking
-    while (1)
+    while (countAlivePlayers(&session) >= min_alive)
     {
         /* --- Drain whatever the clients sent since the last tick --- */
         // Bounded so a flood of packets can never starve the simulation below
@@ -263,8 +272,54 @@ int main(void)
         usleep(TICK_MICROSECONDS); // Advance at a fixed rate
     }
 
+    /* --- MATCH OVER --- */
+    // Announce the survivor, if there is one
+    uint32_t winner_id = 0;
+    for (int i = 0; i < session.count; i++) // Loop through all players
+    {
+        if (session.players[i].active && !session.players[i].state.game_over) // Player must be active and have not topped out
+        {
+            winner_id = session.players[i].player_id;
+            break;
+        }
+    }
+
+    if (winner_id != 0) // Found a winner
+    {
+        printf("\n[tetrisd] MATCH OVER! Winner: P%u\n", winner_id);
+    }
+    else
+    {
+        // No winner found
+        printf("\n[tetrisd] MATCH OVER! No survivors.\n");
+    }
+
+    // Mark everyone finished and push one final state each so every client can exit its loop cleanly
+    for (int i = 0; i < session.count; i++)
+    {
+        PlayerSlot *slot = &session.players[i];
+
+        if (!slot->active)
+        {
+            continue; // Already gone, nothing listening
+        }
+
+        slot->state.game_over = true;
+        slot->state.winner_id = winner_id;
+
+        StatePayload snapshot;
+        buildStatePayload(&slot->state, &snapshot);
+
+        unsigned char state_buffer[512] = {0};
+        packState(state_buffer, &snapshot);
+        brserver_send_broadcast(server, state_buffer);
+    }
+
+    // Give the final broadcast a moment to land before tearing down the sockets
+    usleep(500000); // 500ms
+
     // Clean up
     brserver_end(server);
-    printf("[tetrisd] Client disconnected or error occurred. Shutting down.\n");
+    printf("[tetrisd] Shutting down.\n");
     return 0;
 }

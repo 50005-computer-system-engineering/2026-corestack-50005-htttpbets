@@ -30,6 +30,7 @@ void startGame(GameState *state)
     state->level = 1;
     state->pending_garbage = 0;
     state->outgoing_garbage = 0;
+    state->winner_id = 0;
 
     // Initialize the 14-bag for preview pieces
     int bag1[7] = {1, 2, 3, 4, 5, 6, 7};

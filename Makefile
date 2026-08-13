@@ -10,7 +10,7 @@
 #	make distclean 	wipe everything including dependencies downloaded
 # ======================================================================
 
-.PHONY: all corestack tetris bomberman test clean distclean
+.PHONY: all corestack tetris bomberman test clean distclean lint
 
 all: corestack tetris bomberman
 
@@ -43,3 +43,18 @@ clean:
 # Also remove dependencies (eg: raylib build)
 distclean: clean
 	$(MAKE) -C bomberman distclean
+
+# Run clang-format (spacing & brackets) on all source files
+format:
+	${MAKE} -C corestack format
+	${MAKE} -C tetris    format
+	${MAKE} -C bomberman format
+
+# Fix variable naming via clang-tidy, 
+# then running clang-format to fix layout (spacing & brackets)
+# tidy > format as renames can change line lengths
+lint:
+	${MAKE} -C corestack lint
+	${MAKE} -C tetris    lint
+	${MAKE} -C bomberman lint
+

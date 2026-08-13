@@ -42,6 +42,7 @@ typedef struct
     bool b2b;
     int level;
     int game_over;
+    uint32_t winner_id;
 } GameState;
 
 // Establish game state

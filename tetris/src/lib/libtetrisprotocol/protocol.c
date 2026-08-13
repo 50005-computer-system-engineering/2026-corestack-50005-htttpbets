@@ -135,6 +135,7 @@ void packState(unsigned char buffer[512], const StatePayload *payload)
     net.target_player_id = htonl(payload->target_player_id);
     net.target_mode = htonl(payload->target_mode);
     net.game_over = htonl(payload->game_over);
+    net.winner_id = htonl(payload->winner_id);
 
     memcpy(out, &net, sizeof(StatePayload));
 }
@@ -168,6 +169,7 @@ void unpackState(const unsigned char buffer[512], StatePayload *payload)
     payload->target_player_id = ntohl(net.target_player_id);
     payload->target_mode = ntohl(net.target_mode);
     payload->game_over = ntohl(net.game_over);
+    payload->winner_id = ntohl(net.winner_id);
 }
 
 /* ----- GAMESTATE <-> STATEPAYLOAD ----- */
@@ -203,6 +205,7 @@ void buildStatePayload(const GameState *state, StatePayload *payload)
     payload->target_player_id = state->target_player_id;
     payload->target_mode = (uint32_t)state->target_mode;
     payload->game_over = (uint32_t)state->game_over;
+    payload->winner_id = state->winner_id;
 }
 
 // Client side, copies a received snapshot into the local GameState render mirror
@@ -240,4 +243,5 @@ void applyStatePayload(const StatePayload *payload, GameState *state)
     state->target_player_id = payload->target_player_id;
     state->target_mode = (TargetingMode)payload->target_mode;
     state->game_over = (int)payload->game_over;
+    state->winner_id = payload->winner_id;
 }
