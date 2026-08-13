@@ -15,12 +15,13 @@ IndentCaseLabels: false
 BreakBeforeBraces: Linux
 
 # --- Line length / wrapping ---
-ColumnLimit: 120
+ColumnLimit: 0
 AlignAfterOpenBracket: Align
 AllowShortBlocksOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
 BinPackArguments: true
 BinPackParameters: true
 
@@ -38,7 +39,7 @@ SpaceBeforeAssignmentOperators: true
 # --- Control flow formatting ---
 IndentCaseBlocks: false
 BreakBeforeBinaryOperators: None
-BreakBeforeTernaryOperators: true
+BreakBeforeTernaryOperators: false
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
 

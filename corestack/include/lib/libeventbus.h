@@ -3,7 +3,7 @@
 
 /**
  *  Event Bus System to allow events to be listened to/broadcast.
- * 
+ *
  *  Example Usage:
  *  // Initialise Event Bus
  *  event_bus_init(EVENT_COUNT);
@@ -22,14 +22,14 @@
  *
  *  // Stop listening to events
  *  event_bus_stop_listening(EVENT_PLAYER_MOVE, on_player_move);
- *  
+ *
  *  // Free event bus
  *  event_bus_free();
  */
 
 // Listener function signature
 // args is cast to whatever struct the event uses
-typedef void (*EventListener)(void *args);
+typedef void (*EventListener)(void* args);
 
 /**
  * @brief Initialise event bus with number of events required.
@@ -47,7 +47,7 @@ void event_bus_free(void);
 
 /**
  * @brief Start listening for an event
- * 
+ *
  * @param event_type enum of event type
  * @param listener listener function
  */
@@ -67,5 +67,5 @@ void event_bus_stop_listening(int event_type, EventListener listener);
  * @param event_type enum of event type
  * @param args arguments to provide to listeners
  */
-void event_bus_trigger(int event_type, void *args);
+void event_bus_trigger(int event_type, void* args);
 #endif

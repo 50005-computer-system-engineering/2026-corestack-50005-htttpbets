@@ -10,46 +10,52 @@
 Music bgm_tracks[BGM_COUNT] = {0};
 Sound sfx_tracks[SFX_COUNT] = {0};
 
-Music* currBgm = NULL;
+Music* curr_bgm = NULL;
 
-static void SetSoundPosition(Camera2D listener, Sound sound, Vector2 soundPos, float maxDist)
+static void set_sound_position(Camera2D listener, Sound sound, Vector2 sound_pos, float max_dist)
 {
-    maxDist *= CONFIG.PHYSICS.TILE_SIZE;
+    max_dist *= CONFIG.PHYSICS.TILE_SIZE;
 
-     // Vector from listener to sound source
-    Vector2 dir = Vector2Subtract(Vector2Scale(soundPos, CONFIG.PHYSICS.TILE_SIZE), listener.target);
+    // Vector from listener to sound source
+    Vector2 dir = Vector2Subtract(Vector2Scale(sound_pos, CONFIG.PHYSICS.TILE_SIZE), listener.target);
     float distance = Vector2Length(dir);
 
     // Calculate volume attenuation (clamp between 0.0f and 1.0f)
-    float volume = 1.0f / (1.0f + (distance / maxDist));
-    if (volume > 1.0f) volume = 1.0f;
-    if (volume < 0.0f) volume = 0.0f;
+    float volume = 1.0f / (1.0f + (distance / max_dist));
+    if (volume > 1.0f)
+        volume = 1.0f;
+    if (volume < 0.0f)
+        volume = 0.0f;
 
     // Calculate stereo pan based on horizontal X offset (-maxDist to +maxDist)
-    float panOffset = dir.x / maxDist;
-    float pan = 0.5f + (panOffset * 0.5f);
-    if (pan > 1.0f) pan = 1.0f;
-    if (pan < 0.0f) pan = 0.0f;
+    float pan_offset = dir.x / max_dist;
+    float pan = 0.5f + (pan_offset * 0.5f);
+    if (pan > 1.0f)
+        pan = 1.0f;
+    if (pan < 0.0f)
+        pan = 0.0f;
 
     // Apply values to raylib sound
     SetSoundVolume(sound, volume);
     SetSoundPan(sound, pan);
 }
 
-void on_bomb_exploded(void *args) {
-    TileEventArgs *a = (TileEventArgs *)args;
-    SetSoundPosition(camera, sfx_tracks[SFX_BOMB], (Vector2){a->x, a->y}, 10.0f);
+void on_bomb_exploded(void* args)
+{
+    TileEventArgs* a = (TileEventArgs*)args;
+    set_sound_position(camera, sfx_tracks[SFX_BOMB], (Vector2){a->x, a->y}, 10.0f);
     play_sound(SFX_BOMB);
 }
 
-void audio_init() {
+void audio_init()
+{
     InitAudioDevice();
 
     // Get the current working directory
-    const char *currentDir = GetWorkingDirectory();
-    
+    const char* current_dir = GetWorkingDirectory();
+
     // Print it to the console/terminal
-    printf("Current working directory: %s\n", currentDir);
+    printf("Current working directory: %s\n", current_dir);
 
     // Initialise BGM tracks
     bgm_tracks[BGM_TITLE] = LoadMusicStream("../../assets/audio/bgm/01_Title.mp3");
@@ -73,29 +79,32 @@ void audio_init() {
     // Listen for events
     event_bus_listen(EVENT_BOMB_EXPLODED, on_bomb_exploded);
 }
-    
 
-void audio_update() {
-    if (currBgm != NULL)
-        UpdateMusicStream(*currBgm);
+void audio_update()
+{
+    if (curr_bgm != NULL)
+        UpdateMusicStream(*curr_bgm);
 }
 
-void play_sound(SFX sfx) {
+void play_sound(SFX sfx)
+{
     PlaySound(sfx_tracks[sfx]);
 }
 
-void play_bgm(BGM bgm) {
-    if (currBgm != NULL)
-        StopMusicStream(*currBgm);
-    currBgm = &bgm_tracks[bgm];
-    PlayMusicStream(*currBgm);
+void play_bgm(BGM bgm)
+{
+    if (curr_bgm != NULL)
+        StopMusicStream(*curr_bgm);
+    curr_bgm = &bgm_tracks[bgm];
+    PlayMusicStream(*curr_bgm);
 }
 
-void audio_cleanup() {
+void audio_cleanup()
+{
     // Unload all bgm
     for (int i = 0; i < BGM_COUNT; i++)
         UnloadMusicStream(bgm_tracks[i]);
-    
+
     // Unload all sfx
     for (int i = 0; i < SFX_COUNT; i++)
         UnloadSound(sfx_tracks[i]);

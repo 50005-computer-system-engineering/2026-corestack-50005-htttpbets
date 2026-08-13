@@ -25,9 +25,9 @@
 
 // common structs throughout
 typedef struct {
-    int tcp;            // important singlecast
-    int udpUni;      // unimportant singlecast
-    int udpBroad;       // broadcasts
+    int tcp;       // important singlecast
+    int udp_uni;   // unimportant singlecast
+    int udp_broad; // broadcasts
 } Sockets;
 
 typedef enum {
@@ -38,20 +38,20 @@ typedef enum {
 } EndpointState;
 
 typedef struct {
-    uint32_t id;                        // Own ID
+    uint32_t id; // Own ID
     EndpointState state;
-    Sockets *socks;                  // track sockets
+    Sockets* socks; // track sockets
     // MessageQueue messages;
 } Endpoint;
 
 // functions for sockets
-int checkSockets(Sockets socks);
-int createSockets(Sockets **socks);
-int closeSockets(Sockets *socks);
-int freeSockets(Sockets **socks);
+int check_sockets(Sockets socks);
+int create_sockets(Sockets** socks);
+int close_sockets(Sockets* socks);
+int free_sockets(Sockets** socks);
 
 // functions for endpoints
-int createEndpoint(Endpoint **endpt);
-int freeEndpoint(Endpoint **endpt);
+int create_endpoint(Endpoint** endpt);
+int free_endpoint(Endpoint** endpt);
 
 #endif

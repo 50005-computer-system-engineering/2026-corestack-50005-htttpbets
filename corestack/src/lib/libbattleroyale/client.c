@@ -4,50 +4,46 @@
 #include "common.h"
 #include "crypto.h"
 
-static MessageQueue clientMessages;
-static pthread_mutex_t clientMessagesLock;
-static int pcFlags[2] = {0, 0};
+static MessageQueue client_messages;
+static pthread_mutex_t client_messages_lock;
+static int pc_flags[2] = {0, 0};
 
 // private functions
-int connectOnTCP(Sockets *socks, char *serverIp)
+int connect_on_tcp(Sockets* socks, char* server_ip)
 {
-    LOG_I("[connectToServer()] Attempting connection to server at %s:%d...", serverIp, PORT_TCP);
+    LOG_I("[connectToServer()] Attempting connection to server at %s:%d...", server_ip, PORT_TCP);
     // sockaddr_in of server to connect to
-    struct sockaddr_in serverAddr = {
+    struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
         .sin_port = htons(PORT_TCP),
     };
-    if (inet_pton(AF_INET, serverIp, &serverAddr.sin_addr) < 0) 
-    {
+    if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) < 0) {
         perror("[client connectToServer()] inet_pton");
         return -1;
     }
-    int serverFd = connect(socks->tcp, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-    if (serverFd < 0) 
-    {
+    int server_fd = connect(socks->tcp, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    if (server_fd < 0) {
         perror("[client connectToServer()] connect");
         return -1;
     }
     LOG_I("[client connectToServer()] connection to server success");
-    return serverFd;
+    return server_fd;
 }
 
-int prepareUDP(Sockets *socks, char *serverIp)
+int prepare_udp(Sockets* socks, char* server_ip)
 {
     LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
 
     // set socket options
     int opt = 1;
-    setsockopt(socks->udpBroad, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+    setsockopt(socks->udp_broad, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
 
-    // Bind sockets to port 
-    struct sockaddr_in serverAddr = {
+    // Bind sockets to port
+    struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
         .sin_port = htons(PORT_UDP_BROAD),
-        .sin_addr.s_addr = INADDR_ANY
-    };
-    if (bind(socks->udpBroad, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-    {
+        .sin_addr.s_addr = INADDR_ANY};
+    if (bind(socks->udp_broad, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("[prepareUnicastUDP()] bind");
         return -1;
     }
@@ -59,18 +55,17 @@ int prepareUDP(Sockets *socks, char *serverIp)
 }
 
 // private state functions
-typedef void (*StateLoops)(Endpoint *client);
+typedef void (*StateLoops)(Endpoint* client);
 
 /*
 CLIENT in IDLE state where it is waiting for player to make action
 In this state, do nothing
 */
 // TODO possibly add server discovery
-void clientIdleState(Endpoint *client)
+void client_idle_state(Endpoint* client)
 {
     LOG_I("[idleStateLoop()] CLIENT entering IDLE state, awaiting state change...");
-    while (client->state == IDLE)
-    {
+    while (client->state == IDLE) {
         // busy wait
         continue;
     }
@@ -82,20 +77,17 @@ void clientIdleState(Endpoint *client)
 CLIENT in LOBBY state where is awaits the server message to START
 In this state, listen and make state change only upon START
 */
-void clientLobbyState(Endpoint *client)
+void client_lobby_state(Endpoint* client)
 {
     LOG_I("[clientLobbyState()] CLIENT entering LOBBY state, awaiting state change...");
-    while (client->state == LOBBY)
-    {
+    while (client->state == LOBBY) {
         // Any HTTTP message in LOBBY state will be send through TCP
         Message msg;
-        if (receiveMessageTCP(client->socks->tcp, &msg) < 0)
-        {
+        if (receive_message_tcp(client->socks->tcp, &msg) < 0) {
             LOG_E("[clientLobbyState()] CLIENT failed to receive TCP message");
             continue;
         }
-        if (msg.msgType == MSG_START)
-        {
+        if (msg.msg_type == MSG_START) {
             LOG_D("[clientLobbyState()] CLIENT received message to START");
             client->state = GAME;
         }
@@ -107,83 +99,68 @@ void clientLobbyState(Endpoint *client)
 CLIENT in GAME state where it listens for broadcasts, TCP, and UDP messages
 In this state listen and handle messages accordingly (mainly about passing the messages to upper layer protocol)
 */
-void clientGameState(Endpoint *client)
+void client_game_state(Endpoint* client)
 {
     LOG_I("[clientGameState()] CLIENT entering GAME state, awaiting state change...");
 
     // Any HTTTP message in LOBBY state will be sent through TCP, UDP unicast, or UDP broadcast
     // create pollfd struct
-    struct pollfd *listenFd = malloc(sizeof(struct pollfd) * 3);
-    listenFd[0] = (struct pollfd) {
+    struct pollfd* listen_fd = malloc(sizeof(struct pollfd) * 3);
+    listen_fd[0] = (struct pollfd){
         .fd = client->socks->tcp,
         .events = POLLIN,
-        .revents = 0
-    };
-    listenFd[1] = (struct pollfd) {
-        .fd = client->socks->udpUni,
+        .revents = 0};
+    listen_fd[1] = (struct pollfd){
+        .fd = client->socks->udp_uni,
         .events = POLLIN,
-        .revents = 0
-    };
-    listenFd[2] = (struct pollfd) {
-        .fd = client->socks->udpBroad,
+        .revents = 0};
+    listen_fd[2] = (struct pollfd){
+        .fd = client->socks->udp_broad,
         .events = POLLIN,
-        .revents = 0
-    };
-    
-    while (client->state == GAME)
-    {
-        int socketActivity = poll(listenFd, 3, 50);
-        if (socketActivity > 0)
-        {
-            LOG_D("[clientGameState()] %d active sockets on CLIENT", socketActivity);
-            for (int i=0; i<3 && socketActivity>0; i++)
-            {
-                if (listenFd[i].revents & POLLIN)
-                {
+        .revents = 0};
+
+    while (client->state == GAME) {
+        int socket_activity = poll(listen_fd, 3, 50);
+        if (socket_activity > 0) {
+            LOG_D("[clientGameState()] %d active sockets on CLIENT", socket_activity);
+            for (int i = 0; i < 3 && socket_activity > 0; i++) {
+                if (listen_fd[i].revents & POLLIN) {
                     Message msg;
 
                     // receiving TCP message
-                    if (i == 0)
-                    {
-                        if (receiveMessageTCP(listenFd[i].fd, &msg) < 0)
-                        {
-                            LOG_E("[clientGameState()] failed to receive TCP message from %d", listenFd[i].fd);
-                            listenFd[i].fd = -1; // To prevent infinite CPU spin if server closes connection
+                    if (i == 0) {
+                        if (receive_message_tcp(listen_fd[i].fd, &msg) < 0) {
+                            LOG_E("[clientGameState()] failed to receive TCP message from %d", listen_fd[i].fd);
+                            listen_fd[i].fd = -1; // To prevent infinite CPU spin if server closes connection
                             continue;
                         }
                     }
                     // receiving UDP messages
-                    else 
-                    {
-                        if (receiveMessageUDP(listenFd[i].fd, &msg) < 0)
-                        {
-                            LOG_E("[clientGameState()] failed to receive UDP message from %d", listenFd[i].fd);
+                    else {
+                        if (receive_message_udp(listen_fd[i].fd, &msg) < 0) {
+                            LOG_E("[clientGameState()] failed to receive UDP message from %d", listen_fd[i].fd);
                             continue;
                         }
                     }
 
-                    if (listenFd[i].revents != 0)
-                    {
-                        socketActivity--;
+                    if (listen_fd[i].revents != 0) {
+                        socket_activity--;
                     }
 
-                    LOG_D("[clientGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.sourceId, msg.msgType, msg.msgContent);
-                    if (msg.msgType == MSG_APP)
-                    {
+                    LOG_D("[clientGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
+                    if (msg.msg_type == MSG_APP) {
                         LOG_D("[clientGameState()] Message received for application");
-                        if (pcFlags[0])
-                        {
-                            pcFlags[1] = 1;
+                        if (pc_flags[0]) {
+                            pc_flags[1] = 1;
                             LOG_D("[clientGameState()] listener yielding CPU control for user polling queue");
                             sched_yield();
                         }
-                        pthread_mutex_lock(&clientMessagesLock);
-                        Message_enqueue(&clientMessages, msg);
-                        pthread_mutex_unlock(&clientMessagesLock);
-                        pcFlags[1] = 0;
+                        pthread_mutex_lock(&client_messages_lock);
+                        Message_enqueue(&client_messages, msg);
+                        pthread_mutex_unlock(&client_messages_lock);
+                        pc_flags[1] = 0;
                     }
-                    if (msg.msgType == MSG_END)
-                    {
+                    if (msg.msg_type == MSG_END) {
                         LOG_D("[clientGameState()] Message received to change to END state");
                         client->state = END;
                     }
@@ -191,78 +168,71 @@ void clientGameState(Endpoint *client)
             }
         }
     }
-    free(listenFd); // Plug memory leak
+    free(listen_fd); // Plug memory leak
     LOG_I("[clientGameState()] state change detected, CLIENT exiting GAME state");
 }
 
-void clientEndState(Endpoint *client)
+void client_end_state(Endpoint* client)
 {
     LOG_I("[endStateCleanup()] CLIENT entering END state, closing connection with all clients");
-    if (freeEndpoint(&client) < 0)
-    {
+    if (free_endpoint(&client) < 0) {
         LOG_E("[clientEndState()] could not free client in memory");
     }
     LOG_I("[endStateCleanup()] CLIENT finished cleaning up");
 }
 
 // setup for private background thread function
-StateLoops clientStateLoops[] = {
-    [IDLE] = clientIdleState,
-    [LOBBY] = clientLobbyState,
-    [GAME] = clientGameState,
-    [END] = clientEndState
-};
+StateLoops client_state_loops[] = {
+    [IDLE] = client_idle_state,
+    [LOBBY] = client_lobby_state,
+    [GAME] = client_game_state,
+    [END] = client_end_state};
 
-void* clientThreadFunc(void *client)
+void* client_thread_func(void* client)
 {
-    Endpoint *thisClient = (Endpoint *) client;
+    Endpoint* this_client = (Endpoint*)client;
 
-    while (thisClient->state != END)
-    {
-        clientStateLoops[thisClient->state](thisClient);
+    while (this_client->state != END) {
+        client_state_loops[this_client->state](this_client);
     }
 
-    if (thisClient ->state == END)
-    {
-        clientStateLoops[thisClient->state](thisClient);
+    if (this_client->state == END) {
+        client_state_loops[this_client->state](this_client);
     }
     pthread_exit(NULL);
 }
 
 // public functions
 // allows developers to create a libhtttp client in application
-int brclient_init(BRClient **clientPtr)
+int brclient_init(BRClient** client_ptr)
 {
-    Endpoint *newClient = NULL;
+    Endpoint* new_client = NULL;
 
     // create endpoint
-    if (createEndpoint(&newClient) < 0)
-    {
+    if (create_endpoint(&new_client) < 0) {
         LOG_E("[brclient_init()] could not create endpoint struct for client");
         return -1;
     }
 
     // open sockets
-    if (createSockets(&newClient->socks) < 0)
-    {
+    if (create_sockets(&new_client->socks) < 0) {
         LOG_E("[brclient_init()] socket creation failed");
         return -1;
     }
 
     // default values
-    newClient->id = 0;
-    newClient->state = 0;
+    new_client->id = 0;
+    new_client->state = 0;
 
-    *clientPtr = newClient;
-    
+    *client_ptr = new_client;
+
     // prepare queue
-    Message_init(&clientMessages);
-    pthread_mutex_init(&clientMessagesLock, NULL);
+    Message_init(&client_messages);
+    pthread_mutex_init(&client_messages_lock, NULL);
 
     // spawn backrgound thread
-    pthread_t threadId;
-    if (pthread_create(&threadId, NULL, clientThreadFunc, (void*)newClient) != 0) 
-    {
+    pthread_t thread_id;
+    if (pthread_create(&thread_id, NULL, client_thread_func, (void*)new_client) != 0) {
         perror("Failed to create thread");
         return 1;
     }
@@ -273,16 +243,15 @@ int brclient_init(BRClient **clientPtr)
 }
 
 // connects to a libhtttp server
-int brclient_join(BRClient *clientPtr, char *ipAddress)
+int brclient_join(BRClient* client_ptr, char* ip_address)
 {
-    Endpoint *thisClient = clientPtr;
+    Endpoint* this_client = client_ptr;
 
-    LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ipAddress);
+    LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ip_address);
 
     // TALKING TO SERVER
     // connect on TCP first
-    if (connectOnTCP(thisClient->socks, ipAddress) < 0)
-    {
+    if (connect_on_tcp(this_client->socks, ip_address) < 0) {
         LOG_E("[startClientHandshake()] failed to connect to server at IP");
         return -1;
     }
@@ -298,67 +267,63 @@ int brclient_join(BRClient *clientPtr, char *ipAddress)
     // sendBytes(sockfd, (unsigned char *)nonce, noncefd);
 
     // receive user id and save to Endpoint
-    unsigned char *buffer = NULL;
+    unsigned char* buffer = NULL;
     buffer = malloc(sizeof(uint32_t));
-    if (buffer == NULL)
-    {
+    if (buffer == NULL) {
         perror("[startClientHandshake()] malloc");
         return -1;
     }
-    if (readBytes(thisClient->socks->tcp, &buffer, sizeof(uint32_t)) < 0)
-    {
+    if (read_bytes(this_client->socks->tcp, &buffer, sizeof(uint32_t)) < 0) {
         LOG_E("[startClientHandshake()] failed to read sourceId");
         return -1;
-    } 
-    uint32_t sourceBytes;
-    memcpy(&sourceBytes, buffer, sizeof(sourceBytes));
-    thisClient->id = ntohl(sourceBytes);
+    }
+    uint32_t source_bytes;
+    memcpy(&source_bytes, buffer, sizeof(source_bytes));
+    this_client->id = ntohl(source_bytes);
     free(buffer);
     buffer = NULL;
 
     // INDEPENDENT OF SERVER
     // prepare UDP ports for future use upon connection
-    if (prepareUDP(thisClient->socks, ipAddress) < 0)
-    {
+    if (prepare_udp(this_client->socks, ip_address) < 0) {
         LOG_E("[brclient_join()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
 
     // joining lobby successful, enter lobby state
-    thisClient->state = LOBBY;
+    this_client->state = LOBBY;
 
     LOG_I("[brclient_join()] lobby joining complete");
     return 0;
 }
 
 // Client state getter
-int brclient_get_state(BRClient *clientPtr)
+int brclient_get_state(BRClient* client_ptr)
 {
-    if (clientPtr == NULL) // Check for valid client
+    if (client_ptr == NULL) // Check for valid client
     {
         LOG_E("[brclient_get_state()] no valid client");
         return -1;
     }
-    Endpoint *thisClient = clientPtr;
-    return thisClient->state;
+    Endpoint* this_client = client_ptr;
+    return this_client->state;
 }
 
 // message functions
-int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024])
+int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024])
 {
-    Endpoint *thisClient = clientPtr;
+    Endpoint* this_client = client_ptr;
 
     // build message
     Message msg = {
-        .sourceId = thisClient->id,
-        .msgType = MSG_APP,
+        .source_id = this_client->id,
+        .msg_type = MSG_APP,
     };
-    //snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
-    memcpy(msg.msgContent, content, MSG_CONTENT_LENGTH);
+    // snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
+    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
 
     // send via socket
-    if (sendMessageTCP(thisClient->socks->tcp, msg) < 0)
-    {
+    if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
         LOG_E("[brclient_send_msg()] sending has failed");
         goto fail;
     }
@@ -367,7 +332,7 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024])
 
     return 0;
 
-    fail:
+fail:
     return -1;
 }
 
@@ -375,26 +340,22 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brclient_get_app_msg(unsigned char returnMsg[1024])
+int brclient_get_app_msg(unsigned char return_msg[1024])
 {
-    if (!Message_empty(&clientMessages))
-    {
-        if (pcFlags[1])
-        {
-            pcFlags[0] = 1;
+    if (!Message_empty(&client_messages)) {
+        if (pc_flags[1]) {
+            pc_flags[0] = 1;
             LOG_D("[brclient_get_app_msg()] yielding CPU control for listener thread to write to queue");
             sched_yield();
         }
-        pthread_mutex_lock(&clientMessagesLock);
-        memcpy(returnMsg, Message_peek(&clientMessages)->msgContent, MSG_CONTENT_LENGTH);
-        Message_dequeue(&clientMessages);
-        pthread_mutex_unlock(&clientMessagesLock);
-        pcFlags[0] = 0; 
+        pthread_mutex_lock(&client_messages_lock);
+        memcpy(return_msg, Message_peek(&client_messages)->msg_content, MSG_CONTENT_LENGTH);
+        Message_dequeue(&client_messages);
+        pthread_mutex_unlock(&client_messages_lock);
+        pc_flags[0] = 0;
         LOG_I("[brclient_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
-    }
-    else 
-    {
+    } else {
         LOG_I("[brclient_get_app_msg()] queue is empty");
         return 0;
     }
@@ -404,15 +365,14 @@ int brclient_get_app_msg(unsigned char returnMsg[1024])
 Function returns the client id to a pointer
 returns 0 on success, -1 on failure
 */
-int brclient_get_id(BRClient *clientPtr, uint32_t *id)
+int brclient_get_id(BRClient* client_ptr, uint32_t* id)
 {
-    if (clientPtr == NULL) 
-    {
+    if (client_ptr == NULL) {
         LOG_E("[brclient_get_id()] no valid client");
         return -1;
     }
-    Endpoint *thisClient = clientPtr;
-    *id = thisClient->id;
+    Endpoint* this_client = client_ptr;
+    *id = this_client->id;
     LOG_I("[brclient_get_id()] retrieved own client id %u", *id);
     return 0;
 }

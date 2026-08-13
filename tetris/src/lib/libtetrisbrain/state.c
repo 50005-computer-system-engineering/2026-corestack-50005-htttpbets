@@ -9,7 +9,7 @@
 GameState gamestate_player;
 
 // Function call to start the game
-void startGame(GameState *state)
+void start_game(GameState* state)
 {
     // Reset game state
     memset(state, 0, sizeof(GameState));
@@ -35,18 +35,16 @@ void startGame(GameState *state)
     // Initialize the 14-bag for preview pieces
     int bag1[7] = {1, 2, 3, 4, 5, 6, 7};
     int bag2[7] = {1, 2, 3, 4, 5, 6, 7};
-    shuffleArray(bag1, 7);
-    shuffleArray(bag2, 7);
-    for (int i = 0; i < 7; i++)
-    {
+    shuffle_array(bag1, 7);
+    shuffle_array(bag2, 7);
+    for (int i = 0; i < 7; i++) {
         state->bag[i] = bag1[i]; // Bag 1 through slots 0 to 6
     }
-    for (int i = 0; i < 7; i++)
-    {
+    for (int i = 0; i < 7; i++) {
         state->bag[i + 7] = bag2[i]; // Bag 2 through slots 7 to 13
     }
     state->bag_index = 0; // Set draw index
 
     // Start spawning first piece
-    spawnNewPiece(state);
+    spawn_new_piece(state);
 }

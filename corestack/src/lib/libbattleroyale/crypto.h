@@ -56,21 +56,21 @@
  * Returns an EVP_PKEY* on success, NULL on failure.
  * Caller must EVP_PKEY_free() the returned key.
  */
-EVP_PKEY *load_private_key(const char *filename);
+EVP_PKEY* load_private_key(const char* filename);
 
 /**
  * Loads an X.509 certificate from a PEM file on disk.
  * Returns an X509* on success, NULL on failure.
  * Caller must X509_free() the returned cert.
  */
-X509 *load_cert_file(const char *filename);
+X509* load_cert_file(const char* filename);
 
 /**
  * Parses an X.509 certificate from a PEM-encoded byte buffer.
  * Returns an X509* on success, NULL on failure.
  * Caller must X509_free() the returned cert.
  */
-X509 *load_cert_bytes(const unsigned char *data, int len);
+X509* load_cert_bytes(const unsigned char* data, int len);
 
 /* ======================================================================
  * Certificate verification
@@ -81,7 +81,7 @@ X509 *load_cert_bytes(const unsigned char *data, int len);
  * is at 'ca_cert_path'. Also checks validity period.
  * Returns 1 on success, 0 on failure. Prints diagnostics.
  */
-int verify_server_cert(X509 *server_cert, const char *ca_cert_path);
+int verify_server_cert(X509* server_cert, const char* ca_cert_path);
 
 /* ======================================================================
  * RSA-PSS signing and verification (Authentication Protocol)
@@ -94,17 +94,17 @@ int verify_server_cert(X509 *server_cert, const char *ca_cert_path);
  * Returns a newly malloc'd signature buffer, and writes its length to *sig_len.
  * Returns NULL on failure. Caller must free().
  */
-unsigned char *sign_message_pss(EVP_PKEY *priv_key,
-                                const unsigned char *msg, size_t msg_len,
-                                size_t *sig_len);
+unsigned char* sign_message_pss(EVP_PKEY* priv_key,
+                                const unsigned char* msg, size_t msg_len,
+                                size_t* sig_len);
 
 /**
  * Verifies an RSA-PSS signature on 'msg' using the public key from 'cert'.
  * Returns 1 if valid, 0 if invalid or error.
  */
-int verify_message_pss(X509 *cert,
-                       const unsigned char *sig, size_t sig_len,
-                       const unsigned char *msg, size_t msg_len);
+int verify_message_pss(X509* cert,
+                       const unsigned char* sig, size_t sig_len,
+                       const unsigned char* msg, size_t msg_len);
 
 /* ======================================================================
  * Symmetric encryption (CP2)
@@ -125,9 +125,9 @@ int generate_session_key(unsigned char key_out[SESSION_KEY_LEN]);
  * Returns a newly malloc'd buffer and writes its length to *out_len.
  * Returns NULL on failure.
  */
-unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
-                               const unsigned char *plain, size_t plain_len,
-                               size_t *out_len);
+unsigned char* session_encrypt(const unsigned char key[SESSION_KEY_LEN],
+                               const unsigned char* plain, size_t plain_len,
+                               size_t* out_len);
 
 /**
  * Decrypts a token produced by session_encrypt().
@@ -135,16 +135,16 @@ unsigned char *session_encrypt(const unsigned char key[SESSION_KEY_LEN],
  *
  * Returns a newly malloc'd plaintext buffer, writes length to *out_len.
  */
-unsigned char *session_decrypt(const unsigned char key[SESSION_KEY_LEN],
-                               const unsigned char *token, size_t token_len,
-                               size_t *out_len);
+unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
+                               const unsigned char* token, size_t token_len,
+                               size_t* out_len);
 
 /* ======================================================================
  * Utility
  * ====================================================================== */
 
 /** Prints the most recent OpenSSL error to stderr. */
-void print_ssl_error(const char *context);
+void print_ssl_error(const char* context);
 
 /** Returns wall-clock time in seconds */
 double get_time(void);

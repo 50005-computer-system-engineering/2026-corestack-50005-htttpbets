@@ -19,24 +19,23 @@
 #define MIN_LOBBY_SIZE 1
 
 // Instantiate logger
-static LogClient logClient;
+static LogClient log_client;
 
 // Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
-static bool enterPressed(void)
+static bool enter_pressed(void)
 {
     fd_set fds;
     struct timeval tv = {0, 0};
     FD_ZERO(&fds);
     FD_SET(STDIN_FILENO, &fds);
-    if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0)
-    {
+    if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0) {
         int c = getchar();
         return c == '\n';
     }
     return false;
 }
 
-static void logMessage(LogLevel level, const char *fmt, ...)
+static void log_message(LogLevel level, const char* fmt, ...)
 {
     char message[LOG_MSG_LENGTH];
     va_list args;
@@ -44,8 +43,8 @@ static void logMessage(LogLevel level, const char *fmt, ...)
     vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
-    printf("%s\n", message);                   // Unchanged terminal output
-    logClientPush(&logClient, level, message); // Forwarded, non-blocking, may be dropped
+    printf("%s\n", message);                      // Unchanged terminal output
+    log_client_push(&log_client, level, message); // Forwarded, non-blocking, may be dropped
 }
 
 int main(void)
@@ -54,13 +53,12 @@ int main(void)
     setvbuf(stdout, NULL, _IOLBF, 0);
 
     // Setup Logger
-    if (!logClientInit(&logClient, LOG_DEFAULT_IPC_PATH, "tetrisd"))
-    {
+    if (!log_client_init(&log_client, LOG_DEFAULT_IPC_PATH, "tetrisd")) {
         printf("[tetrisd] Warning: could not set up logging client, continuing without it.\n");
     }
 
     // Initialize server connection
-    BRServer *server = NULL;
+    BRServer* server = NULL;
 
     // Helper: select first non-loopback IPv4 address
     char host_ip[INET_ADDRSTRLEN] = {0}; // Init to store potential IPV4 addr -> for display only!!
@@ -82,7 +80,7 @@ int main(void)
                 continue;
             }
 
-            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;            // Cast to sockaddr_in (IPV4) to process
+            struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;             // Cast to sockaddr_in (IPV4) to process
             if (inet_ntop(AF_INET, &sa->sin_addr, host_ip, INET_ADDRSTRLEN) != NULL) // Convert binary address into readable texts
             {
                 break; // First candidate found
@@ -95,55 +93,49 @@ int main(void)
     // Tell the host which IPV4 addr to hand out to other players
     if (host_ip[0] != '\0') // Valid IP addr found
     {
-        logMessage(LOG_LEVEL_INFO, "[tetrisd] Players on this network should enter: %s", host_ip);
-    }
-    else
-    {
+        log_message(LOG_LEVEL_INFO, "[tetrisd] Players on this network should enter: %s", host_ip);
+    } else {
         // No IPV4 addr found, only local play is possible
-        logMessage(LOG_LEVEL_WARN, "[tetrisd] No non-loopback IPv4 found, local play only (127.0.0.1).");
+        log_message(LOG_LEVEL_WARN, "[tetrisd] No non-loopback IPv4 found, local play only (127.0.0.1).");
     }
     printf("[tetrisd] Players on this machine can use the default 127.0.0.1\n");
 
     if (init_res < 0) // Failed
     {
-        logMessage(LOG_LEVEL_ERROR, "[tetrisd] Could not create server!");
+        log_message(LOG_LEVEL_ERROR, "[tetrisd] Could not create server!");
         return -1;
     }
-    logMessage(LOG_LEVEL_INFO, "[tetrisd] Server created successfully! Opening lobby...");
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Server created successfully! Opening lobby...");
 
     // LOBBY state and assign player IDs
     if (brserver_open(server) < 0) // Blocking server call, waits until lobby is filled
     {
-        logMessage(LOG_LEVEL_ERROR, "[tetrisd] Could not create lobby!");
+        log_message(LOG_LEVEL_ERROR, "[tetrisd] Could not create lobby!");
         return -1;
     }
 
     // Pre-allocation for clients
-    uint32_t lobbySize = 0;
-    uint32_t clientIds[MAX_LOBBY_SIZE] = {0};
+    uint32_t lobby_size = 0;
+    uint32_t client_ids[MAX_LOBBY_SIZE] = {0};
 
     // Wait dynamically for lobby to fill
     printf("[tetrisd] Lobby open! Need at least %d player(s).\n", MIN_LOBBY_SIZE);
     printf("[tetrisd] Press ENTER at any time once ready to start the game.\n");
-    uint32_t lastReported = UINT32_MAX;
-    while (1)
-    {
-        brserver_client_info(server, &lobbySize, clientIds);
+    uint32_t last_reported = UINT32_MAX;
+    while (1) {
+        brserver_client_info(server, &lobby_size, client_ids);
         // Only announce on actual change
-        if (lobbySize != lastReported)
-        {
-            logMessage(LOG_LEVEL_INFO, "[tetrisd] %u player(s) connected...", lobbySize);
-            lastReported = lobbySize;
+        if (lobby_size != last_reported) {
+            log_message(LOG_LEVEL_INFO, "[tetrisd] %u player(s) connected...", lobby_size);
+            last_reported = lobby_size;
         }
 
-        if (lobbySize >= MIN_LOBBY_SIZE && enterPressed())
-        {
-            logMessage(LOG_LEVEL_INFO, "[tetrisd] Starting game with %u players!", lobbySize);
+        if (lobby_size >= MIN_LOBBY_SIZE && enter_pressed()) {
+            log_message(LOG_LEVEL_INFO, "[tetrisd] Starting game with %u players!", lobby_size);
             break;
         }
-        if (lobbySize >= MAX_LOBBY_SIZE)
-        {
-            logMessage(LOG_LEVEL_INFO, "[tetrisd] Lobby full (%u), starting automatically.", lobbySize);
+        if (lobby_size >= MAX_LOBBY_SIZE) {
+            log_message(LOG_LEVEL_INFO, "[tetrisd] Lobby full (%u), starting automatically.", lobby_size);
             break;
         }
         usleep(100000); // Poll every 100ms
@@ -152,50 +144,44 @@ int main(void)
     // Once lobby is full
     {
         char roster_line[LOG_MSG_LENGTH];
-        int offset = snprintf(roster_line, sizeof(roster_line), "[tetrisd] Lobby filled! %u player(s) connected:", lobbySize);
-        for (uint32_t i = 0; i < lobbySize && offset < (int)sizeof(roster_line); i++)
-        {
-            offset += snprintf(roster_line + offset, sizeof(roster_line) - offset, " P%u", clientIds[i]);
+        int offset = snprintf(roster_line, sizeof(roster_line), "[tetrisd] Lobby filled! %u player(s) connected:", lobby_size);
+        for (uint32_t i = 0; i < lobby_size && offset < (int)sizeof(roster_line); i++) {
+            offset += snprintf(roster_line + offset, sizeof(roster_line) - offset, " P%u", client_ids[i]);
         }
-        logMessage(LOG_LEVEL_INFO, "%s", roster_line);
+        log_message(LOG_LEVEL_INFO, "%s", roster_line);
     }
 
     // Signal listening for events -> switch to GAME state to start
-    if (brserver_start(server) < 0)
-    {
-        logMessage(LOG_LEVEL_ERROR, "[tetrisd] Failed to start game!");
+    if (brserver_start(server) < 0) {
+        log_message(LOG_LEVEL_ERROR, "[tetrisd] Failed to start game!");
         return -1;
     }
-    logMessage(LOG_LEVEL_INFO, "[tetrisd] Server is now in GAME state. Awaiting events...");
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Server is now in GAME state. Awaiting events...");
 
     // Tell every client the players in the lobby
     {
         // Populate roster via RosterPayload
         RosterPayload roster = {0};
-        roster.count = lobbySize; // Total number of players
-        for (uint32_t i = 0; i < lobbySize && i < MAX_LOBBY_SIZE; i++)
-        {
-            roster.ids[i] = clientIds[i]; // Add dynamically to array
+        roster.count = lobby_size; // Total number of players
+        for (uint32_t i = 0; i < lobby_size && i < MAX_LOBBY_SIZE; i++) {
+            roster.ids[i] = client_ids[i]; // Add dynamically to array
         }
         unsigned char roster_buffer[512] = {0}; // Empty buffer
-        packRoster(roster_buffer, &roster);     // Handles tag and byte order
+        pack_roster(roster_buffer, &roster);    // Handles tag and byte order
 
         // Send setup data (explicitly uses TCP here)
-        if (brserver_send_to_all(server, roster_buffer) < 0)
-        {
-            logMessage(LOG_LEVEL_WARN, "[tetrisd] Warning: failed to broadcast player roster.");
-        }
-        else
-        {
-            logMessage(LOG_LEVEL_INFO, "[tetrisd] Roster broadcast to all %u players.", lobbySize);
+        if (brserver_send_to_all(server, roster_buffer) < 0) {
+            log_message(LOG_LEVEL_WARN, "[tetrisd] Warning: failed to broadcast player roster.");
+        } else {
+            log_message(LOG_LEVEL_INFO, "[tetrisd] Roster broadcast to all %u players.", lobby_size);
         }
     }
 
     // Build the authoritative match, one real GameState per connected player
     // From here the server owns the boards, clients only render copies of them
     GameSession session;
-    initSession(&session, clientIds, lobbySize);
-    logMessage(LOG_LEVEL_INFO, "[tetrisd] Authoritative session started for %d player(s).", session.count);
+    init_session(&session, client_ids, lobby_size);
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Authoritative session started for %d player(s).", session.count);
 
     // Array buffer for message queue
     unsigned char buffer[512] = {0};
@@ -205,52 +191,44 @@ int main(void)
     int min_alive = (session.count > 1) ? 2 : 1;
 
     // Authoritative tick loop; non-blocking
-    while (countAlivePlayers(&session) >= min_alive)
-    {
+    while (count_alive_players(&session) >= min_alive) {
         /* --- Drain whatever the clients sent since the last tick --- */
         // Bounded so a flood of packets can never starve the simulation below
-        for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++)
-        {
-            if (brserver_get_app_msg(buffer) != 1)
-            {
+        for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++) {
+            if (brserver_get_app_msg(buffer) != 1) {
                 break; // Queue is empty
             }
 
-            uint32_t tag = readPacketTag(buffer);
+            uint32_t tag = read_packet_tag(buffer);
 
-            if (tag == PACKET_INPUT)
-            {
+            if (tag == PACKET_INPUT) {
                 InputPayload input;
-                unpackInput(buffer, &input);
+                unpack_input(buffer, &input);
 
                 // Perform the requested action on that player's real board
-                PlayerSlot *slot = findPlayer(&session, input.player_id);
-                applyAction(&session, slot, (PlayerAction)input.action);
+                PlayerSlot* slot = find_player(&session, input.player_id);
+                apply_action(&session, slot, (PlayerAction)input.action);
             }
             // Any other tag is ignored
         }
 
         /* --- Advance every board by one tick --- */
-        tickSession(&session);
-        logClientDrain(&logClient, LOG_CLIENT_DRAIN_BATCH);
+        tick_session(&session);
+        log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH);
         // Elimination Check
-        for (int i = 0; i < session.count; i++)
-        {
-            PlayerSlot *slot = &session.players[i];
+        for (int i = 0; i < session.count; i++) {
+            PlayerSlot* slot = &session.players[i];
             if (slot->state.game_over && slot->active) // just topped out this tick
             {
-                logMessage(LOG_LEVEL_INFO, "[tetrisd] P%u has been eliminated.", slot->player_id);
+                log_message(LOG_LEVEL_INFO, "[tetrisd] P%u has been eliminated.", slot->player_id);
             }
         }
 
-        
         /* --- Route any garbage the tick produced --- */
-        for (int i = 0; i < session.count; i++)
-        {
-            PlayerSlot *attacker = &session.players[i];
+        for (int i = 0; i < session.count; i++) {
+            PlayerSlot* attacker = &session.players[i];
 
-            if (attacker->state.outgoing_garbage == 0)
-            {
+            if (attacker->state.outgoing_garbage == 0) {
                 continue;
             }
 
@@ -258,19 +236,18 @@ int main(void)
             attacker->state.outgoing_garbage = 0; // Consumed
 
             // Resolve the victim using the server's roster
-            uint32_t victim_id = resolveTargetID(&attacker->state, &session.roster);
-            PlayerSlot *victim = findPlayer(&session, victim_id);
+            uint32_t victim_id = resolve_target_id(&attacker->state, &session.roster);
+            PlayerSlot* victim = find_player(&session, victim_id);
 
-            if (victim == NULL || victim == attacker || victim->state.game_over)
-            {
+            if (victim == NULL || victim == attacker || victim->state.game_over) {
                 continue; // No valid target, damage is dropped
             }
 
-            queueGarbage(&victim->state, (int)lines);
+            queue_garbage(&victim->state, (int)lines);
             victim->state.last_attacker_id = attacker->player_id;
             victim->dirty = true; // Their board changed, push it
 
-            logMessage(LOG_LEVEL_INFO, " <!> EVENT ROUTED: P%u attacked P%u with %u lines!", attacker->player_id, victim_id, lines);
+            log_message(LOG_LEVEL_INFO, " <!> EVENT ROUTED: P%u attacked P%u with %u lines!", attacker->player_id, victim_id, lines);
 
             // Broadcast the attack itself so every client's kill feed updates
             AttackPayload feed = {
@@ -279,27 +256,25 @@ int main(void)
                 .lines = lines};
 
             unsigned char feed_buffer[512] = {0};
-            packAttack(feed_buffer, &feed);
+            pack_attack(feed_buffer, &feed);
             brserver_send_broadcast(server, feed_buffer);
         }
 
         /* --- Push state to anyone whose board changed --- */
         // Send-on-change keeps traffic low, the keepalive repairs dropped UDP packets
-        for (int i = 0; i < session.count; i++)
-        {
-            PlayerSlot *slot = &session.players[i];
+        for (int i = 0; i < session.count; i++) {
+            PlayerSlot* slot = &session.players[i];
 
-            if (!slot->dirty && slot->idle_ticks < KEEPALIVE_TICKS)
-            {
+            if (!slot->dirty && slot->idle_ticks < KEEPALIVE_TICKS) {
                 slot->idle_ticks++;
                 continue; // Nothing new to say about this player yet
             }
 
             StatePayload snapshot;
-            buildStatePayload(&slot->state, &snapshot);
+            build_state_payload(&slot->state, &snapshot);
 
             unsigned char state_buffer[512] = {0};
-            packState(state_buffer, &snapshot);
+            pack_state(state_buffer, &snapshot);
             brserver_send_broadcast(server, state_buffer);
 
             slot->dirty = false;
@@ -324,20 +299,16 @@ int main(void)
     if (winner_id != 0) // Found a winner
     {
         printf("\n[tetrisd] MATCH OVER! Winner: P%u\n", winner_id);
-    }
-    else
-    {
+    } else {
         // No winner found
         printf("\n[tetrisd] MATCH OVER! No survivors.\n");
     }
 
     // Mark everyone finished and push one final state each so every client can exit its loop cleanly
-    for (int i = 0; i < session.count; i++)
-    {
-        PlayerSlot *slot = &session.players[i];
+    for (int i = 0; i < session.count; i++) {
+        PlayerSlot* slot = &session.players[i];
 
-        if (!slot->active)
-        {
+        if (!slot->active) {
             continue; // Already gone, nothing listening
         }
 
@@ -345,16 +316,16 @@ int main(void)
         slot->state.winner_id = winner_id;
 
         StatePayload snapshot;
-        buildStatePayload(&slot->state, &snapshot);
+        build_state_payload(&slot->state, &snapshot);
 
         unsigned char state_buffer[512] = {0};
-        packState(state_buffer, &snapshot);
+        pack_state(state_buffer, &snapshot);
         brserver_send_broadcast(server, state_buffer);
     }
 
-    logMessage(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", logClientGetDroppedCount(&logClient));
-    logClientDrain(&logClient, LOG_CLIENT_DRAIN_BATCH); // Send that very last line too
-    logClientClose(&logClient);
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", log_client_get_dropped_count(&log_client));
+    log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH); // Send that very last line too
+    log_client_close(&log_client);
 
     // Give the final broadcast a moment to land before tearing down the sockets
     usleep(500000); // 500ms

@@ -2,17 +2,15 @@
 #include <stdlib.h>
 
 // Inject garbage lines at the bottom of the board
-void addGarbage(GameState *state, int lines)
+void add_garbage(GameState* state, int lines)
 {
     // If 0 or -ve garbage passed, do nothing
-    if (lines <= 0)
-    {
+    if (lines <= 0) {
         return;
     }
 
     // Bounds check in case garbage sent > board height
-    if (lines > BOARD_HEIGHT)
-    {
+    if (lines > BOARD_HEIGHT) {
         lines = BOARD_HEIGHT;
     }
 
@@ -33,13 +31,10 @@ void addGarbage(GameState *state, int lines)
 
         for (int x = 0; x < BOARD_WIDTH; x++) // Loop across x axis
         {
-            if (x == hole)
-            {
+            if (x == hole) {
                 // Gap
                 state->board.cells[y][x] = 0;
-            }
-            else
-            {
+            } else {
                 // Fill with solid tile; used 8 as a separate ID since 0-7 already in use
                 state->board.cells[y][x] = 8;
             }
@@ -48,21 +43,18 @@ void addGarbage(GameState *state, int lines)
 }
 
 // Queue incoming garbage so it accumulates in the pending meter until it is applied
-void queueGarbage(GameState *state, int lines)
+void queue_garbage(GameState* state, int lines)
 {
-    if (lines <= 0)
-    {
+    if (lines <= 0) {
         return;
     }
 
-    if (state == NULL)
-    {
+    if (state == NULL) {
         return;
     }
 
     uint32_t pending = state->pending_garbage + (uint32_t)lines;
-    if (pending > BOARD_HEIGHT)
-    {
+    if (pending > BOARD_HEIGHT) {
         pending = BOARD_HEIGHT;
     }
 
@@ -70,13 +62,12 @@ void queueGarbage(GameState *state, int lines)
 }
 
 // Calculate garbage based on lines cleared (following TETR.IO guideline rules)
-int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
+int calculate_garbage(GameState* state, int lines_cleared, bool is_t_spin)
 {
     // Fake gamestate
     (void)state;
     // No lines cleared = 0 damage
-    if (lines_cleared == 0)
-    {
+    if (lines_cleared == 0) {
         state->combo = -1; // Reset combo counter
         return 0;
     }
@@ -87,56 +78,39 @@ int calculateGarbage(GameState *state, int lines_cleared, bool is_t_spin)
     bool is_difficult_clear = is_t_spin || (lines_cleared == 4);
 
     // T spins deal more garbage (2x multiplier)
-    if (is_t_spin)
-    {
-        if (lines_cleared > 0)
-        {
+    if (is_t_spin) {
+        if (lines_cleared > 0) {
             base_garbage = lines_cleared * 2;
         }
-    }
-    else
-    {
+    } else {
         // Normal clears, regular multiplier
-        if (lines_cleared == 2)
-        {
+        if (lines_cleared == 2) {
             base_garbage = 1;
-        }
-        else if (lines_cleared == 3)
-        {
+        } else if (lines_cleared == 3) {
             base_garbage = 3;
-        }
-        else if (lines_cleared == 4)
-        {
+        } else if (lines_cleared == 4) {
             base_garbage = 4;
         }
     }
 
     // Specific clears have specific bonuses
-    if (is_difficult_clear)
-    {
-        if (state->b2b)
-        {
+    if (is_difficult_clear) {
+        if (state->b2b) {
             base_garbage += 1;
         }
         state->b2b = true; // Maintain status
-    }
-    else
-    {
+    } else {
         state->b2b = false; // Reset counter
     }
 
     // Guideline Combo Bonus to follow
     int combo_bonus = 0;
-    if (state->combo > 0)
-    {
+    if (state->combo > 0) {
         // Guideline Combo Table
-        static const int combo_table[] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5};
-        if (state->combo < 12)
-        {
-            combo_bonus = combo_table[state->combo];
-        }
-        else
-        {
+        static const int COMBO_TABLE[] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5};
+        if (state->combo < 12) {
+            combo_bonus = COMBO_TABLE[state->combo];
+        } else {
             combo_bonus = 5; // Capped for long combos
         }
     }

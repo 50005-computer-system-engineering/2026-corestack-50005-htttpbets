@@ -7,8 +7,7 @@
 #include <stdint.h>
 
 /* ----- GAME STATE ----- */
-typedef enum
-{
+typedef enum {
     TARGET_MANUAL, // Manual cycling
     TARGET_RANDOM, // Random opponent
     TARGET_KO,     // Highest stack
@@ -49,6 +48,6 @@ typedef struct
 extern GameState gamestate_player;
 
 // Function call to start the game
-void startGame(GameState *state);
+void start_game(GameState* state);
 
 #endif

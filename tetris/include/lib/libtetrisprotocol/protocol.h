@@ -11,8 +11,7 @@
 /* ----- PACKET TAGS ----- */
 // Every packet on the app-message channel opens with one of these as a 4-byte
 // tag (network byte order) so the receiver knows how to read the bytes after it
-typedef enum
-{
+typedef enum {
     PACKET_ATTACK = 0, // Client -> Server, carries AttackPayload
     PACKET_ROSTER = 1, // Server -> Client, carries RosterPayload
     PACKET_INPUT = 2,  // Client -> Server, carries InputPayload
@@ -21,8 +20,7 @@ typedef enum
 
 /* ----- PLAYER ACTIONS ----- */
 // Every key press the client can ask the server to perform on its behalf
-typedef enum
-{
+typedef enum {
     ACTION_NONE = 0,
     ACTION_MOVE_LEFT,
     ACTION_MOVE_RIGHT,
@@ -99,26 +97,26 @@ typedef struct
 
 /* ----- PACK / UNPACK ----- */
 // Single place where the 4-byte tag and byte-order conversion happen
-void packAttack(unsigned char buffer[512], const AttackPayload *payload);
-void unpackAttack(const unsigned char buffer[512], AttackPayload *payload);
+void pack_attack(unsigned char buffer[512], const AttackPayload* payload);
+void unpack_attack(const unsigned char buffer[512], AttackPayload* payload);
 
-void packRoster(unsigned char buffer[512], const RosterPayload *payload);
-void unpackRoster(const unsigned char buffer[512], RosterPayload *payload);
+void pack_roster(unsigned char buffer[512], const RosterPayload* payload);
+void unpack_roster(const unsigned char buffer[512], RosterPayload* payload);
 
-void packInput(unsigned char buffer[512], const InputPayload *payload);
-void unpackInput(const unsigned char buffer[512], InputPayload *payload);
+void pack_input(unsigned char buffer[512], const InputPayload* payload);
+void unpack_input(const unsigned char buffer[512], InputPayload* payload);
 
-void packState(unsigned char buffer[512], const StatePayload *payload);
-void unpackState(const unsigned char buffer[512], StatePayload *payload);
+void pack_state(unsigned char buffer[512], const StatePayload* payload);
+void unpack_state(const unsigned char buffer[512], StatePayload* payload);
 
 // Reads just the tag so a receiver can decide which unpack to call
-uint32_t readPacketTag(const unsigned char buffer[512]);
+uint32_t read_packet_tag(const unsigned char buffer[512]);
 
 /* ----- GAMESTATE <-> STATEPAYLOAD ----- */
 // Server side: flatten its authoritative GameState into a sendable snapshot
-void buildStatePayload(const GameState *state, StatePayload *payload);
+void build_state_payload(const GameState* state, StatePayload* payload);
 
 // Client side: copy a received snapshot into the local GameState render mirror
-void applyStatePayload(const StatePayload *payload, GameState *state);
+void apply_state_payload(const StatePayload* payload, GameState* state);
 
 #endif

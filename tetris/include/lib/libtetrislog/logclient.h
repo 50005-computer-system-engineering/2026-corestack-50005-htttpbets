@@ -25,18 +25,18 @@ typedef struct
 } LogClient;
 
 // Opens the socket and prepares the client
-bool logClientInit(LogClient *client, const char *log_ipc_path, const char *source_name);
+bool log_client_init(LogClient* client, const char* log_ipc_path, const char* source_name);
 
 // Pushing (logging a message); non-blocking
-void logClientPush(LogClient *client, LogLevel level, const char *message);
+void log_client_push(LogClient* client, LogLevel level, const char* message);
 
 // Draining (once per game tick); sends up to max_records queued records as individual datagrams
-void logClientDrain(LogClient *client, int max_records);
+void log_client_drain(LogClient* client, int max_records);
 
 // Metrics; total records dropped locally because the ring buffer was full
-uint32_t logClientGetDroppedCount(const LogClient *client);
+uint32_t log_client_get_dropped_count(const LogClient* client);
 
 // Teardown
-void logClientClose(LogClient *client);
+void log_client_close(LogClient* client);
 
 #endif

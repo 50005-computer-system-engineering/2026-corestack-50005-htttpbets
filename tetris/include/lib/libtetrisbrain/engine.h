@@ -8,12 +8,12 @@
 #define LOCK_THRESHOLD_START 50    // Loop cycles a resting piece waits before locking
 
 // Check for t-spin; return 1 if valid, 0 if not
-int checkTSpin(GameState *state);
+int check_t_spin(GameState* state);
 
 // Repeat function to advance the game
-int tickGame(GameState *state);
+int tick_game(GameState* state);
 
 // Advances gravity and lock delay by exactly one tick
-bool updateTimers(GameState *state);
+bool update_timers(GameState* state);
 
 #endif

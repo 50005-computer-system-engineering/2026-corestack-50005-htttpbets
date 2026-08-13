@@ -10,7 +10,7 @@
 struct termios orig_termios; // Store terminal initial settings before the game starts
 
 // Reset terminal back to normal; if not will remain broken
-void disableRawMode(void)
+void disable_raw_mode(void)
 {
     tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios); // Apply stdin NOW, then reset back to handed saved state
     printf("\e[?25h");                               // Show cursor
@@ -18,10 +18,10 @@ void disableRawMode(void)
 }
 
 // Invoke terminal settings
-void enableRawMode()
+void enable_raw_mode()
 {
     tcgetattr(STDIN_FILENO, &orig_termios); // Save current terminal settings and store as saved state
-    atexit(disableRawMode);                 // Enforces revert back to normal terminal settings when user quits / ctrl-c
+    atexit(disable_raw_mode);               // Enforces revert back to normal terminal settings when user quits / ctrl-c
     struct termios raw = orig_termios;      // Make a copy of current state for us to work on
 
     // ICANON => system holds input inside a buffer until enter key is pressed
@@ -46,8 +46,7 @@ int kbhit(void)
     fcntl(STDIN_FILENO, F_SETFL, oldf);              // Restore normal behaviour
 
     // If a key was pressed
-    if (ch != EOF)
-    {
+    if (ch != EOF) {
         ungetc(ch, stdin); // Feed obtained input into actual input
         return 1;          // Return true
     }

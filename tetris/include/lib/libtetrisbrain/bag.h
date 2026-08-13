@@ -4,12 +4,12 @@
 #include "state.h"
 
 // Helper method to shuffle arrays
-void shuffleArray(int *array, int size);
+void shuffle_array(int* array, int size);
 
 // Shifts the upcoming bag forward and generates a new one
-void refillBag(GameState *state);
+void refill_bag(GameState* state);
 
 // Spawns a new piece
-void spawnNewPiece(GameState *state);
+void spawn_new_piece(GameState* state);
 
 #endif

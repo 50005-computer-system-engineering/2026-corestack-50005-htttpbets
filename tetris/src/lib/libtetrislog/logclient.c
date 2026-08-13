@@ -8,7 +8,7 @@
 
 /* ----- SETUP ----- */
 // Initialization
-bool logClientInit(LogClient *client, const char *log_ipc_path, const char *source_name)
+bool log_client_init(LogClient* client, const char* log_ipc_path, const char* source_name)
 {
     // Reset entire buffer before doing anything
     memset(client, 0, sizeof(LogClient));
@@ -19,8 +19,7 @@ bool logClientInit(LogClient *client, const char *log_ipc_path, const char *sour
     client->source[LOG_SOURCE_LENGTH - 1] = '\0';
 
     client->sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (client->sock < 0)
-    {
+    if (client->sock < 0) {
         perror("[logclient] Socket initialization failed!");
         return false;
     }
@@ -39,57 +38,48 @@ bool logClientInit(LogClient *client, const char *log_ipc_path, const char *sour
 }
 
 /* ----- PUSH ----- */
-void logClientPush(LogClient *client, LogLevel level, const char *message)
+void log_client_push(LogClient* client, LogLevel level, const char* message)
 {
-    if (client->sock < 0)
-    {
+    if (client->sock < 0) {
         return; // Not initialized, nothing to queue
     }
 
     LogRecord record;
-    buildLogRecord(&record, level, client->source, message); // Uses helper function to build the logs
+    build_log_record(&record, level, client->source, message); // Uses helper function to build the logs
 
-    if (!LogRecord_enqueue(&client->queue, record))
-    {
+    if (!LogRecord_enqueue(&client->queue, record)) {
         client->dropped_queue_full++; // Ring buffer full, this record never gets sent
     }
 }
 
 /* ----- DRAIN ----- */
-void logClientDrain(LogClient *client, int max_records)
+void log_client_drain(LogClient* client, int max_records)
 {
-    if (client->sock < 0)
-    {
+    if (client->sock < 0) {
         return; // Not initialized, nothing to dequeue
     }
 
-    for (int i = 0; i < max_records; i++)
-    {
-        LogRecord *record = LogRecord_peek(&client->queue); // Check the next record in queue
-        if (record == NULL)
-        {
+    for (int i = 0; i < max_records; i++) {
+        LogRecord* record = LogRecord_peek(&client->queue); // Check the next record in queue
+        if (record == NULL) {
             break; // Nothing left queued this tick
         }
 
         // Serialize the struct and fires the datagram at the socket path
         unsigned char buffer[LOG_WIRE_SIZE];
-        packLogRecord(buffer, record);
+        pack_log_record(buffer, record);
 
-        ssize_t sent = sendto(client->sock, buffer, LOG_WIRE_SIZE, 0, (struct sockaddr *)&client->dest, sizeof(client->dest));
+        ssize_t sent = sendto(client->sock, buffer, LOG_WIRE_SIZE, 0, (struct sockaddr*)&client->dest, sizeof(client->dest));
 
-        if (sent < 0)
-        {
+        if (sent < 0) {
             // Etiher tetrislogd is not running or its receive buffer is momentarily full
             // This specific record is lost
-            if (!client->daemon_unreachable_warned)
-            {
+            if (!client->daemon_unreachable_warned) {
                 fprintf(stderr, "[logclient] cannot reach tetrislogd at %s (further failures will be counted silently)\n", client->dest.sun_path);
                 client->daemon_unreachable_warned = true;
             }
             client->dropped_queue_full++;
-        }
-        else
-        {
+        } else {
             client->daemon_unreachable_warned = false; // Recovered, allow the warning to fire again if it drops later
         }
 
@@ -98,16 +88,15 @@ void logClientDrain(LogClient *client, int max_records)
 }
 
 /* ----- STATUS / TEARDOWN ----- */
-uint32_t logClientGetDroppedCount(const LogClient *client)
+uint32_t log_client_get_dropped_count(const LogClient* client)
 {
     return client->dropped_queue_full;
 }
 
-void logClientClose(LogClient *client)
+void log_client_close(LogClient* client)
 {
     // ENsures file descriptor is released back when game server shuts down
-    if (client->sock >= 0)
-    {
+    if (client->sock >= 0) {
         close(client->sock);
         client->sock = -1;
     }

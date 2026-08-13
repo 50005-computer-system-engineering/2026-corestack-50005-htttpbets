@@ -15,7 +15,7 @@ typedef struct {
 
 // Broadcast once at game start so every client learns who else is in the lobby
 typedef struct {
-    uint32_t count;               // Determined lobby size
+    uint32_t count; // Determined lobby size
     uint32_t ids[]; // Connected players
 } RosterPayload;
 
@@ -61,16 +61,16 @@ typedef struct {
 } StatePayload;
 
 /* ----- PACK / UNPACK ----- */
-void payload_encode_attack(char *buffer, const AttackPayload *payload);
-void payload_decode_attack(const char *buffer, AttackPayload *payload);
+void payload_encode_attack(char* buffer, const AttackPayload* payload);
+void payload_decode_attack(const char* buffer, AttackPayload* payload);
 
-void payload_encode_roster(char *buffer, const RosterPayload *payload);
-void payload_decode_roster(const char *buffer, RosterPayload *payload);
+void payload_encode_roster(char* buffer, const RosterPayload* payload);
+void payload_decode_roster(const char* buffer, RosterPayload* payload);
 
-void payload_encode_input(char *buffer, const InputPayload *payload);
-void payload_decode_input(const char *buffer, InputPayload *payload);
+void payload_encode_input(char* buffer, const InputPayload* payload);
+void payload_decode_input(const char* buffer, InputPayload* payload);
 
-void payload_encode_state(char *buffer, const StatePayload *payload);
-void payload_decode_state(const char *buffer, StatePayload *payload);
+void payload_encode_state(char* buffer, const StatePayload* payload);
+void payload_decode_state(const char* buffer, StatePayload* payload);
 
 #endif

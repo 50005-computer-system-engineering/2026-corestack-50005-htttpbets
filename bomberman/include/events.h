@@ -26,7 +26,7 @@ typedef struct {
 
 typedef struct {
     int player_id; // TODO
-    int x, y; // Direction
+    int x, y;      // Direction
 } MoveEventArgs;
 
 typedef struct {

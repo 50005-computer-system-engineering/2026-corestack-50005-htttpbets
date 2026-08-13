@@ -11,7 +11,7 @@ static uint32_t next_seq = 0;
 
 // Helper function that copies into a fixed char array and always terminates
 // In the event len of source > len of dest then no \0 added
-static void copyFixed(char *dest, const char *src, size_t dest_size)
+static void copy_fixed(char* dest, const char* src, size_t dest_size)
 {
     if (src == NULL) // Invalid
     {
@@ -24,7 +24,7 @@ static void copyFixed(char *dest, const char *src, size_t dest_size)
 
 /* ----- PACK / UNPACK ----- */
 // Network Serialization
-void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record)
+void pack_log_record(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord* record)
 {
     // Reset entire buffer before doing anything
     memset(buffer, 0, LOG_WIRE_SIZE);
@@ -47,7 +47,7 @@ void packLogRecord(unsigned char buffer[LOG_WIRE_SIZE], const LogRecord *record)
 }
 
 // Network Deserialization
-void unpackLogRecord(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord *record)
+void unpack_log_record(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord* record)
 {
     uint32_t fields[5]; // 5 fields to fill
 
@@ -75,7 +75,7 @@ void unpackLogRecord(const unsigned char buffer[LOG_WIRE_SIZE], LogRecord *recor
 
 /* ----- HELPERS ----- */
 // Record Builder
-void buildLogRecord(LogRecord *record, LogLevel level, const char *source, const char *message)
+void build_log_record(LogRecord* record, LogLevel level, const char* source, const char* message)
 {
     // Reset entire buffer before doing anything
     memset(record, 0, sizeof(LogRecord));
@@ -91,15 +91,14 @@ void buildLogRecord(LogRecord *record, LogLevel level, const char *source, const
     record->pid = (uint32_t)getpid();
     record->seq = next_seq++;
 
-    copyFixed(record->source, source, LOG_SOURCE_LENGTH);
-    copyFixed(record->message, message, LOG_MSG_LENGTH);
+    copy_fixed(record->source, source, LOG_SOURCE_LENGTH);
+    copy_fixed(record->message, message, LOG_MSG_LENGTH);
 }
 
 // Output Formatting
-const char *logLevelName(LogLevel level)
+const char* log_level_name(LogLevel level)
 {
-    switch (level)
-    {
+    switch (level) {
     case LOG_LEVEL_DEBUG:
         return "DEBUG";
     case LOG_LEVEL_INFO:
@@ -114,7 +113,7 @@ const char *logLevelName(LogLevel level)
 }
 
 // Output Formatting - 2
-void formatLogLine(const LogRecord *record, char *out, size_t out_size)
+void format_log_line(const LogRecord* record, char* out, size_t out_size)
 {
     // Convert epoch seconds into a readable local timestamp
     time_t raw = (time_t)record->time_sec;
@@ -122,21 +121,18 @@ void formatLogLine(const LogRecord *record, char *out, size_t out_size)
     char timestamp[32] = {0};
 
     // localtime_r instead of localtime to be thread-safe (reentrant)
-    if (localtime_r(&raw, &tm_buf) != NULL)
-    {
+    if (localtime_r(&raw, &tm_buf) != NULL) {
         strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_buf);
-    }
-    else
-    {
+    } else {
         // Unparseable time, keep the line aligned
-        copyFixed(timestamp, "0000-00-00 00:00:00", sizeof(timestamp));
+        copy_fixed(timestamp, "0000-00-00 00:00:00", sizeof(timestamp));
     }
 
     // %-5s pads the level so the columns line up
     snprintf(out, out_size, "%s.%03u [%-5s] %s[%u] #%u %s\n",
              timestamp,
              record->time_msec,
-             logLevelName((LogLevel)record->level),
+             log_level_name((LogLevel)record->level),
              record->source,
              record->pid,
              record->seq,

@@ -1,8 +1,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h> 
-#include <string.h> 
+#include <stddef.h>
+#include <string.h>
 #include <strings.h>
 #include <time.h>
 
@@ -12,7 +12,8 @@
 /*
 Function generates date
 */
-void get_date_str(char *buf) {
+void get_date_str(char* buf)
+{
     time_t now = time(NULL);
     struct tm tm_utc;
     gmtime_r(&now, &tm_utc);
@@ -23,21 +24,18 @@ void get_date_str(char *buf) {
 Function finds the correct HTTTP method
 Returns enum value if found, else returns UNKOWN=0
 */
-MethodHTTTP string_to_method(char *s)
+MethodHTTTP string_to_method(char* s)
 {
     // case where string is empty
-    if (!s)
-    {
+    if (!s) {
         LOG_E("[string_to_method()] string not found");
         return UNKNOWN;
     }
-    
+
     // iterate until matching string
-    for (int i=0; i<N_HTTTP_METHODS; i++)
-    {
+    for (int i = 0; i < N_HTTTP_METHODS; i++) {
         // matching string in legal methods
-        if (strcmp(s, HTTTP_METHODS[i].string) == 0)
-        {
+        if (strcmp(s, HTTTP_METHODS[i].string) == 0) {
             LOG_I("[string_to_method()] string \"%s\" maps to method %d", s, HTTTP_METHODS[i].method);
             return HTTTP_METHODS[i].method;
         }
@@ -51,7 +49,7 @@ MethodHTTTP string_to_method(char *s)
 /*
 Simple boolean function to determine if method is legal
 */
-bool is_legal_method(char *s)
+bool is_legal_method(char* s)
 {
     return (string_to_method(s) != UNKNOWN);
 }
@@ -59,21 +57,18 @@ bool is_legal_method(char *s)
 /*
 Function returns the string corresponding to method enum value
 */
-char *method_to_string(MethodHTTTP v)
+char* method_to_string(MethodHTTTP v)
 {
     // case where string is empty
-    if (v == UNKNOWN)
-    {
+    if (v == UNKNOWN) {
         LOG_E("[string_to_method()] string not found");
         return NULL;
     }
-    
+
     // iterate until matching string
-    for (int i=0; i<N_HTTTP_METHODS; i++)
-    {
+    for (int i = 0; i < N_HTTTP_METHODS; i++) {
         // matching string in legal methods
-        if (v == HTTTP_METHODS[i].method)
-        {
+        if (v == HTTTP_METHODS[i].method) {
             return HTTTP_METHODS[i].string;
         }
     }
@@ -82,21 +77,18 @@ char *method_to_string(MethodHTTTP v)
 /*
 Returns if header is legal
 */
-bool is_legal_header_field(char *s)
+bool is_legal_header_field(char* s)
 {
     // case where string is empty
-    if (!s)
-    {
+    if (!s) {
         LOG_E("[is_legal_header_field()] string not found");
         return false;
     }
-    
+
     // iterate until matching string
-    for (int i=0; i<N_HTTTP_HEADERS; i++)
-    {
+    for (int i = 0; i < N_HTTTP_HEADERS; i++) {
         // matching string in legal headers
-        if (strcmp(s, HTTTP_HEADERS[i]) == 0)
-        {
+        if (strcmp(s, htttp_headers[i]) == 0) {
             LOG_I("[is_legal_header_field()] string \"%s\" is a header", s);
             return true;
         }
@@ -105,88 +97,87 @@ bool is_legal_header_field(char *s)
     return false;
 }
 
-void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formatted_msg)
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg)
 {
     // request line
     formatted_msg->token1 = method_to_string(method);
-    char *path = malloc(MAX_BUF);
-    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
+    char* path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id); // room not implemented
     formatted_msg->token2 = path;
     formatted_msg->token3 = CURRENT_VER;
 
     // headers
-    char *id_str = malloc(16);
+    char* id_str = malloc(16);
     sprintf(id_str, "%u", id);
     msg_add_header(formatted_msg, "Player-Id", id_str);
     msg_add_header(formatted_msg, "Content-Type", "application/input-payload");
-    char *date_str = malloc(30);
+    char* date_str = malloc(30);
     get_date_str(date_str);
     msg_add_header(formatted_msg, "Date", date_str);
 
     // body
-    char *body = malloc(MAX_BUF);
+    char* body = malloc(MAX_BUF);
     payload_encode_input(body, payload);
     msg_add_body(formatted_msg, body);
-    char *content_len = malloc(16);
+    char* content_len = malloc(16);
     sprintf(content_len, "%u", (unsigned)strlen(body));
     msg_add_header(formatted_msg, "Content-Length", content_len);
 }
 
-void req_create_state(uint32_t id, StatePayload *payload, ParsedMsgHT *formattedMsg)
+void req_create_state(uint32_t id, StatePayload* payload, ParsedMsgHT* formatted_msg)
 {
     // request line
-    formattedMsg->token1 = method_to_string(REQ_STATE);
-    char *path = malloc(MAX_BUF);
-    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
-    formattedMsg->token2 = path;
-    formattedMsg->token3 = CURRENT_VER;
+    formatted_msg->token1 = method_to_string(REQ_STATE);
+    char* path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id); // room not implemented
+    formatted_msg->token2 = path;
+    formatted_msg->token3 = CURRENT_VER;
 
     // headers
-    char *id_str = malloc(16);
+    char* id_str = malloc(16);
     sprintf(id_str, "%u", id);
-    msg_add_header(formattedMsg, "Player-Id", id_str);
-    msg_add_header(formattedMsg, "Content-Type", "application/state-payload");
-    char *date_str = malloc(30);
+    msg_add_header(formatted_msg, "Player-Id", id_str);
+    msg_add_header(formatted_msg, "Content-Type", "application/state-payload");
+    char* date_str = malloc(30);
     get_date_str(date_str);
-    msg_add_header(formattedMsg, "Date", date_str);
+    msg_add_header(formatted_msg, "Date", date_str);
 
     // body
-    char *body = malloc(MAX_BUF);
+    char* body = malloc(MAX_BUF);
     payload_encode_state(body, payload);
-    msg_add_body(formattedMsg, body);
-    char *content_len = malloc(16);
+    msg_add_body(formatted_msg, body);
+    char* content_len = malloc(16);
     sprintf(content_len, "%u", (unsigned)strlen(body));
-    msg_add_header(formattedMsg, "Content-Length", content_len);
+    msg_add_header(formatted_msg, "Content-Length", content_len);
 }
 
-void req_create_attack(uint32_t id, AttackPayload *payload, ParsedMsgHT *formattedMsg)
+void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatted_msg)
 {
     // request line
-    formattedMsg->token1 = method_to_string(REQ_ATTACK);
-    char *path = malloc(MAX_BUF);
-    sprintf(path, "/room/%u/player/%u", 0, id);    // room not implemented
-    formattedMsg->token2 = path;
-    formattedMsg->token3 = CURRENT_VER;
-    
+    formatted_msg->token1 = method_to_string(REQ_ATTACK);
+    char* path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id); // room not implemented
+    formatted_msg->token2 = path;
+    formatted_msg->token3 = CURRENT_VER;
+
     // headers
-    char *id_str = malloc(16);
+    char* id_str = malloc(16);
     sprintf(id_str, "%u", id);
-    msg_add_header(formattedMsg, "Player-Id", id_str);
-    msg_add_header(formattedMsg, "Content-Type", "application/state-payload");
-    char *date_str = malloc(30);
+    msg_add_header(formatted_msg, "Player-Id", id_str);
+    msg_add_header(formatted_msg, "Content-Type", "application/state-payload");
+    char* date_str = malloc(30);
     get_date_str(date_str);
-    msg_add_header(formattedMsg, "Date", date_str);
+    msg_add_header(formatted_msg, "Date", date_str);
 
     // body
-    char *body = malloc(MAX_BUF);
+    char* body = malloc(MAX_BUF);
     payload_encode_attack(body, payload);
-    msg_add_body(formattedMsg, body);
-    char *content_len = malloc(16);
+    msg_add_body(formatted_msg, body);
+    char* content_len = malloc(16);
     sprintf(content_len, "%u", (unsigned)strlen(body));
-    msg_add_header(formattedMsg, "Content-Length", content_len);
+    msg_add_header(formatted_msg, "Content-Length", content_len);
 }
 
-void req_extract_info(ParsedMsgHT formatted_msg, MethodHTTTP *method, uint32_t *id, char **body)
+void req_extract_info(ParsedMsgHT formatted_msg, MethodHTTTP* method, uint32_t* id, char** body)
 {
-    
 }
