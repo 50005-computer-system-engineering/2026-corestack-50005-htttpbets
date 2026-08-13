@@ -43,7 +43,24 @@ static void log_message(LogLevel level, const char* fmt, ...)
     vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
-    printf("%s\n", message);                      // Unchanged terminal output
+    // Color code by severity so event types are scannable at a glance
+    const char* color;
+    switch (level) {
+    case LOG_LEVEL_ERROR:
+        color = "\e[0;31m";
+        break; // Red
+    case LOG_LEVEL_WARN:
+        color = "\e[0;33m";
+        break; // Yellow
+    case LOG_LEVEL_INFO:
+        color = "\e[0;32m";
+        break; // Green
+    default:
+        color = "\e[0m";
+        break; // Default
+    }
+
+    printf("%s%s\e[0m\n", color, message);      // Unchanged terminal output, colored
     log_client_push(&log_client, level, message); // Forwarded, non-blocking, may be dropped
 }
 

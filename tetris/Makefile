@@ -71,12 +71,12 @@ run:
 # -I$(INC_DIR)/$(LIB_SUBDIR)  find headers in include/lib/ (library-specific headers)
 # -I$(CS_INC)                 also search corestack/include/ for shared library headers
 # $(COMMON_CFLAGS)            expands to: -Wall -Wextra -g -pthread (defined in config file)
-CFLAGS := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -I$(CS_INC) $(COMMON_CFLAGS)
+CFLAGS := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -I$(CS_INC)
 
 # LDFLAGS: flags for the linker (search paths and system libs)
 # CSLIB comes from included config file
 # LDLIBS is filled in after library auto-discovery below!
-LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB) -lpthread -lncurses
+LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB)
 
 # ----------------------------------------------------------------------
 # Library Auto-Discovery (src/lib/<libname>)
@@ -192,7 +192,7 @@ $(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
 
 $(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $$(dir $$@)
-	$(CC) $$($(1)_CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $$($(1)_CFLAGS) $$($(1)_SRC) -o $$@ $(LDFLAGS) $(LDLIBS) $(COMMON_CFLAGS)
 
 ALL_BINS += $(BIN_OUT)/$(1)
 endef
@@ -206,7 +206,7 @@ $(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
 define FLAT_BIN_template =
 $(BIN_OUT)/$(1): $(SRC_DIR)/$(1).c | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$< -o $$@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) $$< -o $$@ $(LDFLAGS) $(LDLIBS) $(COMMON_CFLAGS) -lraylib
 
 ALL_BINS += $(BIN_OUT)/$(1)
 endef
