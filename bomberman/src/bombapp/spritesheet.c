@@ -1,6 +1,6 @@
 #include "spritesheet.h"
 #include "config.h"
-#include <raylib.h>
+#include "raylib.h"
 
 void spritesheet_init(Spritesheet* s, const SpritesheetAsset ASSET)
 {

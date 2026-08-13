@@ -1,7 +1,7 @@
 #ifndef MAP_H
 #define MAP_H
 
-#include <raylib.h>
+#include "raylib.h"
 
 typedef enum {
     EMPTY = 0,

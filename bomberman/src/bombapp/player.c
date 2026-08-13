@@ -1,4 +1,4 @@
-#include <raylib.h>
+#include "raylib.h"
 #include <raymath.h>
 #include "config.h"
 #include "player.h"

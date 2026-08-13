@@ -1,7 +1,7 @@
 #ifndef SPRITESHEET_H
 #define SPRITESHEET_H
 
-#include <raylib.h>
+#include "raylib.h"
 
 typedef struct {
     char* path;

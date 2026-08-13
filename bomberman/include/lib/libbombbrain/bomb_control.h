@@ -1,6 +1,6 @@
 #ifndef BOMB_CONTROL_H
 #define BOMB_CONTROL_H
-#include <raylib.h>
+#include "raylib.h"
 #include "utils/queue.h"
 #include "inventory.h"
 
