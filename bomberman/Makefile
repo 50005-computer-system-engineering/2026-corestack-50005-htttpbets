@@ -308,7 +308,13 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all init deps run unit integration test clean clean-deps distclean
+.PHONY: all init deps run unit integration test clean clean-deps distclean lint
+
+
+# All project .c/.h under src/, include/, tests/
+SOURCES := $(shell find $(SRC_DIR) $(INC_DIR) $(TESTS_DIR) \
+	-path $(UNITY_DIR) -prune -o \
+	\( -name '*.c' -o -name '*.h' \) -print)
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
@@ -380,3 +386,11 @@ clean:
 distclean: 
 	clean clean-deps
 	rm -rf $(DEPS_DIR)
+
+# Fix variable naming via clang-tidy, 
+# => we run run-clang-tidy instead of --fix so we apply fixes in one pass to avoid conflicts
+# then running clang-format to fix layout (spacing & brackets)
+# tidy -> format as renames can change line lengths
+lint: init # Generate compile_commands.json first
+	run-clang-tidy -p . -fix $(SOURCES)
+	clang-format -i ${SOURCES}; \

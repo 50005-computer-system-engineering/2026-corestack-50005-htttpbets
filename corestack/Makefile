@@ -86,6 +86,10 @@ LDLIBS       := $(LOCAL_LDLIBS)
 # Final container of all libraries, empty for now
 ALL_LIB_ARCHIVES :=
 
+# Final container of all src files
+SOURCES := $(shell find $(SRC_DIR) $(INC_DIR) $(TEST_DIR) \
+	\( -name '*.c' -o -name '*.h' \) -print)
+
 # Directory Library Template: Subdirectory -> Archive
 # $(1) is the argument supplied to this function, the library name (eg: libtest)
 # Note that we include each directory's own path to the CFLAGS to
@@ -198,7 +202,7 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all init unit integration test clean
+.PHONY: all init unit integration test clean lint
 
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
@@ -249,3 +253,11 @@ $(TEST_BIN_DIR):
 # ----------------------------------------------------------------------
 clean:
 	rm -rf ./build $(UNIT_BIN)
+
+# Fix variable naming via clang-tidy, 
+# => we run run-clang-tidy instead of --fix so we apply fixes in one pass to avoid conflicts
+# then running clang-format to fix layout (spacing & brackets)
+# tidy -> format as renames can change line lengths
+lint: init # Generate compile_commands.json first
+	run-clang-tidy -p . -fix $(SOURCES)
+	clang-format -i $(SOURCES)\
