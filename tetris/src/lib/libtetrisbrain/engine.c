@@ -17,23 +17,26 @@ int checkTSpin(GameState *state)
     int cy = state->current.y + 1;
     int blocked_corners = 0;
 
-    // Check for overhead
+    // Check for {x, y} offsets for the 4 corners (top left, top right, bottom left, bottom right)
     int corner_offsets[4][2] = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
-
+    // Through all 4 corners
     for (int i = 0; i < 4; i++)
     {
+        // Checking x and y axis
         int checkX = cx + corner_offsets[i][0];
         int checkY = cy + corner_offsets[i][1];
+        // If corner point is out of bounds
         if (checkX < 0 || checkX >= BOARD_WIDTH || checkY >= BOARD_HEIGHT || checkY < 0)
         {
             blocked_corners++;
         }
+        // Within bounds but blocked
         else if (checkY >= 0 && state->board.cells[checkY][checkX] != 0)
         {
             blocked_corners++;
         }
     }
-
+    // Minimum 3 corners blocked to qualify for t-spin
     if (blocked_corners >= 3)
     {
         return 1; // T-spin confirmed
@@ -42,7 +45,7 @@ int checkTSpin(GameState *state)
     return 0; // Not t-spin
 }
 
-// Repeat function to advance the game
+// Function to advance the game / frame
 int tickGame(GameState *state)
 {
     // Attempt to let gravity pull the piece down
@@ -67,37 +70,41 @@ int tickGame(GameState *state)
     bool tspin = checkTSpin(state);
     if (tspin)
     {
-        state->t_spins++;
+        state->t_spins++; // Increment counter
     }
 
     // Otherwise collision detected, so cannot move
-    lockPiece(state); // Store in game state
-    state->pieces_placed++;
-    int cleared = clearLines(state); // Check if any rows need to be cleared
+    lockPiece(state);                // Bake into the board grid
+    state->pieces_placed++;          // Increment coutner
+    int cleared = clearLines(state); // Clear full rows and store amount in counter
+    if (cleared == 4)
+    {
+        state->tetrises++; // Increment counter
+    }
 
     // Dealing with Garbage
-    int damage = calculateGarbage(state, cleared, tspin);
-    // Defend Phase: Cancel incoming garbage with our attack
-    if (damage > 0 && state->pending_garbage > 0)
+    int damage = calculateGarbage(state, cleared, tspin); // Number of garbage lines generated in total for this turn
+    // Cancel incoming garbage with our attack
+    if (damage > 0 && state->pending_garbage > 0) // Generated + Incoming
     {
-        if (damage >= state->pending_garbage)
+        if (damage >= (int)state->pending_garbage) // Generated > Incoming
         {
-            damage -= state->pending_garbage;
-            state->pending_garbage = 0;
+            damage -= (int)state->pending_garbage; // Reduce generated
+            state->pending_garbage = 0;           // Reset Incoming
         }
         else
         {
-            state->pending_garbage -= damage;
-            damage = 0;
+            state->pending_garbage -= (uint32_t)damage; // Incoming > Generated
+            damage = 0;                                 // Reset Generated
         }
     }
-    // Attack Phase: Send remaining damage to opponent
+    // Send remaining generated damage to opponent
     state->outgoing_garbage = damage;
-    // Recieve Phase: eat that shit up
-    if (cleared == 0 && state->pending_garbage > 0)
+    // Taking damage
+    if (cleared == 0 && state->pending_garbage > 0) // No generated to cancel out incoming
     {
-        addGarbage(state, state->pending_garbage);
-        state->pending_garbage = 0;
+        addGarbage(state, state->pending_garbage); // Push to bottom of the board
+        state->pending_garbage = 0;                // Reset buffer
     }
 
     // Spawn a new piece at the top AFTER garbage has been settled
@@ -109,6 +116,46 @@ int tickGame(GameState *state)
         // Block Out
         state->game_over = true;
     }
-
+    // Return lines cleared this turn
     return cleared;
+}
+// Advances gravity and lock delay by exactly one tick
+bool updateTimers(GameState *state)
+{
+    // Track current gravity of piece for lock delay
+    int current_gravity = GRAVITY_THRESHOLD_START - ((state->level - 1) * 5);
+    if (current_gravity < 5)
+    {
+        current_gravity = 5; // Failsafe
+    }
+
+    // Gravity + Lock Delay
+    bool is_resting = !isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1);
+    if (is_resting)
+    {
+        // Lock Timer
+        state->lock_timer++;
+        if (state->lock_timer >= LOCK_THRESHOLD_START)
+        {
+            tickGame(state);
+            // Reset env variables
+            state->lock_timer = 0;
+            state->gravity_timer = 0;
+            return true; // Piece locked, board definitely changed
+        }
+    }
+    else
+    {
+        // Gravity Timer
+        state->lock_timer = 0;
+        state->gravity_timer++;
+        if (state->gravity_timer >= current_gravity)
+        {
+            tickGame(state);
+            state->gravity_timer = 0;
+            return true; // Piece fell one row
+        }
+    }
+
+    return false; // Nothing visible happened this tick
 }

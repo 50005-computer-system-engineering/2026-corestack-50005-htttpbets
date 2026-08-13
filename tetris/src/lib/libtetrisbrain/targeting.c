@@ -10,72 +10,75 @@ void cycleTargetMode(GameState *player)
 // Cycle manual target selection
 // Find current target in the lobby => move forward one at at time, wrap with total players
 // Skips own player ID and anyone who is eliminated => lands on first valid hit
-void cycleManualTarget(GameState *attacker, GameState *all_players[], int total_players)
+void cycleManualTarget(GameState *attacker, const Roster *roster)
 {
-    int current_index = -1;
-    for (int i = 0; i < total_players; i++)
+    if (roster->count <= 1) // Nobody else in the lobby (or solo)
     {
-        if (all_players[i]->player_id == attacker->target_player_id)
+        return;
+    }
+
+    // Finds the array index of the currently locked target -> resets to -1
+    int current_index = -1;
+    for (int i = 0; i < roster->count; i++)
+    {
+        if (roster->ids[i] == attacker->target_player_id)
         {
             current_index = i;
             break;
         }
     }
-    for (int step = 1; step <= total_players; step++)
+
+    // Loop through the roster step by step
+    for (int step = 1; step <= roster->count; step++)
     {
-        int index = (current_index + step + total_players) % total_players;
-        if (all_players[index]->player_id != attacker->player_id && !all_players[index]->game_over)
+        int index = (current_index + step + roster->count) % roster->count;
+        
+        // Assign iff it is a valid player
+        if (roster->ids[index] != attacker->player_id && !roster->eliminated[index])
         {
-            attacker->target_player_id = all_players[index]->player_id;
+            attacker->target_player_id = roster->ids[index];
             return;
         }
     }
 }
 
-// Resolve and return correct target ID based on attacker's mode
-int resolveTargetID(GameState *attacker, GameState *all_players[], int total_players)
+// Resolve and return correct target ID based on attacker's target mode
+uint32_t resolveTargetID(GameState *attacker, const Roster *roster)
 {
     switch (attacker->target_mode)
     {
     case TARGET_RANDOM:
     {
-        int candidates[total_players];
+        uint32_t candidates[MAX_LOBBY_PLAYERS]; // To hold valid target IDs
         int count = 0;
-        for (int i = 0; i < total_players; i++)
+        for (int i = 0; i < roster->count; i++)
         {
-            if (all_players[i]->player_id != attacker->player_id && !all_players[i]->game_over)
+            // Add all living opponents into candidates array
+            if (roster->ids[i] != attacker->player_id && !roster->eliminated[i])
             {
-                candidates[count++] = all_players[i]->player_id;
+                candidates[count++] = roster->ids[i];
             }
         }
-        if (count == 0) // Nobody left to hit
+        if (count == 0) // No valid candidates in array is given (caller only knows about itself)
         {
-            return attacker->player_id;
+            return attacker->target_player_id; // Fallback to known / locked target
         }
-        return candidates[rand() % count];
+        return candidates[rand() % count]; // Select random candidate from the pool
     }
-    case TARGET_KO:
-        int target_id = attacker->player_id; // Fallback if no target id found
-        int highest_garbage = -1;
-        // Find player with most pending garbage lines or highest placed piece activity
-        for (int i = 0; i < total_players; i++)
+    case TARGET_KO: // Retaliation
+        if (attacker->last_attacker_id != 0 && attacker->last_attacker_id != attacker->player_id) // Valid previous attacker that is not self
         {
-            if (all_players[i]->player_id == attacker->player_id)
+            for (int i = 0; i < roster->count; i++)
             {
-                continue;
-            }
-            if (all_players[i]->game_over)
-            {
-                continue;
-            }
-            // Target the player closest to topping out
-            if (all_players[i]->pending_garbage > highest_garbage && !all_players[i]->game_over)
-            {
-                highest_garbage = all_players[i]->pending_garbage;
-                target_id = all_players[i]->player_id;
+                // Verify iff previous attack is still in the game
+                if (roster->ids[i] == attacker->last_attacker_id && !roster->eliminated[i])
+                {
+                    return attacker->last_attacker_id;
+                }
             }
         }
-        return target_id;
+        // Else fallback to already locked target
+        return attacker->target_player_id;
     case TARGET_MANUAL:
     default:
         // Use manually locked target selection

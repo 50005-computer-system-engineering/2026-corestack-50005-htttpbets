@@ -40,7 +40,6 @@ int hardDrop(GameState *state)
     while (isValidPos(state, state->current.type, state->current.rot, state->current.x, state->current.y + 1))
     {
         state->current.y++;
-        state->last_action_rotation = false;
         rows++;
     }
     return rows;
