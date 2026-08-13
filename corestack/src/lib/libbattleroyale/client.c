@@ -4,7 +4,7 @@
 #include "common.h"
 #include "crypto.h"
 
-static unsigned char sess_key[SESSION_KEY_LEN];
+static unsigned char sesskey[SESSION_KEY_LEN];
 
 static MessageQueue client_messages;
 static pthread_mutex_t client_messages_lock;
@@ -315,15 +315,20 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     }
 
     // generate session key and encrypt with pubkey
-    if (generate_session_key(sess_key) < 0) {
+    if (generate_session_key(sesskey) < 0) {
         LOG_E("Failed key generation");
         return -1;
     }
-    LOG_D("checkpoint 2");
+
+    this_client->sesskey = malloc(SESSION_KEY_LEN);
+    if (this_client->sesskey == NULL) {
+        perror("malloc");
+        return -1;
+    }
+    memcpy(this_client->sesskey, sesskey, SESSION_KEY_LEN);
 
     size_t enc_key_len;
-    unsigned char *enc_key = rsa_encrypt_block(pubkey, sess_key, SESSION_KEY_LEN, &enc_key_len, 0);
-    LOG_D("checkpoint 3");
+    unsigned char *enc_key = rsa_encrypt_block(pubkey, sesskey, SESSION_KEY_LEN, &enc_key_len, 0);
 
     if (enc_key == NULL || enc_key_len > sizeof(msg.msg_content)) {
         LOG_E("failed to encrypt session key");
@@ -336,6 +341,7 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     msg.msg_type = MSG_KEY;
     msg.msg_len = enc_key_len;
     memcpy(msg.msg_content, enc_key, msg.msg_len);
+    LOG_D("EEEE: %u", msg.msg_len);
     free(enc_key);
     if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
         LOG_E("failed to send session key");

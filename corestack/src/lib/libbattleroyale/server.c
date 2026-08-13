@@ -206,13 +206,6 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             goto cleanup;
         }
 
-        // add completed new client to the clients list
-        if (add_to_list(server_ptr->clients, &new_client)) {
-            LOG_E("failed to add client to new list");
-            goto cleanup;
-        }
-        LOG_D("finished sending the new client their ID");
-
         // security - authentication
         // send certificate top new client
         Message msg;
@@ -230,7 +223,10 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
 
         // wait for nonce before signing and returning
         do {
-            receive_message_tcp(new_client.socks->tcp, &msg);
+            if (receive_message_tcp(new_client.socks->tcp, &msg) < 0) {
+                LOG_E("client disconnected while awaiting auth nonce");
+                goto cleanup;
+            }
         } while (msg.msg_type != MSG_AUTH);
         size_t sig_len;
         unsigned char* sig = sign_message_pss(pkey, msg.msg_content, NONCE_LEN, &sig_len);
@@ -241,18 +237,41 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
         msg.msg_len = sig_len;
         memcpy(msg.msg_content, sig, sig_len);
         send_message_tcp(new_client.socks->tcp, msg);
+        free(sig);
 
         // get session key for this client
         do {
-            receive_message_tcp(new_client.socks->tcp, &msg);
+            if (receive_message_tcp(new_client.socks->tcp, &msg) < 0) {
+                LOG_E("client disconnected while awaiting session key");
+                goto cleanup;
+            }
         } while (msg.msg_type != MSG_KEY);
         size_t client_sesskey_len;
         unsigned char *client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, &client_sesskey_len, 0);
-        if (client_sesskey_len != SESSION_KEY_LEN)
+        if (client_sesskey == NULL || client_sesskey_len != SESSION_KEY_LEN)
         {
             LOG_E("invalid sesskey length received");
+            free(client_sesskey);
+            goto cleanup;
         }
-        // TODO copy to client record
+
+        // save the session key, then register the fully-authenticated client
+        new_client.sesskey = malloc(SESSION_KEY_LEN);
+        if (new_client.sesskey == NULL) {
+            perror("malloc");
+            free(client_sesskey);
+            goto cleanup;
+        }
+        memcpy(new_client.sesskey, client_sesskey, SESSION_KEY_LEN);
+        free(client_sesskey);
+
+        // add completed new client to the clients list
+        if (add_to_list(server_ptr->clients, &new_client)) {
+            LOG_E("failed to add client to new list");
+            free(new_client.sesskey);
+            goto cleanup;
+        }
+        LOG_D("finished sending the new client their ID");
 
         continue;
 

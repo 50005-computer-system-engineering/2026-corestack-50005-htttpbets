@@ -100,7 +100,7 @@ int executeTestStage(BRClient* testClient, int id, enum TestStage stage)
     // execute test functions
     switch (stage) {
         // used in multiple tests
-        unsigned char msgContent[1024];
+        unsigned char msgContent[2048];
     case SETUP:
         // do nothing
         result = PASS;
