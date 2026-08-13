@@ -181,4 +181,27 @@ int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG)
     return 0;
 }
 
-// TODO unicasting with UDP
+int send_unicast_udp(int sockfd, const char* dest_ip, const Message COMPLETE_MSG)
+{
+    LOG_I("[sendUnicastUDP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
+
+    // preparing parameters 
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_UNI)};
+    if (inet_pton(AF_INET, dest_ip, &addr.sin_addr) <= 0) {
+        perror("[sendUnicastUDP()] inet_pton");
+        return -1;
+    }
+    int flags_set = 0;
+    socklen_t addr_len = sizeof(addr);
+
+    // send to the unicast UDP port
+    if (sendto(sockfd, (unsigned char*)&COMPLETE_MSG, sizeof(Message), flags_set, (struct sockaddr*)&addr, addr_len) < 0) {
+        perror("[sendUnicastUDP()] sendto");
+        return -1;
+    }
+
+    LOG_I("[sendUnicastUDP()] unicast message has been sent");
+    return 0;
+}

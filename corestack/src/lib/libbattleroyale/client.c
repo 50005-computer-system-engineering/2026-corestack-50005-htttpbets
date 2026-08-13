@@ -5,6 +5,7 @@
 #include "crypto.h"
 
 static unsigned char sesskey[SESSION_KEY_LEN];
+static char server_ip_addr[INET_ADDRSTRLEN];
 
 static MessageQueue client_messages;
 static pthread_mutex_t client_messages_lock;
@@ -260,6 +261,9 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
 
     LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ip_address);
 
+    // save server IP for future unicast UDP messaging
+    snprintf(server_ip_addr, sizeof(server_ip_addr), "%s", ip_address);
+
     // TALKING TO SERVER
     // connect on TCP first
     if (connect_on_tcp(this_client->socks, ip_address) < 0) {
@@ -391,7 +395,7 @@ int brclient_send_msg(BRClient* client_ptr, unsigned char content[MAX_APP_PAYLOA
         .source_id = this_client->id,
         .msg_type = MSG_APP_ENC,
     };
-    
+
     encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     // send via socket
@@ -406,6 +410,28 @@ int brclient_send_msg(BRClient* client_ptr, unsigned char content[MAX_APP_PAYLOA
 
 fail:
     return -1;
+}
+
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[2048])
+{
+    Endpoint* this_client = client_ptr;
+
+    // build message
+    Message msg = {
+        .source_id = this_client->id,
+        .msg_type = MSG_APP,
+    };
+    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
+
+    // send message
+    if (send_unicast_udp(this_client->socks->udp_uni, server_ip_addr, msg) < 0) {
+        LOG_E("[brclient_send_msg_udp()] sending has failed");
+        return -1;
+    }
+
+    LOG_I("[brclient_send_msg_udp()] message has been sent");
+
+    return 0;
 }
 
 /*

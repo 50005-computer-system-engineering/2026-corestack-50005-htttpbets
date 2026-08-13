@@ -19,6 +19,7 @@ int brclient_get_state(BRClient* client_ptr);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
 int brclient_send_msg(BRClient* client_ptr, unsigned char content[2048]); // use defined value instead of explicit number
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[2048]);
 
 int brclient_get_app_msg(unsigned char return_msg[2048]);
 

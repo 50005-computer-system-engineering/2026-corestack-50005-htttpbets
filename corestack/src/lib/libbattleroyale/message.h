@@ -38,5 +38,6 @@ int receive_message_tcp(int sockfd, Message* return_ptr);
 int receive_message_udp(int sockfd, Message* return_ptr);
 int send_message_tcp(int sockfd, const Message COMPLETE_MSG);
 int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG);
+int send_unicast_udp(int sockfd, const char* dest_ip, const Message COMPLETE_MSG);
 
 #endif
