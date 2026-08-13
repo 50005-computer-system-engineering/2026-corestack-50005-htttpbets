@@ -12,11 +12,7 @@ typedef enum {
 
 static const char* level_str[] = {"DEBUG", "INFO", "WARN", "ERROR"};
 
-#ifdef LOGGER_UP
-#define LOG(level, fmt, ...) fprintf(stderr, "[%s] %s [%s]:%d: " fmt "\n", level_str[level], __FILE__, __func__, __LINE__, ##__VA_ARGS__)
-#else
-#define LOG(level, fmt, ...) ((void)0)
-#endif
+#define LOG(level, fmt, ...) fprintf(stderr, "[%s] %s:%d: " fmt "\n", level_str[level], __FILE__, __LINE__, ##__VA_ARGS__)
 
 #define LOG_D(fmt, ...) LOG(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_I(fmt, ...) LOG(LOG_INFO, fmt, ##__VA_ARGS__)
