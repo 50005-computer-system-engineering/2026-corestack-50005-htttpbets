@@ -50,12 +50,12 @@ void payload_encode_state(char* buffer, const StatePayload* payload)
         }
     }
 
-    sprintf(buffer + offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u",
+    sprintf(buffer + offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u,%u",
             payload->current_type, payload->current_rot, payload->current_x, payload->current_y, payload->next_type,
             payload->preview[0], payload->preview[1], payload->preview[2],
             payload->held_type, payload->has_held,
             payload->player_id, payload->score, payload->level, payload->lines_cleared, payload->combo, payload->b2b, payload->t_spins, payload->tetrises, payload->pending_garbage,
-            payload->target_player_id, payload->target_mode, payload->game_over);
+            payload->target_player_id, payload->target_mode, payload->game_over, payload->winner_id);
 }
 
 void payload_decode_state(const char* buffer, StatePayload* payload)
@@ -67,10 +67,10 @@ void payload_decode_state(const char* buffer, StatePayload* payload)
         }
     }
 
-    sscanf(buffer + offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u",
+    sscanf(buffer + offset, ",%u,%u,%d,%d,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%u,%u,%u",
            &payload->current_type, &payload->current_rot, &payload->current_x, &payload->current_y, &payload->next_type,
            &payload->preview[0], &payload->preview[1], &payload->preview[2],
            &payload->held_type, &payload->has_held,
            &payload->player_id, &payload->score, &payload->level, &payload->lines_cleared, &payload->combo, &payload->b2b, &payload->t_spins, &payload->tetrises, &payload->pending_garbage,
-           &payload->target_player_id, &payload->target_mode, &payload->game_over);
+           &payload->target_player_id, &payload->target_mode, &payload->game_over, &payload->winner_id);
 }
