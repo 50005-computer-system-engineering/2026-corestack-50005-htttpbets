@@ -285,9 +285,9 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     do {
         receive_message_tcp(this_client->socks->tcp, &msg);
     } while (msg.msg_type != MSG_CERT);
-    
-    unsigned char *cert_bytes = malloc(msg.msg_len); 
-    X509 *cert = load_cert_bytes(msg.msg_content, msg.msg_len);
+
+    unsigned char* cert_bytes = malloc(msg.msg_len);
+    X509* cert = load_cert_bytes(msg.msg_content, msg.msg_len);
 
     // send nonce
     msg.msg_type = MSG_AUTH;
@@ -300,30 +300,43 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
         receive_message_tcp(this_client->socks->tcp, &msg);
     } while (msg.msg_type != MSG_AUTH);
 
-    if (!verify_message_pss(cert, msg.msg_content, msg.msg_len, nonce, sizeof(nonce)))
-    {
+    if (!verify_message_pss(cert, msg.msg_content, msg.msg_len, nonce, sizeof(nonce))) {
         LOG_E("server could not be authenticated");
-        this_client->state = END;
+        return -1;
     }
 
     // authentication - symmetric key establishment
     // get public key
     EVP_PKEY *pubkey = X509_get_pubkey(cert);
+    if (pubkey == NULL)
+    {
+        LOG_E("could not load pubkey from cert");
+        return -1;
+    }
 
     // generate session key and encrypt with pubkey
     if (generate_session_key(sess_key) < 0) {
         LOG_E("Failed key generation");
         return -1;
     }
+    LOG_D("checkpoint 2");
 
     size_t enc_key_len;
     unsigned char *enc_key = rsa_encrypt_block(pubkey, sess_key, SESSION_KEY_LEN, &enc_key_len, 0);
+    LOG_D("checkpoint 3");
+
+    if (enc_key == NULL || enc_key_len > sizeof(msg.msg_content)) {
+        LOG_E("failed to encrypt session key");
+        free(enc_key);
+        return -1;
+    }
 
     // send key to server
     msg.source_id = this_client->id;
     msg.msg_type = MSG_KEY;
     msg.msg_len = enc_key_len;
     memcpy(msg.msg_content, enc_key, msg.msg_len);
+    free(enc_key);
     if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
         LOG_E("failed to send session key");
     }
@@ -401,7 +414,6 @@ int brclient_get_app_msg(unsigned char return_msg[2048])
         LOG_I("[brclient_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     } else {
-        LOG_I("[brclient_get_app_msg()] queue is empty");
         return 0;
     }
 }

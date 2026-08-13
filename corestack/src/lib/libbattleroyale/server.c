@@ -10,8 +10,8 @@ typedef struct {
     ClientLinkedList* clients;
 } Server;
 
-static X509 *cert;
-static EVP_PKEY *pkey; 
+static X509* cert;
+static EVP_PKEY* pkey;
 
 static MessageQueue server_messages;
 static pthread_mutex_t server_messages_lock;
@@ -198,7 +198,7 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             perror("malloc");
             goto cleanup;
         }
-        
+
         // new client id
         uint32_t id_bytes = htonl(new_client.id);
         if (send_bytes(new_client.socks->tcp, (unsigned char*)&id_bytes, sizeof(uint32_t)) < 0) {
@@ -212,29 +212,29 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             goto cleanup;
         }
         LOG_D("finished sending the new client their ID");
-        
+
         // security - authentication
         // send certificate top new client
         Message msg;
         msg.source_id = server_ptr->self->id;
         msg.msg_type = MSG_CERT;
         /* Send certificate */
-        BIO *cert_bio = BIO_new(BIO_s_mem());
+        BIO* cert_bio = BIO_new(BIO_s_mem());
         PEM_write_bio_X509(cert_bio, cert);
-        unsigned char *cert_buf_ptr;
+        unsigned char* cert_buf_ptr;
         uint32_t cert_len = BIO_get_mem_data(cert_bio, &cert_buf_ptr);
-        msg.msg_len = cert_len; 
+        msg.msg_len = cert_len;
         memcpy(msg.msg_content, cert_buf_ptr, cert_len);
         send_message_tcp(new_client.socks->tcp, msg);
         BIO_free(cert_bio);
-        
+
         // wait for nonce before signing and returning
         do {
             receive_message_tcp(new_client.socks->tcp, &msg);
         } while (msg.msg_type != MSG_AUTH);
         size_t sig_len;
-        unsigned char *sig = sign_message_pss(pkey, msg.msg_content, NONCE_LEN, &sig_len);
-        
+        unsigned char* sig = sign_message_pss(pkey, msg.msg_content, NONCE_LEN, &sig_len);
+
         // format and send back signature
         msg.source_id = server_ptr->self->id;
         msg.msg_type = MSG_AUTH;
@@ -246,7 +246,12 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
         do {
             receive_message_tcp(new_client.socks->tcp, &msg);
         } while (msg.msg_type != MSG_KEY);
-        unsigned char *client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, NULL, 0);
+        size_t client_sesskey_len;
+        unsigned char *client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, &client_sesskey_len, 0);
+        if (client_sesskey_len != SESSION_KEY_LEN)
+        {
+            LOG_E("invalid sesskey length received");
+        }
         // TODO copy to client record
 
         continue;
@@ -494,14 +499,12 @@ int brserver_open(BRServer* server_ptr)
 
     // security - authentication, load certificate
     cert = load_cert_file("auth/server_signed.crt"); // TODO replace with proper location
-    if (!cert)
-    {
+    if (!cert) {
         LOG_E("failed to load cert");
         return -1;
     }
     pkey = load_private_key("auth/private_key.pem"); // TODO replace with proper location
-    if (!pkey)
-    {
+    if (!pkey) {
         LOG_E("failed to private key");
         return -1;
     }
@@ -698,7 +701,6 @@ int brserver_get_app_msg(unsigned char return_msg[2048])
         LOG_D("[brserver_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     } else {
-        LOG_D("[brserver_get_app_msg()] queue is empty");
         return 0;
     }
 }

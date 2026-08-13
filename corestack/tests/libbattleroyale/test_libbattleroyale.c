@@ -111,7 +111,7 @@ int executeTestStage(BRClient* testClient, int id, enum TestStage stage)
             printf("client %d: failed to join the lobby\n", id);
             result = FAIL;
             break;
-                break;
+            break;
         }
         printf("client %d: successfully joined lobby\n", id);
         result = PASS;
