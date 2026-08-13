@@ -37,11 +37,7 @@ _CS_DIR_LIBS  := $(patsubst lib%,-l%,$(notdir $(_CS_LIB_DIRS)))
 # Flat file libs  e.g. src/lib/libeventbus.c
 _CS_FLAT_SRCS := $(wildcard $(CORESTACK_DIR)/src/lib/*.c)
 _CS_FLAT_LIBS := $(patsubst lib%,-l%,$(notdir $(_CS_FLAT_SRCS:.c=)))
-
-# -lssh -lcrypto come from common.mk's SYS_LDLIBS default; corestack's own
-# libs need them too (transitively, via its static archives), so they're
-# defined once there instead of duplicated here.
-CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS)
+CS_LDLIBS := $(_CS_DIR_LIBS) $(_CS_FLAT_LIBS) $(SYS_LDLIBS)
 
 # Compiler flags shared across all projects
 #

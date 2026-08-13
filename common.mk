@@ -47,8 +47,10 @@ UNITY_DIR  ?= $(TESTS_DIR)/unity
 # ----------------------------------------------------------------------
 CS_INC        ?=
 CS_LIB        ?=
-CS_LDLIBS     ?= -lssh -lcrypto -lm
+CS_LDLIBS     ?=
 COMMON_CFLAGS ?= -Wall -Wextra -g -pthread
+
+SYS_LDLIBS := -lssh -lcrypto -lm
 
 # ----------------------------------------------------------------------
 # Compiler / Linker Flags
@@ -80,7 +82,7 @@ FLAT_LIB_NAMES := $(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/%.c,%,$(FLAT_LIB_SRCS))
 # Converts every library name into a -l flag, stripping 'lib' prefix (eg: libtest -> -ltest)
 LOCAL_LDLIBS := $(patsubst lib%,-l%,$(LIB_NAMES) $(FLAT_LIB_NAMES))
 # Assigns final set of -l flags to LDLIBS, including corestack libraries
-LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS)
+LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS) $(SYS_LDLIBS)
 
 # Final container of all libraries, empty for now
 ALL_LIB_ARCHIVES :=
