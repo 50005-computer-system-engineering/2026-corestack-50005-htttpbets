@@ -15,26 +15,57 @@
 #	tests		unit tests
 #
 # Usage:
-#   make              	runs 'all' by default, builds everything
+#   make              	runs 'all' by default, builds everything (downloads stb_image if needed)
+#   make deps			explicitly fetch missing dependencies only
 #   make run/run-server/run-client	launch server/client in a new terminal
 #   make test			runs all tests
 #	make unit			runs unit tests
 #	make integration	runs integration tests
 # 	make clean 			wipe build/ folder
+#	make distclean		clean + wipe deps/ (forces re-download on next build)
 #	make lint			automatically format code to style guide
 # =============================================================================
 # Include corestack variables
 include ../config.mk
 
 # Block Emoji
-INIT_MSG     := \U0001F9F1 
+INIT_MSG     := \U0001F9F1
 PROJECT_NAME := tetris
 POST_INIT    := mkdir -p var/log var/run
+DEPS_DIR     := ./deps
+
+# stb_image (single-header image loader)
+# Used by libgraphics/viuer.c to decode PNGs/JPEGs/BMPs/TGAs
+# Ref: https://github.com/nothings/stb
+STB_IMAGE_URL      := https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
+STB_IMAGE_ARTIFACT := $(DEPS_DIR)/stb_image/stb_image.h
+
+COMMON_CFLAGS += -I$(dir $(STB_IMAGE_ARTIFACT))
 
 # Include basic compiling logic
 include ../common.mk
 # Include testing logic
 include ../common-test.mk
+# Include dependency downloading logic
+include ../common-deps.mk
+
+# Generate template for fetching stb_image.h
+# NOT cleaned by make clean so we don't have to re-download each time
+$(eval $(call FETCH_FILE_template,STB_IMAGE))
+
+# libgraphics's viuer.c #includes stb_image.h, so it must be fetched first
+$(OBJ_DIR)/libgraphics/viuer.o: $(STB_IMAGE_ARTIFACT)
+
+.PHONY: deps distclean
+
+# Fetch dependencies without building the project
+deps: $(STB_IMAGE_ARTIFACT)
+	@echo "==> All dependencies ready."
+
+# Remove /deps and build artifacts
+distclean: clean
+	rm -rf $(DEPS_DIR)
+
 # ----------------------------------------------------------------------
 # Launcher
 # ----------------------------------------------------------------------
