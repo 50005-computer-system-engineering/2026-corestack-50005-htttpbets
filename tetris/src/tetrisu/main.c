@@ -131,7 +131,7 @@ int main(void)
         process_inputs(&gamestate_player);
 
         // Read directly from message queue
-        unsigned char net_buffer[512] = {0};
+        unsigned char net_buffer[1024] = {0};
 
         while (brclient_get_app_msg(net_buffer) == 1) {
             uint32_t tag = read_packet_tag(net_buffer);
