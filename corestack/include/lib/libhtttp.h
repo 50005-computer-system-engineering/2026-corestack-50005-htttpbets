@@ -36,4 +36,6 @@ extern const int N_HTTTP_HEADERS;
 void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg);
 void req_create_state(uint32_t id, StatePayload* payload, ParsedMsgHT* formatted_msg);
 void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatted_msg);
+void req_create_roster(uint32_t id, RosterPayload* payload, ParsedMsgHT* formatted_msg);
+
 #endif
