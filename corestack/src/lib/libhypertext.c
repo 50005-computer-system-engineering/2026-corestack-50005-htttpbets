@@ -76,12 +76,21 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
     char* ptr = ht;
     parser_result->token1 = ptr;
     ptr = next_token(ptr, HT_TOKEN_SEP);
+    if (!ptr) {
+        return -1;
+    }
     parser_result->token2 = ptr;
     ptr = next_token(ptr, HT_TOKEN_SEP);
+    if (!ptr) {
+        return -1;
+    }
     parser_result->token3 = ptr;
 
     // headers
     ptr = next_token(ptr, HT_END_LINE);
+    if (!ptr) {
+        return -1;
+    }
     char* field;
     char* value;
     parser_result->n_headers = count_headers(ptr);
@@ -89,8 +98,14 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
         // find the values for the header
         field = ptr;
         ptr = next_token(ptr, HT_HEADER_SEP);
+        if (!ptr) {
+            return -1;
+        }
         value = ptr;
         ptr = next_token(ptr, HT_END_LINE);
+        if (!ptr) {
+            return -1;
+        }
 
         // assign the strings
         parser_result->headers[i].field = field;
@@ -99,10 +114,12 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
 
     // body
     ptr = next_token(ptr, HT_END_LINE); // only end line left after the last loop iteration
+    if (!ptr) {
+        return -1;
+    }
     parser_result->body = ptr;
 
-fail:
-    return -1;
+    return 0;
 }
 
 // builder functions
