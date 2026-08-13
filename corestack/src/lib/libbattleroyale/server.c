@@ -58,6 +58,7 @@ int listen_on_tcp(Server* server_ptr)
         perror("[listenOnTCP()] listen");
         return -1;
     }
+
     LOG_I("[listenOnTCP()] server now listening for TCP connections on port %d", PORT_TCP);
     return 0;
 }
@@ -240,6 +241,13 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
         msg.msg_len = sig_len;
         memcpy(msg.msg_content, sig, sig_len);
         send_message_tcp(new_client.socks->tcp, msg);
+
+        // get session key for this client
+        do {
+            receive_message_tcp(new_client.socks->tcp, &msg);
+        } while (msg.msg_type != MSG_KEY);
+        unsigned char *client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, NULL, 0);
+        // TODO copy to client record
 
         continue;
 

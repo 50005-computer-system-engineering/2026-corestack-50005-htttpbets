@@ -4,6 +4,8 @@
 #include "common.h"
 #include "crypto.h"
 
+static unsigned char sess_key[SESSION_KEY_LEN];
+
 static MessageQueue client_messages;
 static pthread_mutex_t client_messages_lock;
 static int pc_flags[2] = {0, 0};
@@ -302,6 +304,28 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     {
         LOG_E("server could not be authenticated");
         this_client->state = END;
+    }
+
+    // authentication - symmetric key establishment
+    // get public key
+    EVP_PKEY *pubkey = X509_get_pubkey(cert);
+
+    // generate session key and encrypt with pubkey
+    if (generate_session_key(sess_key) < 0) {
+        LOG_E("Failed key generation");
+        return -1;
+    }
+
+    size_t enc_key_len;
+    unsigned char *enc_key = rsa_encrypt_block(pubkey, sess_key, SESSION_KEY_LEN, &enc_key_len, 0);
+
+    // send key to server
+    msg.source_id = this_client->id;
+    msg.msg_type = MSG_KEY;
+    msg.msg_len = enc_key_len;
+    memcpy(msg.msg_content, enc_key, msg.msg_len);
+    if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
+        LOG_E("failed to send session key");
     }
 
     // INDEPENDENT OF SERVER
