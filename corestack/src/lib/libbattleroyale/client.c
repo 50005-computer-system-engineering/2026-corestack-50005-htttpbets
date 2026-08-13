@@ -2,6 +2,7 @@
 
 #include "lib/libbattleroyale/client.h"
 #include "common.h"
+#include "crypto.h"
 
 static MessageQueue clientMessages;
 static pthread_mutex_t clientMessagesLock;
@@ -285,6 +286,16 @@ int brclient_join(BRClient *clientPtr, char *ipAddress)
         LOG_E("[startClientHandshake()] failed to connect to server at IP");
         return -1;
     }
+
+    // security - authentication
+    // nonce generation
+    unsigned char nonce[NONCE_LEN];
+    RAND_bytes(nonce, sizeof(nonce));
+    // receive server cert
+    // Message *msg;
+    // while (receiveMessageTCP(thisClient->socks->tcp, ))
+
+    // sendBytes(sockfd, (unsigned char *)nonce, noncefd);
 
     // receive user id and save to Endpoint
     unsigned char *buffer = NULL;
