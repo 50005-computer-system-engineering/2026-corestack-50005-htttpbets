@@ -275,7 +275,7 @@ int main(void)
 
             unsigned char state_buffer[512] = {0};
             pack_state(state_buffer, &snapshot);
-            brserver_send_broadcast(server, state_buffer);
+            brserver_send_to_all(server, state_buffer);
 
             slot->dirty = false;
             slot->idle_ticks = 0;
