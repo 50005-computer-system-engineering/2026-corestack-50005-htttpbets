@@ -3,13 +3,19 @@
 
 #include "common.h"
 
-#define MSG_CONTENT_LENGTH 512
+#define MSG_CONTENT_LENGTH 1024
 
 typedef enum {
+    // security related
+    MSG_CERT,
+    MSG_AUTH,
+    MSG_KEY,
+    // lobby related
     MSG_JOIN,
     MSG_LEAVE,
     MSG_START,
     MSG_END,
+    // app related
     MSG_APP
 } MessageType;
 

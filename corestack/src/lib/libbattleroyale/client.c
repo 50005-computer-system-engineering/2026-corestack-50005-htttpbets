@@ -2,6 +2,7 @@
 
 #include "lib/libbattleroyale/client.h"
 #include "common.h"
+#include "crypto.h"
 
 static MessageQueue clientMessages;
 static pthread_mutex_t clientMessagesLock;
@@ -286,6 +287,16 @@ int brclient_join(BRClient *clientPtr, char *ipAddress)
         return -1;
     }
 
+    // security - authentication
+    // nonce generation
+    unsigned char nonce[NONCE_LEN];
+    RAND_bytes(nonce, sizeof(nonce));
+    // receive server cert
+    // Message *msg;
+    // while (receiveMessageTCP(thisClient->socks->tcp, ))
+
+    // sendBytes(sockfd, (unsigned char *)nonce, noncefd);
+
     // receive user id and save to Endpoint
     unsigned char *buffer = NULL;
     buffer = malloc(sizeof(uint32_t));
@@ -333,7 +344,7 @@ int brclient_get_state(BRClient *clientPtr)
 }
 
 // message functions
-int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
+int brclient_send_msg(BRClient *clientPtr, unsigned char content[1024])
 {
     Endpoint *thisClient = clientPtr;
 
@@ -364,7 +375,7 @@ int brclient_send_msg(BRClient *clientPtr, unsigned char content[512])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brclient_get_app_msg(unsigned char returnMsg[512])
+int brclient_get_app_msg(unsigned char returnMsg[1024])
 {
     if (!Message_empty(&clientMessages))
     {
