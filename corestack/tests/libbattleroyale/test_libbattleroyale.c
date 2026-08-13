@@ -108,7 +108,7 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
     switch (stage) 
     {
         // used in multiple tests
-        unsigned char msgContent[1024];
+        unsigned char msgContent[2048];
         case SETUP:
             // do nothing
             result = PASS;
@@ -126,7 +126,7 @@ int executeTestStage(BRClient *testClient, int id, enum TestStage stage)
             break;
         case SEND_MESSAGES:
             // build message
-            snprintf(msgContent, 1024, "client %d: gamer word", id);
+            snprintf(msgContent, 2048, "client %d: gamer word", id);
             // perform send
             if (brclient_send_msg(testClient, msgContent) < 0)
             {

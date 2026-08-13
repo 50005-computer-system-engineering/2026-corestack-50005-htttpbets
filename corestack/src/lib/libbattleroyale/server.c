@@ -3,11 +3,15 @@
 #include "lib/libbattleroyale/server.h"
 #include "common.h"
 #include "clientll.h"
+#include "crypto.h"
 
 typedef struct {
     Endpoint* self;
     ClientLinkedList* clients;
 } Server;
+
+static X509 *cert;
+static EVP_PKEY *pkey; 
 
 static MessageQueue server_messages;
 static pthread_mutex_t server_messages_lock;
@@ -150,7 +154,7 @@ During this state, TCP connections from client are accepted (and server assigns 
 */
 void server_lobby_state(Server* server_ptr) // loop where server accepts clients
 {
-    LOG_I("[serverLobbyState()] SERVER entering LOBBY state, accepting clients...");
+    LOG_I("SERVER entering LOBBY state, accepting clients...");
 
     // tracking the id assigned
     int prev_assigned_id = 0;
@@ -170,13 +174,13 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
         }
 
         // accept a client if the socket has any POLLIN activity
-        LOG_D("[serverLobbyState()] polled activity, accpeting a client");
+        LOG_D("polled activity, accpeting a client");
         int client_fd = accept_on_tcp(server_ptr);
         if (client_fd < 0) {
-            LOG_E("[serverLobbyState()] accept failed to find client, skipping loop iteration...");
+            LOG_E("accept failed to find client, skipping loop iteration...");
             continue;
         }
-        LOG_D("[serverLobbyState()] accept succses, assigning player id %u to new connection", ++prev_assigned_id);
+        LOG_D("accept succses, assigning player id %u to new connection", ++prev_assigned_id);
 
         // creating client endpoint of newly connected client
         Endpoint new_client = {
@@ -184,27 +188,58 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             .socks = malloc(sizeof(Sockets))};
         new_client.socks->tcp = client_fd;
 
-        LOG_D("[serverLobbyState()] sending client %u their ID", new_client.id);
+        LOG_D("sending client %u their ID", new_client.id);
 
         unsigned char* buffer = NULL;
 
         buffer = malloc(sizeof(uint32_t));
         if (buffer == NULL) {
-            perror("[serverLobbyState()] malloc");
+            perror("malloc");
             goto cleanup;
         }
+        
+        // new client id
         uint32_t id_bytes = htonl(new_client.id);
         if (send_bytes(new_client.socks->tcp, (unsigned char*)&id_bytes, sizeof(uint32_t)) < 0) {
-            LOG_E("[serverLobbyState()] failed to send source ID");
+            LOG_E("failed to send source ID");
             goto cleanup;
         }
 
         // add completed new client to the clients list
         if (add_to_list(server_ptr->clients, &new_client)) {
-            LOG_E("[serverLobbyState()] failed to add client to new list");
+            LOG_E("failed to add client to new list");
             goto cleanup;
         }
-        LOG_D("[serverLobbyState()] finished sending the new client their ID");
+        LOG_D("finished sending the new client their ID");
+        
+        // security - authentication
+        // send certificate top new client
+        Message msg;
+        msg.source_id = server_ptr->self->id;
+        msg.msg_type = MSG_CERT;
+        /* Send certificate */
+        BIO *cert_bio = BIO_new(BIO_s_mem());
+        PEM_write_bio_X509(cert_bio, cert);
+        unsigned char *cert_buf_ptr;
+        uint32_t cert_len = BIO_get_mem_data(cert_bio, &cert_buf_ptr);
+        msg.msg_len = cert_len; 
+        memcpy(msg.msg_content, cert_buf_ptr, cert_len);
+        send_message_tcp(new_client.socks->tcp, msg);
+        BIO_free(cert_bio);
+        
+        // wait for nonce before signing and returning
+        do {
+            receive_message_tcp(new_client.socks->tcp, &msg);
+        } while (msg.msg_type != MSG_AUTH);
+        size_t sig_len;
+        unsigned char *sig = sign_message_pss(pkey, msg.msg_content, NONCE_LEN, &sig_len);
+        
+        // format and send back signature
+        msg.source_id = server_ptr->self->id;
+        msg.msg_type = MSG_AUTH;
+        msg.msg_len = sig_len;
+        memcpy(msg.msg_content, sig, sig_len);
+        send_message_tcp(new_client.socks->tcp, msg);
 
         continue;
 
@@ -449,6 +484,20 @@ int brserver_open(BRServer* server_ptr)
         return 0; // allow to continue as though no issue (intended effect already in place)
     }
 
+    // security - authentication, load certificate
+    cert = load_cert_file("auth/server_signed.crt"); // TODO replace with proper location
+    if (!cert)
+    {
+        LOG_E("failed to load cert");
+        return -1;
+    }
+    pkey = load_private_key("auth/private_key.pem"); // TODO replace with proper location
+    if (!pkey)
+    {
+        LOG_E("failed to private key");
+        return -1;
+    }
+
     this_server->self->state = LOBBY;
 
     LOG_I("[brserver_open()] SERVER is set to LOBBY state");
@@ -546,7 +595,7 @@ int brserver_client_info(BRServer* server_ptr, uint32_t* n_clients, uint32_t* cl
     return 0;
 }
 
-int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[1024]) // use defined value instead of explicit number
+int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[2048]) // use defined value instead of explicit number
 {
     LOG_I("[brserver_send_to_target()] sending broadcast to cliets...");
 
@@ -581,7 +630,7 @@ int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned c
     return 0;
 }
 
-int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024])
+int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[2048])
 {
     Server* this_server = server_ptr;
 
@@ -601,7 +650,7 @@ int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024])
     LOG_I("[brserver_send_broadcast()] message has been sent");
 }
 
-int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024])
+int brserver_send_to_all(BRServer* server_ptr, unsigned char content[2048])
 {
     Server* this_server = server_ptr;
 
@@ -625,7 +674,7 @@ int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brserver_get_app_msg(unsigned char return_msg[1024])
+int brserver_get_app_msg(unsigned char return_msg[2048])
 {
     if (!Message_empty(&server_messages)) {
         if (pc_flags[1]) {

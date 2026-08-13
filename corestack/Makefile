@@ -57,7 +57,7 @@ CFLAGS := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -Wall -Wextra -g -pthread
 
 # LDFLAGS: flags for the linker (search paths and system libs)
 # LDLIBS is filled in after library auto-discovery below!
-LDFLAGS := -L$(LIB_OUT) -lpthread
+LDFLAGS := -L$(LIB_OUT) -lbattleroyale -lpthread -lssl -lcrypto
 
 # ----------------------------------------------------------------------
 # Library Auto-Discovery (src/lib/<libname>)
@@ -242,7 +242,7 @@ test: $(TEST_BINS)
 
 $(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(TARGET_STATIC) | $(TEST_BIN_DIR)
 	@mkdir -p $(dir $@)
-	$(CC) $(TEST_CFLAGS) $< -o $@ -L$(LIB_OUT) -lbattleroyale
+	$(CC) $(TEST_CFLAGS) $< -o $@ ${LDFLAGS}
 	@echo "Built test binary: $@"
 
 $(TEST_BIN_DIR):

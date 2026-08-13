@@ -69,6 +69,16 @@ int receive_message_tcp(int sockfd, Message* return_ptr)
     buffer = NULL;
 
     if (read_bytes(sockfd, &buffer, sizeof(uint32_t)) < 0) {
+        LOG_E("[receiveMessageTCP()] failed to read source id");
+        goto fail;
+    }
+    uint32_t length_bytes;
+    memcpy(&length_bytes, buffer, sizeof(length_bytes));
+    return_ptr->msg_len = ntohl(length_bytes);
+    free(buffer);
+    buffer = NULL;
+
+    if (read_bytes(sockfd, &buffer, sizeof(uint32_t)) < 0) {
         LOG_E("[receiveMessageTCP()] failed to read message type");
         goto fail;
     }
@@ -87,7 +97,7 @@ int receive_message_tcp(int sockfd, Message* return_ptr)
     free(buffer);
     buffer = NULL;
 
-    LOG_D("[receiveMessageTCP()] received message:\n\tsource: %u\n\ttype: %d", return_ptr->source_id, return_ptr->msg_type);
+    LOG_D("[receiveMessageTCP()] received message:\n\tsource: %u\n\ttype: %d\ncontent: %s", return_ptr->source_id, return_ptr->msg_type, return_ptr->msg_content);
     LOG_I("[receiveMessageTCP()] finished receiving message");
 
     return 0;
@@ -137,6 +147,8 @@ int send_message_tcp(int sockfd, const Message COMPLETE_MSG)
     LOG_I("[sendMessageTCP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
     uint32_t source_id = htonl(COMPLETE_MSG.source_id);
     send_bytes(sockfd, (const unsigned char*)&source_id, sizeof(uint32_t));
+    uint32_t msg_len = htonl(COMPLETE_MSG.msg_len);
+    send_bytes(sockfd, (const unsigned char*)&msg_len, sizeof(uint32_t));
     MessageType type = htonl(COMPLETE_MSG.msg_type);
     send_bytes(sockfd, (const unsigned char*)&type, sizeof(uint32_t));
     send_bytes(sockfd, COMPLETE_MSG.msg_content, MSG_CONTENT_LENGTH);

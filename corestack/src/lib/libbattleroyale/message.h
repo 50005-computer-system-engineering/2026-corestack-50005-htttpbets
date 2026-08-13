@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#define MSG_CONTENT_LENGTH 1024
+#define MSG_CONTENT_LENGTH 2048
 
 typedef enum {
     // security related
@@ -21,6 +21,7 @@ typedef enum {
 
 typedef struct {
     uint32_t source_id;
+    uint32_t msg_len;
     MessageType msg_type;
     unsigned char msg_content[MSG_CONTENT_LENGTH];
 } Message;

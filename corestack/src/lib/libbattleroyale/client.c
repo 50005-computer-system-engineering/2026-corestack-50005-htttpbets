@@ -283,27 +283,22 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     do {
         receive_message_tcp(this_client->socks->tcp, &msg);
     } while (msg.msg_type != MSG_CERT);
-    size_t cert_len;
-    sscanf(msg.msg_content, "%u/crt/", &cert_len);
     
-    unsigned char *cert_bytes = malloc(cert_len);
-    unsigned char *cert_start = strstr(msg.msg_content, "/crt/") + strlen("/crt/"); 
-    X509 *cert = load_cert_bytes(cert_start, cert_len);
+    unsigned char *cert_bytes = malloc(msg.msg_len); 
+    X509 *cert = load_cert_bytes(msg.msg_content, msg.msg_len);
 
     // send nonce
     msg.msg_type = MSG_AUTH;
     msg.source_id = this_client->id;
-    snprintf(msg.msg_content, 1024, "%s", nonce);
+    snprintf(msg.msg_content, 2048, "%s", nonce);
     send_message_tcp(this_client->socks->tcp, msg);
 
     // receive signed nonce and verify
     do {
         receive_message_tcp(this_client->socks->tcp, &msg);
     } while (msg.msg_type != MSG_AUTH);
-    size_t sig_len;
-    sscanf(msg.msg_content, "%u/sig/", &sig_len);
-    unsigned char *sig_start = strstr(msg.msg_content, "/sig/") + strlen("/sig/");
-    if (!verify_message_pss(cert, msg.msg_content, sig_len, nonce, sizeof(nonce)))
+
+    if (!verify_message_pss(cert, msg.msg_content, msg.msg_len, nonce, sizeof(nonce)))
     {
         LOG_E("server could not be authenticated");
         this_client->state = END;
@@ -336,7 +331,7 @@ int brclient_get_state(BRClient* client_ptr)
 }
 
 // message functions
-int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024])
+int brclient_send_msg(BRClient* client_ptr, unsigned char content[2048])
 {
     Endpoint* this_client = client_ptr;
 
@@ -366,7 +361,7 @@ fail:
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brclient_get_app_msg(unsigned char return_msg[1024])
+int brclient_get_app_msg(unsigned char return_msg[2048])
 {
     if (!Message_empty(&client_messages)) {
         if (pc_flags[1]) {
