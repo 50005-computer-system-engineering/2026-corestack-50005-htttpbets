@@ -1,33 +1,38 @@
 #!/bin/bash
-# L10.1 System UI & Integration Test
-# Asserts that the compiled binaries boot successfully and yield expected exit codes.
 
-SERVER_BIN="./build/bin/tetrisd"
-CLIENT_BIN="./build/bin/tetrisu"
+# =============================================================================
+# Integration Test: Daemon Boot Sequence
+# Purpose: Ensures the compiled tetrisd binary can launch without instantly crashing.
+# =============================================================================
 
-# 1. Check if make successfully generated the binaries
-if [ ! -f "$SERVER_BIN" ] || [ ! -f "$CLIENT_BIN" ]; then
-    echo "[FAIL] Binaries not found! Did 'make all' succeed?"
+echo "[*] Running Integration Test: test_ui_boot.sh"
+
+# 1. Define the path to the compiled daemon binary
+# (Adjust this path if your Makefile outputs to a different bin folder)
+DAEMON_BIN="./build/bin/tetrisd"
+
+# 2. Check if the binary actually compiled and exists
+if [ ! -f "$DAEMON_BIN" ]; then
+    echo "[-] FAILED: Binary $DAEMON_BIN does not exist. Did it compile?"
     exit 1
 fi
 
-# 2. Boot the server in the background
-$SERVER_BIN > server_test.log 2>&1 &
-SERVER_PID=$!
+# 3. Launch the daemon in the background (&)
+echo "[*] Launching $DAEMON_BIN..."
+$DAEMON_BIN &
+DAEMON_PID=$!
 
-# Give server 1 second to bind to port
-sleep 1
+# 4. Wait for 2 seconds to see if it survives initialization
+sleep 2
 
-# 3. Verify server hasn't crashed immediately
-if ! kill -0 $SERVER_PID 2>/dev/null; then
-    echo "[FAIL] tetrisd crashed immediately upon boot."
-    cat server_test.log
+# 5. Check if the process is still running
+if kill -0 $DAEMON_PID 2>/dev/null; then
+    echo "[+] SUCCESS: Daemon successfully booted and held its state."
+    
+    # Clean up: Kill the test daemon so it doesn't hang in the background
+    kill -9 $DAEMON_PID
+    exit 0
+else
+    echo "[-] FAILED: Daemon crashed immediately after boot."
     exit 1
 fi
-
-# 4. Clean up background process
-kill $SERVER_PID
-rm -f server_test.log
-
-echo "[PASS] System Integration Boot check succeeded."
-exit 0

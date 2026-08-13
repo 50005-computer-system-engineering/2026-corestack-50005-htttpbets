@@ -1,34 +1,57 @@
 #include "unity.h"
-#include "libtetrisbrain/killfeed.h"
 #include <pthread.h>
+#include <string.h>
+#include "lib/libtetrisbrain/engine.h"
+#include "lib/libtetrisbrain/movement.h"
+#include "lib/libtetrisbrain/bag.h"
 
-void setUp(void) {}
+#define NUM_THREADS 2
+#define OPERATIONS_PER_THREAD 5000
+
+static GameState global_state;
+
+void setUp(void) {
+    memset(&global_state, 0, sizeof(GameState));
+    refillBag(&global_state);
+    spawnNewPiece(&global_state);
+}
+
 void tearDown(void) {}
 
-// Thread worker simulating intense network logging
-void* killfeed_spammer(void* arg) {
+void* thread_input_spam(void* arg) {
     (void)arg;
-    for(int i = 0; i < 5000; i++) {
-        addKillFeed(1, 2, 4); 
+    
+    for (int i = 0; i < OPERATIONS_PER_THREAD; i++) {
+        // Rapidly alternate movement inputs
+        moveLeft(&global_state);
+        moveRight(&global_state);
+        softDrop(&global_state);
+        updateTimers(&global_state);
     }
     return NULL;
 }
 
-void test_killfeed_race_conditions(void) {
-    // L12.1 Concurrency: 2 threads hammering the same circular buffer
-    pthread_t t1, t2;
-    pthread_create(&t1, NULL, killfeed_spammer, NULL);
-    pthread_create(&t2, NULL, killfeed_spammer, NULL);
+void test_concurrent_state_mutation(void) {
+    pthread_t threads[NUM_THREADS];
     
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
+    // 1. Spawn concurrent threads hammering the shared GameState pointer
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_create(&threads[i], NULL, thread_input_spam, NULL);
+    }
     
-    // If no segfault occurs during threaded circular buffer wraparound, test passes.
-    TEST_ASSERT_MESSAGE(1 == 1, "Concurrency survived without segmentation fault.");
+    // 2. Synchronize threads
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    
+    // 3. Assert the state survived without memory corruption or deadlocks
+    TEST_ASSERT_TRUE_MESSAGE(global_state.current.x >= -4 && global_state.current.x <= BOARD_WIDTH + 4, 
+                            "Concurrent inputs corrupted piece position beyond logical bounds");
 }
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_killfeed_race_conditions);
+    printf("[*] Executing Concurrency & Thread-Safety Tests...\n");
+    RUN_TEST(test_concurrent_state_mutation);
     return UNITY_END();
 }
