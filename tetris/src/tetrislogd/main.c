@@ -26,6 +26,8 @@
 #define SUMMARY_INTERVAL_SEC 30
 
 /* ----- SIGNAL STATE ----- */
+// Volatile to prevent compiler from caching in a register
+// Atomic to ensure that reading and writing cannot be interrupted halfway
 static volatile sig_atomic_t running = 1;
 static volatile sig_atomic_t reopen_requested = 0;
 
@@ -88,6 +90,7 @@ static void load_config(const char* rc_path, char* log_path, size_t log_path_siz
         return; // No .tetrishrc yet, defaults are fine, this is not an error
     }
 
+    // Reads the file line by line
     char line[CONFIG_LINE_LENGTH];
     while (fgets(line, sizeof(line), f) != NULL) {
         // Search for a # -> if found, replaced with \0
@@ -141,7 +144,7 @@ static void load_config(const char* rc_path, char* log_path, size_t log_path_siz
 // Need to create the directories first; if they don't exist if not fopen() and bind() would not work
 static void ensure_parent_dir_exists(const char* file_path)
 {
-    // Copies the path
+    // Copies the path into a local buffer so can be safely modified
     char path[CONFIG_PATH_LENGTH];
     strncpy(path, file_path, sizeof(path) - 1);
     path[sizeof(path) - 1] = '\0';
@@ -237,6 +240,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    // Init sequence tracking
     SenderTracker trackers[MAX_TRACKED_SENDERS];
     int tracker_count = 0;
     uint32_t channel_dropped_total = 0;  // Gaps detected via seq, for the whole run
@@ -307,6 +311,8 @@ int main(int argc, char* argv[])
             // Ignore if datagram is the wrong size
         }
 
+        // Check current time vs last summary
+        // If 30s passed + packets dropped -> print warning to stderr, reset period counter, update timestamp
         time_t now = time(NULL);
         if (now - last_summary >= SUMMARY_INTERVAL_SEC) {
             if (channel_dropped_period > 0) {
