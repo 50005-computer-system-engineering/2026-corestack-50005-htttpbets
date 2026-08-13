@@ -310,6 +310,12 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 .PHONY: all init deps run unit integration test clean clean-deps distclean lint
 
+
+# All project .c/.h under src/, include/, tests/
+SOURCES := $(shell find $(SRC_DIR) $(INC_DIR) $(TESTS_DIR) \
+	-path $(UNITY_DIR) -prune -o \
+	\( -name '*.c' -o -name '*.h' \) -print)
+
 # 'all' is ran by default when make is ran with no arguments
 .DEFAULT_GOAL := all
 all: $(ALL_LIB_ARCHIVES) $(ALL_BINS) $(TARGET)

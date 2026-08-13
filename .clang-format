@@ -15,7 +15,7 @@ IndentCaseLabels: false
 BreakBeforeBraces: Linux
 
 # --- Line length / wrapping ---
-ColumnLimit: 80
+ColumnLimit: 120
 AlignAfterOpenBracket: Align
 AllowShortBlocksOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
@@ -24,8 +24,8 @@ AllowShortLoopsOnASingleLine: false
 BinPackArguments: true
 BinPackParameters: true
 
-# --- Pointers/refs: K&R keeps the * next to the variable name ---
-PointerAlignment: Right
+# --- Pointers/refs: Keep * next to variable name, like int* x---
+PointerAlignment: Left
 DerivePointerAlignment: false
 
 # --- Spacing ---

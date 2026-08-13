@@ -16,22 +16,22 @@ CheckOptions:
     value: lower_case
   - key: readability-identifier-naming.MemberCase
     value: lower_case
+  - key: readability-identifier-naming.ConstantMemberCase
+    value: UPPER_CASE
 
   # Functions
   - key: readability-identifier-naming.FunctionCase
     value: lower_case
 
-  # Types: classic K&R/C convention is lower_case with _t suffix for typedefs
+  # Types
   - key: readability-identifier-naming.TypedefCase
-    value: lower_case
-  - key: readability-identifier-naming.TypedefSuffix
-    value: _t
+    value: CamelCase
   - key: readability-identifier-naming.StructCase
-    value: lower_case
+    value: CamelCase
   - key: readability-identifier-naming.UnionCase
     value: lower_case
   - key: readability-identifier-naming.EnumCase
-    value: lower_case
+    value: CamelCase
   - key: readability-identifier-naming.EnumConstantCase
     value: UPPER_CASE
 
@@ -40,13 +40,6 @@ CheckOptions:
     value: UPPER_CASE
   - key: readability-identifier-naming.GlobalConstantCase
     value: UPPER_CASE
-
-  # Globals (non-const) — many K&R-era codebases prefix these; adjust
-  # or delete this block if you don't want a g_ prefix enforced
-  - key: readability-identifier-naming.GlobalVariableCase
-    value: lower_case
-  - key: readability-identifier-naming.GlobalVariablePrefix
-    value: g_
 
   # Static (file-scope) variables/functions
   - key: readability-identifier-naming.StaticVariableCase
