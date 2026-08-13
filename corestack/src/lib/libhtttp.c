@@ -9,6 +9,25 @@
 #include "lib/libhtttp.h"
 #include "utils/logger.h"
 
+// array of accepted methods
+const MethodMapping HTTTP_METHODS[] = {
+    {"MOVE", REQ_MOVE},
+    {"DROP", REQ_DROP},
+    {"ROTATE", REQ_ROTATE},
+    {"STATE", REQ_STATE},
+    {"ATTACK", REQ_ATTACK},
+    {"ACTION", REQ_ACTION},
+    {"ROSTER", REQ_ROSTER}};
+const int N_HTTTP_METHODS = sizeof(HTTTP_METHODS) / sizeof(MethodMapping);
+
+// HTTTP header fields
+const char* htttp_headers[] = {
+    "Content-Length",
+    "Content-Type",
+    "Player-Id",
+    "Date"};
+const int N_HTTTP_HEADERS = sizeof(htttp_headers) / sizeof(char*);
+
 /*
 Function generates date
 */
@@ -72,6 +91,9 @@ char* method_to_string(MethodHTTTP v)
             return HTTTP_METHODS[i].string;
         }
     }
+
+    LOG_E("[method_to_string()] method %d does not map to any known string", v);
+    return NULL;
 }
 
 /*
@@ -178,6 +200,44 @@ void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatt
     msg_add_header(formatted_msg, "Content-Length", content_len);
 }
 
-void req_extract_info(ParsedMsgHT formatted_msg, MethodHTTTP* method, uint32_t* id, char** body)
+void req_create_roster(uint32_t id, RosterPayload* payload, ParsedMsgHT* formatted_msg)
 {
+    // request line
+    formatted_msg->token1 = method_to_string(REQ_ROSTER);
+    char* path = malloc(MAX_BUF);
+    sprintf(path, "/room/%u/player/%u", 0, id); // room not implemented
+    formatted_msg->token2 = path;
+    formatted_msg->token3 = CURRENT_VER;
+
+    // headers
+    char* id_str = malloc(16);
+    sprintf(id_str, "%u", id);
+    msg_add_header(formatted_msg, "Player-Id", id_str);
+    msg_add_header(formatted_msg, "Content-Type", "application/roster-payload");
+    char* date_str = malloc(30);
+    get_date_str(date_str);
+    msg_add_header(formatted_msg, "Date", date_str);
+
+    // body
+    char* body = malloc(MAX_BUF);
+    payload_encode_roster(body, payload);
+    msg_add_body(formatted_msg, body);
+    char* content_len = malloc(16);
+    sprintf(content_len, "%u", (unsigned)strlen(body));
+    msg_add_header(formatted_msg, "Content-Length", content_len);
+}
+
+void req_extract_info(ParsedMsgHT* formatted_msg, MethodHTTTP* method, uint32_t* id, char** body)
+{
+    *method = string_to_method((char*)HT_REQ_METHOD(formatted_msg));
+
+    *id = 0;
+    for (int i = 0; i < formatted_msg->n_headers; i++) {
+        if (strcmp(formatted_msg->headers[i].field, "Player-Id") == 0) {
+            *id = (uint32_t)strtoul(formatted_msg->headers[i].value, NULL, 10);
+            break;
+        }
+    }
+
+    *body = (char*)formatted_msg->body;
 }

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libhtttp/payload.h"
 
 // Event Dictionary
 enum GameEvents {

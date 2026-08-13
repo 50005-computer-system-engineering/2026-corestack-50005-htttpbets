@@ -76,12 +76,21 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
     char* ptr = ht;
     parser_result->token1 = ptr;
     ptr = next_token(ptr, HT_TOKEN_SEP);
+    if (!ptr) {
+        return -1;
+    }
     parser_result->token2 = ptr;
     ptr = next_token(ptr, HT_TOKEN_SEP);
+    if (!ptr) {
+        return -1;
+    }
     parser_result->token3 = ptr;
 
     // headers
     ptr = next_token(ptr, HT_END_LINE);
+    if (!ptr) {
+        return -1;
+    }
     char* field;
     char* value;
     parser_result->n_headers = count_headers(ptr);
@@ -89,8 +98,14 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
         // find the values for the header
         field = ptr;
         ptr = next_token(ptr, HT_HEADER_SEP);
+        if (!ptr) {
+            return -1;
+        }
         value = ptr;
         ptr = next_token(ptr, HT_END_LINE);
+        if (!ptr) {
+            return -1;
+        }
 
         // assign the strings
         parser_result->headers[i].field = field;
@@ -99,10 +114,12 @@ int parse_hypertext(HyperText ht, ParsedMsgHT* parser_result)
 
     // body
     ptr = next_token(ptr, HT_END_LINE); // only end line left after the last loop iteration
+    if (!ptr) {
+        return -1;
+    }
     parser_result->body = ptr;
 
-fail:
-    return -1;
+    return 0;
 }
 
 // builder functions
@@ -132,11 +149,8 @@ int res_init(ParsedMsgHT* new_res, const char* ver, const char* code, const char
 /*
 helper function which checks for illegal characters in a string
 */
-const char* illegal_chars = "\r\n:";
-bool has_illegal_chars(const char* s)
-{
-    return strpbrk(s, illegal_chars) != NULL;
-}
+const char* illegal_field_chars = "\r\n:";
+const char* illegal_value_chars = "\r\n";
 
 /*
 Function adds header to the message if there are no illegal characters
@@ -144,8 +158,8 @@ Function adds header to the message if there are no illegal characters
 int msg_add_header(ParsedMsgHT* msg, const char* field, const char* value)
 {
     // check for illegal characters
-    if (has_illegal_chars(field) || has_illegal_chars(value)) {
-        LOG_E("[msg_add_header()] field name or value has illegal characters");
+    if (strpbrk(field, illegal_field_chars) != NULL || strpbrk(value, illegal_value_chars) != NULL) {
+        LOG_E("[msg_add_header()] field name or value has illegal characters: field=\"%s\" value=\"%s\"", field, value);
         return -1;
     }
 
@@ -187,7 +201,7 @@ int convert_to_hypertext(ParsedMsgHT* msg, HyperText converted_ht)
     offset += snprintf(converted_ht + offset, MAX_BUF - offset, "%s %s %s\r\n", msg->token1, msg->token2, msg->token3);
 
     // headers
-    for (int i = 0; i < msg->n_headers || offset < MAX_BUF; i++) {
+    for (int i = 0; i < msg->n_headers && offset < MAX_BUF; i++) {
         offset += snprintf(converted_ht + offset, MAX_BUF - offset, "%s: %s\r\n", msg->headers[i].field, msg->headers[i].value);
     }
 
