@@ -12,12 +12,15 @@ bool log_client_init(LogClient* client, const char* log_ipc_path, const char* so
 {
     // Reset entire buffer before doing anything
     memset(client, 0, sizeof(LogClient));
+
     // Init the ring buffer
     LogRecord_init(&client->queue);
 
+    // Copy source name with \0 at the end
     strncpy(client->source, source_name, LOG_SOURCE_LENGTH - 1);
     client->source[LOG_SOURCE_LENGTH - 1] = '\0';
 
+    // Open a socket (datagram based domain socket)
     client->sock = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (client->sock < 0) {
         perror("[logclient] Socket initialization failed!");
@@ -95,7 +98,7 @@ uint32_t log_client_get_dropped_count(const LogClient* client)
 
 void log_client_close(LogClient* client)
 {
-    // ENsures file descriptor is released back when game server shuts down
+    // Ensures file descriptor is released back when game server shuts down
     if (client->sock >= 0) {
         close(client->sock);
         client->sock = -1;
