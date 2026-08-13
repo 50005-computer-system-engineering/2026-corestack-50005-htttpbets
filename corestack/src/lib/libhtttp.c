@@ -226,5 +226,18 @@ void req_create_roster(uint32_t id, RosterPayload* payload, ParsedMsgHT* formatt
     sprintf(content_len, "%u", (unsigned)strlen(body));
     msg_add_header(formatted_msg, "Content-Length", content_len);
 }
+
+void req_extract_info(ParsedMsgHT* formatted_msg, MethodHTTTP* method, uint32_t* id, char** body)
 {
+    *method = string_to_method((char*)HT_REQ_METHOD(formatted_msg));
+
+    *id = 0;
+    for (int i = 0; i < formatted_msg->n_headers; i++) {
+        if (strcmp(formatted_msg->headers[i].field, "Player-Id") == 0) {
+            *id = (uint32_t)strtoul(formatted_msg->headers[i].value, NULL, 10);
+            break;
+        }
+    }
+
+    *body = (char*)formatted_msg->body;
 }

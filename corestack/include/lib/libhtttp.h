@@ -38,4 +38,7 @@ void req_create_state(uint32_t id, StatePayload* payload, ParsedMsgHT* formatted
 void req_create_attack(uint32_t id, AttackPayload* payload, ParsedMsgHT* formatted_msg);
 void req_create_roster(uint32_t id, RosterPayload* payload, ParsedMsgHT* formatted_msg);
 
+// parses an incoming request, pulling out the method, the Player-Id header, and the body
+void req_extract_info(ParsedMsgHT* formatted_msg, MethodHTTTP* method, uint32_t* id, char** body);
+
 #endif
