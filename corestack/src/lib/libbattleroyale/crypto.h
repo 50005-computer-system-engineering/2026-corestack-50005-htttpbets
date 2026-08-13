@@ -149,18 +149,18 @@ int verify_message_pss(X509* cert,
  * Returns a newly malloc'd ciphertext buffer (RSA_KEY_BYTES long),
  * and writes its length to *out_len. Returns NULL on failure.
  */
-unsigned char *rsa_encrypt_block(EVP_PKEY *pub_key,
-                                 const unsigned char *plain, size_t plain_len,
-                                 size_t *out_len, int use_oaep);
+unsigned char* rsa_encrypt_block(EVP_PKEY* pub_key,
+                                 const unsigned char* plain, size_t plain_len,
+                                 size_t* out_len, int use_oaep);
 
 /**
  * Decrypts a single RSA-encrypted block.
  * Returns a newly malloc'd plaintext buffer, writes length to *out_len.
  * Returns NULL on failure.
  */
-unsigned char *rsa_decrypt_block(EVP_PKEY *priv_key,
-                                 const unsigned char *cipher, size_t cipher_len,
-                                 size_t *out_len, int use_oaep);
+unsigned char* rsa_decrypt_block(EVP_PKEY* priv_key,
+                                 const unsigned char* cipher, size_t cipher_len,
+                                 size_t* out_len, int use_oaep);
 
 /* ======================================================================
  * Symmetric encryption (CP2)
@@ -204,13 +204,13 @@ unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
  * Encrypts content for packet
  * Returns 0 on success, -1 on failure.
  */
-int message_pack_encrypted(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len);
+int encrypt_message(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len);
 
 /**
  * Decrypts packet content
  * Returns 0 on success, -1 on failure.
  */
-int message_unpack_encrypted(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len);
+int decrypt_message(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len);
 
 /* ======================================================================
  * Utility

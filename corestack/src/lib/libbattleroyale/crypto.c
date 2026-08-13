@@ -226,9 +226,9 @@ done:
  * RSA encryption / decryption
  * ====================================================================== */
 
-unsigned char *rsa_encrypt_block(EVP_PKEY *pub_key,
-                                 const unsigned char *plain, size_t plain_len,
-                                 size_t *out_len, int use_oaep)
+unsigned char* rsa_encrypt_block(EVP_PKEY* pub_key,
+                                 const unsigned char* plain, size_t plain_len,
+                                 size_t* out_len, int use_oaep)
 {
     /**
      * Encrypts a single plaintext block with RSA.
@@ -237,25 +237,22 @@ unsigned char *rsa_encrypt_block(EVP_PKEY *pub_key,
      * use_oaep=0: PKCS1v15 (max 117 bytes for 1024-bit key)
      *
      */
-    unsigned char *out = NULL;
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pub_key, NULL);
+    unsigned char* out = NULL;
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pub_key, NULL);
     if (!ctx)
         return NULL;
 
     if (EVP_PKEY_encrypt_init(ctx) <= 0)
         goto fail;
 
-    if (use_oaep)
-    {
+    if (use_oaep) {
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
             goto fail;
         if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0)
             goto fail;
         if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0)
             goto fail;
-    }
-    else
-    {
+    } else {
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0)
             goto fail;
     }
@@ -268,8 +265,7 @@ unsigned char *rsa_encrypt_block(EVP_PKEY *pub_key,
     if (!out)
         goto fail;
 
-    if (EVP_PKEY_encrypt(ctx, out, out_len, plain, plain_len) <= 0)
-    {
+    if (EVP_PKEY_encrypt(ctx, out, out_len, plain, plain_len) <= 0) {
         free(out);
         out = NULL;
     }
@@ -281,32 +277,29 @@ fail:
     return out;
 }
 
-unsigned char *rsa_decrypt_block(EVP_PKEY *priv_key,
-                                 const unsigned char *cipher, size_t cipher_len,
-                                 size_t *out_len, int use_oaep)
+unsigned char* rsa_decrypt_block(EVP_PKEY* priv_key,
+                                 const unsigned char* cipher, size_t cipher_len,
+                                 size_t* out_len, int use_oaep)
 {
     /**
      * Decrypts a single RSA-encrypted block.
      */
-    unsigned char *out = NULL;
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(priv_key, NULL);
+    unsigned char* out = NULL;
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(priv_key, NULL);
     if (!ctx)
         return NULL;
 
     if (EVP_PKEY_decrypt_init(ctx) <= 0)
         goto fail;
 
-    if (use_oaep)
-    {
+    if (use_oaep) {
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
             goto fail;
         if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0)
             goto fail;
         if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0)
             goto fail;
-    }
-    else
-    {
+    } else {
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0)
             goto fail;
     }
@@ -319,8 +312,7 @@ unsigned char *rsa_decrypt_block(EVP_PKEY *priv_key,
     if (!out)
         goto fail;
 
-    if (EVP_PKEY_decrypt(ctx, out, out_len, cipher, cipher_len) <= 0)
-    {
+    if (EVP_PKEY_decrypt(ctx, out, out_len, cipher, cipher_len) <= 0) {
         free(out);
         out = NULL;
     }
@@ -480,7 +472,7 @@ unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
  * Message envelope helpers
  * ====================================================================== */
 
-int message_pack_encrypted(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len)
+int encrypt_message(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len)
 {
     // check if legal length
     if (content_len > MAX_APP_PAYLOAD_LEN) {
@@ -507,7 +499,7 @@ int message_pack_encrypted(Message* msg, const unsigned char sesskey[SESSION_KEY
     return 0;
 }
 
-int message_unpack_encrypted(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len)
+int decrypt_message(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len)
 {
     // decrypt
     unsigned char* decrypted = session_decrypt(sesskey, msg->msg_content, msg->msg_len, out_len);

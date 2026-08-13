@@ -150,8 +150,17 @@ void client_game_state(Endpoint* client)
                     }
 
                     LOG_D("[clientGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
-                    if (msg.msg_type == MSG_APP) {
+                    if (msg.msg_type == MSG_APP || msg.msg_type == MSG_APP_ENC) {
                         LOG_D("[clientGameState()] Message received for application");
+                        if (msg.msg_type == MSG_APP_ENC) {
+                            LOG_D("decrypting content");
+                            unsigned char decrypted[MSG_CONTENT_LENGTH];
+                            size_t decrypted_len;
+                            decrypt_message(&msg, client->sesskey, decrypted, &decrypted_len);
+                            msg.msg_len = (uint32_t)decrypted_len;
+                            memcpy(msg.msg_content, decrypted, decrypted_len);
+                            msg.msg_type = MSG_APP;
+                        }
                         if (pc_flags[0]) {
                             pc_flags[1] = 1;
                             LOG_D("[clientGameState()] listener yielding CPU control for user polling queue");
@@ -307,9 +316,8 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
 
     // authentication - symmetric key establishment
     // get public key
-    EVP_PKEY *pubkey = X509_get_pubkey(cert);
-    if (pubkey == NULL)
-    {
+    EVP_PKEY* pubkey = X509_get_pubkey(cert);
+    if (pubkey == NULL) {
         LOG_E("could not load pubkey from cert");
         return -1;
     }
@@ -328,7 +336,7 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     memcpy(this_client->sesskey, sesskey, SESSION_KEY_LEN);
 
     size_t enc_key_len;
-    unsigned char *enc_key = rsa_encrypt_block(pubkey, sesskey, SESSION_KEY_LEN, &enc_key_len, 0);
+    unsigned char* enc_key = rsa_encrypt_block(pubkey, sesskey, SESSION_KEY_LEN, &enc_key_len, 0);
 
     if (enc_key == NULL || enc_key_len > sizeof(msg.msg_content)) {
         LOG_E("failed to encrypt session key");
@@ -374,17 +382,17 @@ int brclient_get_state(BRClient* client_ptr)
 }
 
 // message functions
-int brclient_send_msg(BRClient* client_ptr, unsigned char content[2048])
+int brclient_send_msg(BRClient* client_ptr, unsigned char content[MAX_APP_PAYLOAD_LEN])
 {
     Endpoint* this_client = client_ptr;
 
     // build message
     Message msg = {
         .source_id = this_client->id,
-        .msg_type = MSG_APP,
+        .msg_type = MSG_APP_ENC,
     };
-    // snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
-    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
+    
+    encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     // send via socket
     if (send_message_tcp(this_client->socks->tcp, msg) < 0) {

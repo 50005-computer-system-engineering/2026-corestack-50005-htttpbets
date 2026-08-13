@@ -247,9 +247,8 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             }
         } while (msg.msg_type != MSG_KEY);
         size_t client_sesskey_len;
-        unsigned char *client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, &client_sesskey_len, 0);
-        if (client_sesskey == NULL || client_sesskey_len != SESSION_KEY_LEN)
-        {
+        unsigned char* client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, &client_sesskey_len, 0);
+        if (client_sesskey == NULL || client_sesskey_len != SESSION_KEY_LEN) {
             LOG_E("invalid sesskey length received");
             free(client_sesskey);
             goto cleanup;
@@ -350,8 +349,20 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
                 LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 
                 // enqueue a message if its an application layer message
-                if (msg.msg_type == MSG_APP) // Shifted this inside the successful TCP read block to prevent queuing stale / uninitialized messages
-                {
+                if (msg.msg_type == MSG_APP || msg.msg_type == MSG_APP_ENC) {
+                    if (msg.msg_type == MSG_APP_ENC) {
+                        Endpoint sender;
+                        if (get_from_list(server_ptr->clients, &sender, msg.source_id) < 0) {
+                            LOG_E("invalid source id");
+                            continue; // drop message
+                        }
+                        unsigned char decrypted[MSG_CONTENT_LENGTH];
+                        size_t decrypted_len;
+                        decrypt_message(&msg, sender.sesskey, decrypted, &decrypted_len);
+                        msg.msg_len = (uint32_t)decrypted_len;
+                        memcpy(msg.msg_content, decrypted, decrypted_len);
+                        msg.msg_type = MSG_APP;
+                    }
                     LOG_D("[serverGameState()] Message received for application");
                     if (pc_flags[0]) {
                         pc_flags[1] = 1;
@@ -625,20 +636,12 @@ int brserver_client_info(BRServer* server_ptr, uint32_t* n_clients, uint32_t* cl
     return 0;
 }
 
-int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[2048]) // use defined value instead of explicit number
+int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[MAX_APP_PAYLOAD_LEN]) // use defined value instead of explicit number
 {
     LOG_I("[brserver_send_to_target()] sending broadcast to cliets...");
 
     // cast to private server struct
     Server* this_server = server_ptr;
-
-    // prepare the complete message
-    Message complete_msg = {
-        .source_id = this_server->self->id,
-        .msg_type = MSG_APP,
-    };
-    // snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
-    memcpy(complete_msg.msg_content, content, MSG_CONTENT_LENGTH); // Prevent null-byte truncation of binary data
 
     // get client
     Endpoint target_client;
@@ -646,6 +649,14 @@ int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned c
         LOG_E("[brserver_send_to_target()] failed to get target client %u from the list", target_id);
         return -1;
     }
+
+    // prepare the complete message
+    Message complete_msg = {
+        .source_id = this_server->self->id,
+        .msg_type = MSG_APP_ENC,
+    };
+
+    encrypt_message(&complete_msg, target_client.sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     LOG_D("[brserver_send_to_target()] sending message to client %u:\n\tcontent: %s", target_id, complete_msg.msg_content);
 
