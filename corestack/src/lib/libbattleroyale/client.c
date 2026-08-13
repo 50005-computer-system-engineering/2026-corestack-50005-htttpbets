@@ -256,25 +256,15 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
         return -1;
     }
 
-    // security - authentication
-    // nonce generation
-    unsigned char nonce[NONCE_LEN];
-    RAND_bytes(nonce, sizeof(nonce));
-    // receive server cert
-    // Message *msg;
-    // while (receiveMessageTCP(thisClient->socks->tcp, ))
-
-    // sendBytes(sockfd, (unsigned char *)nonce, noncefd);
-
     // receive user id and save to Endpoint
     unsigned char* buffer = NULL;
     buffer = malloc(sizeof(uint32_t));
     if (buffer == NULL) {
-        perror("[startClientHandshake()] malloc");
+        perror("malloc");
         return -1;
     }
     if (read_bytes(this_client->socks->tcp, &buffer, sizeof(uint32_t)) < 0) {
-        LOG_E("[startClientHandshake()] failed to read sourceId");
+        LOG_E("failed to read sourceId");
         return -1;
     }
     uint32_t source_bytes;
@@ -282,6 +272,42 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     this_client->id = ntohl(source_bytes);
     free(buffer);
     buffer = NULL;
+
+    // security - authentication
+    // nonce generation
+    unsigned char nonce[NONCE_LEN];
+    RAND_bytes(nonce, sizeof(nonce));
+
+    // receive server cert
+    Message msg;
+    do {
+        receive_message_tcp(this_client->socks->tcp, &msg);
+    } while (msg.msg_type != MSG_CERT);
+    size_t cert_len;
+    sscanf(msg.msg_content, "%u/crt/", &cert_len);
+    
+    unsigned char *cert_bytes = malloc(cert_len);
+    unsigned char *cert_start = strstr(msg.msg_content, "/crt/") + strlen("/crt/"); 
+    X509 *cert = load_cert_bytes(cert_start, cert_len);
+
+    // send nonce
+    msg.msg_type = MSG_AUTH;
+    msg.source_id = this_client->id;
+    snprintf(msg.msg_content, 1024, "%s", nonce);
+    send_message_tcp(this_client->socks->tcp, msg);
+
+    // receive signed nonce and verify
+    do {
+        receive_message_tcp(this_client->socks->tcp, &msg);
+    } while (msg.msg_type != MSG_AUTH);
+    size_t sig_len;
+    sscanf(msg.msg_content, "%u/sig/", &sig_len);
+    unsigned char *sig_start = strstr(msg.msg_content, "/sig/") + strlen("/sig/");
+    if (!verify_message_pss(cert, msg.msg_content, sig_len, nonce, sizeof(nonce)))
+    {
+        LOG_E("server could not be authenticated");
+        this_client->state = END;
+    }
 
     // INDEPENDENT OF SERVER
     // prepare UDP ports for future use upon connection
