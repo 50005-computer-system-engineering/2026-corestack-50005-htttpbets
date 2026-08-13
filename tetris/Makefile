@@ -285,8 +285,9 @@ clean:
 	rm -f $(TARGET)
 
 # Fix variable naming via clang-tidy, 
+# => we run run-clang-tidy instead of --fix so we apply fixes in one pass to avoid conflicts
 # then running clang-format to fix layout (spacing & brackets)
-# tidy > format as renames can change line lengths
+# tidy -> format as renames can change line lengths
 lint: init # Generate compile_commands.json first
-	clang-tidy -p . --fix --fix-errors ${SOURCES}; \
-	clang-format -i ${SOURCES}; \
+	run-clang-tidy -p . -fix $(SOURCES)
+	clang-format -i $(SOURCES)\
