@@ -421,7 +421,8 @@ int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[2048])
         .source_id = this_client->id,
         .msg_type = MSG_APP,
     };
-    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
+
+    encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     // send message
     if (send_unicast_udp(this_client->socks->udp_uni, server_ip_addr, msg) < 0) {
