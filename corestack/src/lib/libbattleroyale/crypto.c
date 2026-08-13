@@ -477,6 +477,57 @@ unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
 }
 
 /* ======================================================================
+ * Message envelope helpers
+ * ====================================================================== */
+
+int message_pack_encrypted(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len)
+{
+    // check if legal length
+    if (content_len > MAX_APP_PAYLOAD_LEN) {
+        LOG_E("content is too large for encryption, maximum is %d", MAX_APP_PAYLOAD_LEN);
+        return -1;
+    }
+
+    // encrypt
+    size_t enc_len;
+    unsigned char* encrypted = session_encrypt(sesskey, content, content_len, &enc_len);
+    if (encrypted == NULL) {
+        print_ssl_error("message_pack_encrypted");
+        LOG_E("encryption failed");
+        return -1;
+    }
+
+    // copy to content
+    msg->msg_len = (uint32_t)enc_len;
+    memcpy(msg->msg_content, encrypted, enc_len);
+    free(encrypted);
+
+    LOG_I("Successfully encrypted payload");
+
+    return 0;
+}
+
+int message_unpack_encrypted(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len)
+{
+    // decrypt
+    unsigned char* decrypted = session_decrypt(sesskey, msg->msg_content, msg->msg_len, out_len);
+    if (decrypted == NULL) {
+        print_ssl_error("message_unpack_encrypted");
+        LOG_E("encryption failed");
+        return -1;
+    }
+
+    // output to buffer
+    memset(out, 0, MSG_CONTENT_LENGTH);
+    memcpy(out, decrypted, *out_len);
+    free(decrypted);
+
+    LOG_I("Successfully decrypted payload");
+
+    return 0;
+}
+
+/* ======================================================================
  * Utility
  * ====================================================================== */
 

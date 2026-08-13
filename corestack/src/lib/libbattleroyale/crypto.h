@@ -1,4 +1,4 @@
-// direct copy of common.h from PA2
+// slight modification of common.h from PA2
 
 /**
  * common.h
@@ -40,6 +40,8 @@
 #include <openssl/rand.h>
 #include <openssl/hmac.h>
 
+#include "message.h"
+
 /* ======================================================================
  * Constants
  * ====================================================================== */
@@ -71,6 +73,11 @@
  * Session key length = HMAC key (16) + AES key (16) = 32 bytes.
  */
 #define SESSION_KEY_LEN (HMAC_KEY_LEN + AES_KEY_LEN)
+
+/**
+ * Largest app payload that can be encrypted within MESSAGE_CONTENT_LENGTH
+ */
+#define MAX_APP_PAYLOAD_LEN (MSG_CONTENT_LENGTH - AES_IV_LEN - HMAC_LEN - AES_BLOCK)
 
 /* ======================================================================
  * OpenSSL key/cert loading
@@ -187,6 +194,23 @@ unsigned char* session_encrypt(const unsigned char key[SESSION_KEY_LEN],
 unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
                                const unsigned char* token, size_t token_len,
                                size_t* out_len);
+
+/* ======================================================================
+ * Message encryption helpers
+ * ======================================================================
+ */
+
+/**
+ * Encrypts content for packet
+ * Returns 0 on success, -1 on failure.
+ */
+int message_pack_encrypted(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len);
+
+/**
+ * Decrypts packet content
+ * Returns 0 on success, -1 on failure.
+ */
+int message_unpack_encrypted(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len);
 
 /* ======================================================================
  * Utility

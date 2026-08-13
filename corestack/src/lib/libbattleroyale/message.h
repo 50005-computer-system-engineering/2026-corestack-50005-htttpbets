@@ -16,7 +16,8 @@ typedef enum {
     MSG_START,
     MSG_END,
     // app related
-    MSG_APP
+    MSG_APP,     // plaintext
+    MSG_APP_ENC  // ciphertext
 } MessageType;
 
 typedef struct {
