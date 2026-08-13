@@ -9,6 +9,25 @@
 #include "lib/libhtttp.h"
 #include "utils/logger.h"
 
+// array of accepted methods
+const MethodMapping HTTTP_METHODS[] = {
+    {"MOVE", REQ_MOVE},
+    {"DROP", REQ_DROP},
+    {"ROTATE", REQ_ROTATE},
+    {"STATE", REQ_STATE},
+    {"ATTACK", REQ_ATTACK},
+    {"ACTION", REQ_ACTION},
+    {"ROSTER", REQ_ROSTER}};
+const int N_HTTTP_METHODS = sizeof(HTTTP_METHODS) / sizeof(MethodMapping);
+
+// HTTTP header fields
+const char* htttp_headers[] = {
+    "Content-Length",
+    "Content-Type",
+    "Player-Id",
+    "Date"};
+const int N_HTTTP_HEADERS = sizeof(htttp_headers) / sizeof(char*);
+
 /*
 Function generates date
 */

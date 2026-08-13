@@ -13,7 +13,9 @@ typedef enum {
     REQ_DROP,
     REQ_ROTATE,
     REQ_STATE,
-    REQ_ATTACK
+    REQ_ATTACK,
+    REQ_ACTION,
+    REQ_ROSTER
 } MethodHTTTP;
 
 // mapping to string
@@ -23,21 +25,12 @@ typedef struct {
 } MethodMapping;
 
 // array of accepted methods
-const MethodMapping HTTTP_METHODS[] = {
-    {"MOVE", REQ_MOVE},
-    {"DROP", REQ_DROP},
-    {"ROTATE", REQ_ROTATE},
-    {"STATE", REQ_STATE},
-    {"ATTACK", REQ_ATTACK}};
-const int N_HTTTP_METHODS = sizeof(HTTTP_METHODS) / sizeof(MethodMapping);
+extern const MethodMapping HTTTP_METHODS[];
+extern const int N_HTTTP_METHODS;
 
 // HTTTP header fields
-const char* htttp_headers[] = {
-    "Content-Length",
-    "Content-Type",
-    "Player-Id",
-    "Date"};
-const int N_HTTTP_HEADERS = sizeof(htttp_headers) / sizeof(char*);
+extern const char* htttp_headers[];
+extern const int N_HTTTP_HEADERS;
 
 // important request builders
 void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg);
