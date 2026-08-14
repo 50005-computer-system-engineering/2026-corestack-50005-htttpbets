@@ -12,11 +12,21 @@
 // low default: most cases use fixed input, so repeats add no coverage, and libhypertext's LOG_D/
 // LOG_I write unbuffered to stderr on every parse step, which gets slow in volume
 #define ITER_DEFAULT 5
+// class 9 (mutation-based) is genuinely randomised, so it gets its own, larger iteration count.
+// Kept modest (not larger still): each case forks via bombfuzzer_run_isolated, and fork() alone
+// measured ~0.5s in this environment - the Valgrind pass multiplies that further
+#define MUTATE_ITER_DEFAULT 15
 
 static int iterations(void)
 {
     const char *env = getenv("BOMBFUZZER_ITERS");
     return env != NULL ? atoi(env) : ITER_DEFAULT;
+}
+
+static int mutateIterations(void)
+{
+    const char *env = getenv("BOMBFUZZER_MUTATE_ITERS");
+    return env != NULL ? atoi(env) : MUTATE_ITER_DEFAULT;
 }
 
 // class 1: well-formed input, hand-built (not via convert_to_hypertext, which has its own bug -
@@ -221,6 +231,35 @@ static void case_illegal_chars(unsigned int seed)
                        "msg_add_header rejected a value containing ':'");
 }
 
+// class 9: mutation-based - bit-flip a well-formed request and confirm parse_hypertext never
+// crashes/hangs on it, whatever the mutation lands on (a broader, less-targeted complement to the
+// hand-picked classes above)
+static void doParseMutated(void *arg)
+{
+    ParsedMsgHT result;
+    memset(&result, 0, sizeof(result));
+    parse_hypertext(((ParseArg *)arg)->ht, &result);
+}
+
+static void case_mutated_request(unsigned int seed)
+{
+    char raw[256];
+    snprintf(raw, sizeof(raw), "MOVE /room/0/player/1 HTTTP/1.0\r\nPlayer-Id: 1\r\nContent-Length: 4\r\n\r\ntest");
+
+    ParseArg arg;
+    memset(arg.ht, 0, sizeof(arg.ht));
+    memcpy(arg.ht, raw, strlen(raw) + 1);
+
+    int mutations = 1 + (int)(bombfuzzer_rand_byte() % 8);
+    for (int i = 0; i < mutations; i++)
+    {
+        bombfuzzer_flip_random_bit((unsigned char *)arg.ht, strlen(raw));
+    }
+
+    int sig = bombfuzzer_run_isolated(doParseMutated, &arg, BOMBFUZZER_TIMEOUT_SEC);
+    reportCrashProbe("mutated well-formed request", seed, arg.ht, sig);
+}
+
 int main(void)
 {
     signal(SIGPIPE, SIG_IGN);
@@ -240,6 +279,13 @@ int main(void)
         case_convert_few_headers(caseSeed);
         case_oversized_body(caseSeed);
         case_illegal_chars(caseSeed);
+    }
+
+    int m = mutateIterations();
+    printf("bombfuzzer_hypertext: running %d mutation-based cases\n", m);
+    for (int i = 0; i < m; i++)
+    {
+        case_mutated_request(seed + (unsigned int)i);
     }
 
     printf("bombfuzzer_hypertext: done\n");

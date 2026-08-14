@@ -9,12 +9,23 @@
 // low default: these cases use fixed input, so repeats add no coverage - see
 // bombfuzzer_hypertext.c's ITER_DEFAULT comment
 #define ITER_DEFAULT 5
+// mutation-based cases are genuinely randomised, so they get their own, larger iteration count.
+// Kept modest (not larger still): each case forks via bombfuzzer_run_isolated, and fork() alone
+// measured ~0.5s in this environment - the Valgrind pass multiplies that further, and there are
+// 4 payload types per iteration here
+#define MUTATE_ITER_DEFAULT 15
 #define ROSTER_CAPACITY 4   // mimics a caller who sized ids[] for a small, expected lobby
 
 static int iterations(void)
 {
     const char *env = getenv("BOMBFUZZER_ITERS");
     return env != NULL ? atoi(env) : ITER_DEFAULT;
+}
+
+static int mutateIterations(void)
+{
+    const char *env = getenv("BOMBFUZZER_MUTATE_ITERS");
+    return env != NULL ? atoi(env) : MUTATE_ITER_DEFAULT;
 }
 
 static RosterPayload *allocRoster(uint32_t capacity)
@@ -169,6 +180,112 @@ static void case_date_header_silently_dropped(unsigned int seed)
                        "msg_add_header() rejects, and req_create_action never checks the return code");
 }
 
+// class 7: mutation-based - encode a valid payload, bit-flip it, and confirm the matching
+// decode_*() doesn't crash/hang (broader complement to the hand-picked classes above)
+typedef struct {
+    char buf[MAX_BUF];
+    uint64_t len;
+} MutateArg;
+
+static void mutateBuf(MutateArg *arg)
+{
+    int mutations = 1 + (int)(bombfuzzer_rand_byte() % 8);
+    for (int i = 0; i < mutations; i++)
+    {
+        bombfuzzer_flip_random_bit((unsigned char *)arg->buf, arg->len);
+    }
+}
+
+static void doDecodeMutatedAttack(void *arg)
+{
+    AttackPayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload_decode_attack(((MutateArg *)arg)->buf, &payload);
+}
+
+static void case_mutated_attack(unsigned int seed)
+{
+    AttackPayload payload = {.source_player = 1, .target_player = 2, .lines = 4};
+    MutateArg arg;
+    memset(&arg, 0, sizeof(arg));
+    payload_encode_attack(arg.buf, &payload);
+    arg.len = strlen(arg.buf);
+    mutateBuf(&arg);
+
+    int sig = bombfuzzer_run_isolated(doDecodeMutatedAttack, &arg, BOMBFUZZER_TIMEOUT_SEC);
+    reportCrashProbe("mutated attack body", seed, arg.buf, sig, "payload_decode_attack does not crash on a mutated body");
+}
+
+static void doDecodeMutatedInput(void *arg)
+{
+    InputPayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload_decode_input(((MutateArg *)arg)->buf, &payload);
+}
+
+static void case_mutated_input(unsigned int seed)
+{
+    InputPayload payload = {.action = 3};
+    MutateArg arg;
+    memset(&arg, 0, sizeof(arg));
+    payload_encode_input(arg.buf, &payload);
+    arg.len = strlen(arg.buf);
+    mutateBuf(&arg);
+
+    int sig = bombfuzzer_run_isolated(doDecodeMutatedInput, &arg, BOMBFUZZER_TIMEOUT_SEC);
+    reportCrashProbe("mutated input body", seed, arg.buf, sig, "payload_decode_input does not crash on a mutated body");
+}
+
+static void doDecodeMutatedRoster(void *arg)
+{
+    RosterPayload *payload = allocRoster(ROSTER_CAPACITY);
+    payload_decode_roster(((MutateArg *)arg)->buf, payload);
+    free(payload);
+}
+
+static void case_mutated_roster(unsigned int seed)
+{
+    unsigned char rosterBuf[sizeof(RosterPayload) + 4 * sizeof(uint32_t)];
+    RosterPayload *payload = (RosterPayload *)rosterBuf;
+    payload->count = 3;
+    payload->ids[0] = 1;
+    payload->ids[1] = 2;
+    payload->ids[2] = 3;
+
+    MutateArg arg;
+    memset(&arg, 0, sizeof(arg));
+    payload_encode_roster(arg.buf, payload);
+    arg.len = strlen(arg.buf);
+    mutateBuf(&arg);
+
+    int sig = bombfuzzer_run_isolated(doDecodeMutatedRoster, &arg, BOMBFUZZER_TIMEOUT_SEC);
+    reportCrashProbe("mutated roster body", seed, arg.buf, sig, "payload_decode_roster does not crash on a mutated body");
+}
+
+static void doDecodeMutatedState(void *arg)
+{
+    StatePayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload_decode_state(((MutateArg *)arg)->buf, &payload);
+}
+
+static void case_mutated_state(unsigned int seed)
+{
+    StatePayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload.player_id = 1;
+    payload.score = 100;
+
+    MutateArg arg;
+    memset(&arg, 0, sizeof(arg));
+    payload_encode_state(arg.buf, &payload);
+    arg.len = strlen(arg.buf);
+    mutateBuf(&arg);
+
+    int sig = bombfuzzer_run_isolated(doDecodeMutatedState, &arg, BOMBFUZZER_TIMEOUT_SEC);
+    reportCrashProbe("mutated state body", seed, arg.buf, sig, "payload_decode_state does not crash on a mutated body");
+}
+
 int main(void)
 {
     signal(SIGPIPE, SIG_IGN);
@@ -191,6 +308,17 @@ int main(void)
         case_roster_missing_marker(caseSeed);
         case_state_short_buffer(caseSeed);
         case_garbage_attack_input(caseSeed);
+    }
+
+    int m = mutateIterations();
+    printf("bombfuzzer_htttp: running %d mutation-based cases per payload type\n", m);
+    for (int i = 0; i < m; i++)
+    {
+        unsigned int caseSeed = seed + (unsigned int)i;
+        case_mutated_attack(caseSeed);
+        case_mutated_input(caseSeed);
+        case_mutated_roster(caseSeed);
+        case_mutated_state(caseSeed);
     }
 
     printf("bombfuzzer_htttp: done\n");

@@ -152,7 +152,7 @@ BOMBFUZZER_COMMON := $(BOMBFUZZER_DIR)/bombfuzzer_common.c
 
 # message.h/common.h (libbattleroyale) are private headers, not under CS_INC
 BOMBFUZZER_CFLAGS := $(TEST_CFLAGS) -I$(CORESTACK_DIR)/src/lib/libbattleroyale
-BOMBFUZZER_SRCS   := bombfuzzer_bytes bombfuzzer_message bombfuzzer_hypertext bombfuzzer_htttp
+BOMBFUZZER_SRCS   := bombfuzzer_bytes bombfuzzer_message bombfuzzer_hypertext bombfuzzer_htttp bombfuzzer_stress
 # only needs corestack, not $(LDLIBS)'s default -lbombbrain (bomberman's own game logic)
 BOMBFUZZER_LDLIBS := $(CS_LDLIBS) $(SYS_LDLIBS)
 
@@ -173,6 +173,8 @@ bombfuzzer: $(addprefix $(BOMBFUZZER_BIN)/,$(BOMBFUZZER_SRCS))
 	./$(BOMBFUZZER_BIN)/bombfuzzer_message || echo "==> WARNING: bombfuzzer_message crashed"
 	./$(BOMBFUZZER_BIN)/bombfuzzer_hypertext || echo "==> WARNING: bombfuzzer_hypertext crashed"
 	./$(BOMBFUZZER_BIN)/bombfuzzer_htttp || echo "==> WARNING: bombfuzzer_htttp crashed"
+	@echo "==> bombfuzzer: concurrency/volume stress (local precursor - no live server to load-test yet)"
+	./$(BOMBFUZZER_BIN)/bombfuzzer_stress || echo "==> WARNING: bombfuzzer_stress crashed"
 	@echo "==> bombfuzzer: Memory Safety under Valgrind (THREAT_MODEL.md 2.2)"
 	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_bytes 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_bytes.log \
 		|| echo "==> WARNING: bombfuzzer_bytes crashed under Valgrind - see findings/valgrind_bytes.log"
@@ -182,6 +184,10 @@ bombfuzzer: $(addprefix $(BOMBFUZZER_BIN)/,$(BOMBFUZZER_SRCS))
 		|| echo "==> WARNING: bombfuzzer_hypertext crashed under Valgrind - see findings/valgrind_hypertext.log"
 	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_htttp 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_htttp.log \
 		|| echo "==> WARNING: bombfuzzer_htttp crashed under Valgrind - see findings/valgrind_htttp.log"
+	@# scaled down from the plain run's defaults - Valgrind measured ~22ms/op here, vs <1ms without it
+	BOMBFUZZER_STRESS_THREADS=8 BOMBFUZZER_STRESS_ITERS=50 $(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_stress 2>&1 \
+		| tee $(BOMBFUZZER_DIR)/findings/valgrind_stress.log \
+		|| echo "==> WARNING: bombfuzzer_stress crashed under Valgrind - see findings/valgrind_stress.log"
 	@echo "==> bombfuzzer: findings (if any) logged under $(BOMBFUZZER_DIR)/findings/"
 
 # --- bombfuzzer coverage report (node/edge coverage via gcov) ---

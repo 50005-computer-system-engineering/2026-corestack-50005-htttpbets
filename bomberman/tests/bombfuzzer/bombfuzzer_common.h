@@ -17,8 +17,11 @@
 // Layers, bottom-up:
 //   bombfuzzer_bytes.c     - read_bytes/send_bytes over a socketpair (libbattleroyale)
 //   bombfuzzer_message.c   - receive_message_tcp/send_message_tcp (libbattleroyale)
-//   bombfuzzer_hypertext.c - parse_hypertext/msg_add_header/convert_to_hypertext (libhypertext)
-//   bombfuzzer_htttp.c     - payload_encode/decode_*, req_create_*/req_extract_info (libhtttp)
+//   bombfuzzer_hypertext.c - parse_hypertext/msg_add_header/convert_to_hypertext (libhypertext),
+//                            plus mutation-based fuzzing of a well-formed request
+//   bombfuzzer_htttp.c     - payload_encode/decode_*, req_create_*/req_extract_info (libhtttp),
+//                            plus mutation-based fuzzing of each payload type
+//   bombfuzzer_stress.c    - many-threaded round-trip volume/concurrency check across all layers
 
 #define BOMBFUZZER_TIMEOUT_SEC 8   // per-case hang timeout; 3s gave false positives under load
 #define BOMBFUZZER_FINDINGS_DIR "tests/bombfuzzer/findings"  // relative to bomberman/, see Makefile
