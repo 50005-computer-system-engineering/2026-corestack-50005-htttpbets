@@ -11,6 +11,7 @@
 #include <net/if.h>
 #include "lib/libbattleroyale/server.h"
 #include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libhtttp.h"
 #include "lib/libtetrisbrain/garbage.h"
 #include "lib/libtetrislog/logclient.h"
 #include "game.h"
@@ -160,17 +161,21 @@ int main(void)
 
     // Tell every client the players in the lobby
     {
-        // Populate roster via RosterPayload
-        RosterPayload roster = {0};
-        roster.count = lobby_size; // Total number of players
+        // Populate roster via RosterPayload (flexible array member, size to lobby_size)
+        RosterPayload* roster = malloc(sizeof(RosterPayload) + lobby_size * sizeof(uint32_t));
+        roster->count = lobby_size; // Total number of players
         for (uint32_t i = 0; i < lobby_size && i < MAX_LOBBY_SIZE; i++) {
-            roster.ids[i] = client_ids[i]; // Add dynamically to array
+            roster->ids[i] = client_ids[i]; // Add dynamically to array
         }
-        unsigned char roster_buffer[512] = {0}; // Empty buffer
-        pack_roster(roster_buffer, &roster);    // Handles tag and byte order
+
+        ParsedMsgHT msg = {0};
+        req_create_roster(0, roster, &msg);
+        HyperText ht;
+        convert_to_hypertext(&msg, ht);
+        free(roster);
 
         // Send setup data (explicitly uses TCP here)
-        if (brserver_send_to_all(server, roster_buffer) < 0) {
+        if (brserver_send_to_all(server, (unsigned char*)ht) < 0) {
             log_message(LOG_LEVEL_WARN, "[tetrisd] Warning: failed to broadcast player roster.");
         } else {
             log_message(LOG_LEVEL_INFO, "[tetrisd] Roster broadcast to all %u players.", lobby_size);
@@ -184,7 +189,7 @@ int main(void)
     log_message(LOG_LEVEL_INFO, "[tetrisd] Authoritative session started for %d player(s).", session.count);
 
     // Array buffer for message queue
-    unsigned char buffer[512] = {0};
+    HyperText buffer = {0};
 
     // A battle royale ends when only one player is left standing. A solo match
     // (single player testing on localhost) instead runs until that player tops out
@@ -195,21 +200,29 @@ int main(void)
         /* --- Drain whatever the clients sent since the last tick --- */
         // Bounded so a flood of packets can never starve the simulation below
         for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++) {
-            if (brserver_get_app_msg(buffer) != 1) {
+            if (brserver_get_app_msg((unsigned char*)buffer) != 1) {
                 break; // Queue is empty
             }
 
-            uint32_t tag = read_packet_tag(buffer);
+            ParsedMsgHT parsed = {0};
+            if (parse_hypertext(buffer, &parsed) < 0) {
+                continue; // Malformed message, drop it
+            }
 
-            if (tag == PACKET_INPUT) {
+            MethodHTTTP method;
+            uint32_t player_id;
+            char* body;
+            req_extract_info(&parsed, &method, &player_id, &body);
+
+            if (method == REQ_ACTION) {
                 InputPayload input;
-                unpack_input(buffer, &input);
+                payload_decode_input(body, &input);
 
                 // Perform the requested action on that player's real board
-                PlayerSlot* slot = find_player(&session, input.player_id);
+                PlayerSlot* slot = find_player(&session, player_id);
                 apply_action(&session, slot, (PlayerAction)input.action);
             }
-            // Any other tag is ignored
+            // Any other method is ignored
         }
 
         /* --- Advance every board by one tick --- */
@@ -255,9 +268,11 @@ int main(void)
                 .target_player = victim_id,
                 .lines = lines};
 
-            unsigned char feed_buffer[512] = {0};
-            pack_attack(feed_buffer, &feed);
-            brserver_send_broadcast(server, feed_buffer);
+            ParsedMsgHT feed_msg = {0};
+            req_create_attack(attacker->player_id, &feed, &feed_msg);
+            HyperText feed_ht;
+            convert_to_hypertext(&feed_msg, feed_ht);
+            brserver_send_to_all(server, (unsigned char*)feed_ht);
         }
 
         /* --- Push state to anyone whose board changed --- */
@@ -273,9 +288,11 @@ int main(void)
             StatePayload snapshot;
             build_state_payload(&slot->state, &snapshot);
 
-            unsigned char state_buffer[512] = {0};
-            pack_state(state_buffer, &snapshot);
-            brserver_send_broadcast(server, state_buffer);
+            ParsedMsgHT state_msg = {0};
+            req_create_state(slot->player_id, &snapshot, &state_msg);
+            HyperText state_ht;
+            convert_to_hypertext(&state_msg, state_ht);
+            brserver_send_to_all(server, (unsigned char*)state_ht);
 
             slot->dirty = false;
             slot->idle_ticks = 0;
@@ -318,9 +335,11 @@ int main(void)
         StatePayload snapshot;
         build_state_payload(&slot->state, &snapshot);
 
-        unsigned char state_buffer[512] = {0};
-        pack_state(state_buffer, &snapshot);
-        brserver_send_broadcast(server, state_buffer);
+        ParsedMsgHT state_msg = {0};
+        req_create_state(slot->player_id, &snapshot, &state_msg);
+        HyperText state_ht;
+        convert_to_hypertext(&state_msg, state_ht);
+        brserver_send_to_all(server, (unsigned char*)state_ht);
     }
 
     log_message(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", log_client_get_dropped_count(&log_client));

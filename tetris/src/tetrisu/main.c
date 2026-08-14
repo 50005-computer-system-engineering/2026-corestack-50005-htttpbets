@@ -11,6 +11,7 @@
 #include "renderer.h"
 #include "input_handler.h"
 #include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libhtttp.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
 #include "lib/libtetrisbrain/killfeed.h"
@@ -22,7 +23,7 @@
 // Global network client
 BRClient* network_client = NULL;
 
-// Populate lobby from server's PACKET_ROSTER broadcast at game start
+// Populate lobby from server's REQ_ROSTER broadcast at game start
 Roster lobby = {0};
 
 // Helper function to trim \n
@@ -131,23 +132,34 @@ int main(void)
         process_inputs(&gamestate_player);
 
         // Read directly from message queue
-        unsigned char net_buffer[512] = {0};
+        HyperText net_buffer = {0};
 
-        while (brclient_get_app_msg(net_buffer) == 1) {
-            uint32_t tag = read_packet_tag(net_buffer);
+        while (brclient_get_app_msg((unsigned char*)net_buffer) == 1) {
+            ParsedMsgHT parsed = {0};
+            if (parse_hypertext(net_buffer, &parsed) < 0) {
+                continue; // Malformed message, drop it
+            }
 
-            if (tag == PACKET_STATE) // Authoritative board pushed by the server
+            MethodHTTTP method;
+            uint32_t sender_id;
+            char* body;
+            req_extract_info(&parsed, &method, &sender_id, &body);
+
+            if (method == REQ_STATE) // Authoritative board pushed by the server
             {
                 StatePayload incoming;
-                unpack_state(net_buffer, &incoming);
+                payload_decode_state(body, &incoming);
 
                 if (incoming.player_id == gamestate_player.player_id) {
                     apply_state_payload(&incoming, &gamestate_player);
                 }
-            } else if (tag == PACKET_ROSTER) // Server to populate who is in the lobby
+            } else if (method == REQ_ROSTER) // Server to populate who is in the lobby
             {
-                RosterPayload incoming_roster;
-                unpack_roster(net_buffer, &incoming_roster);
+                struct {
+                    uint32_t count;
+                    uint32_t ids[MAX_LOBBY_SIZE];
+                } incoming_roster = {0};
+                payload_decode_roster(body, (RosterPayload*)&incoming_roster);
 
                 lobby.count = incoming_roster.count;
                 if (lobby.count > MAX_LOBBY_PLAYERS) {
@@ -157,11 +169,10 @@ int main(void)
                     lobby.ids[i] = incoming_roster.ids[i];
                     lobby.eliminated[i] = false; // Nobody is out yet at game start
                 }
-            } else if (tag == PACKET_ATTACK) // Notification only, damage already applied server-side
+            } else if (method == REQ_ATTACK) // Notification only, damage already applied server-side
             {
-                // Cast the raw byte buffer back into our struct
                 AttackPayload incoming;
-                unpack_attack(net_buffer, &incoming);
+                payload_decode_attack(body, &incoming);
 
                 // Kill feed is driven through the event bus
                 event_bus_trigger(EVENT_ATTACK_GENERATED, &incoming);
