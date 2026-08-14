@@ -18,6 +18,8 @@ static BGM curr_bgm_id = BGM_COUNT; // BGM_COUNT doubles as "none playing yet"
 #define BGM_FADE_IN_SECONDS 1.5f
 static float fade_in_elapsed = -1.0f; // < 0 means "not fading"
 
+static void play_bgm_faded_in(BGM bgm);
+
 static void set_sound_position(Camera2D listener, Sound sound, Vector2 sound_pos, float max_dist)
 {
     max_dist *= CONFIG.PHYSICS.TILE_SIZE;
@@ -106,8 +108,26 @@ void audio_init()
 
 void audio_update()
 {
-    if (curr_bgm != NULL)
-        UpdateMusicStream(*curr_bgm);
+    if (curr_bgm == NULL)
+        return;
+
+    UpdateMusicStream(*curr_bgm);
+
+    if (fade_in_elapsed >= 0.0f) {
+        fade_in_elapsed += GetFrameTime();
+        float t = fade_in_elapsed / BGM_FADE_IN_SECONDS;
+        if (t >= 1.0f) {
+            t = 1.0f;
+            fade_in_elapsed = -1.0f; // Fade complete
+        }
+        SetMusicVolume(*curr_bgm, t * CONFIG.SETTINGS.MUSIC_VOLUME);
+    }
+
+    // A one-shot track (win/lose) reached its end: return to the battle
+    // theme, fading it back in rather than snapping straight to full volume
+    if (!bgm_tracks[curr_bgm_id].looping && !IsMusicStreamPlaying(*curr_bgm)) {
+        play_bgm_faded_in(BGM_BATTLE);
+    }
 }
 
 void play_sound(SFX sfx)
@@ -119,7 +139,23 @@ void play_bgm(BGM bgm)
 {
     if (curr_bgm != NULL)
         StopMusicStream(*curr_bgm);
+    curr_bgm_id = bgm;
     curr_bgm = &bgm_tracks[bgm];
+    fade_in_elapsed = -1.0f; // Direct plays start at full volume, no fade
+    SetMusicVolume(*curr_bgm, CONFIG.SETTINGS.MUSIC_VOLUME);
+    PlayMusicStream(*curr_bgm);
+}
+
+// Same as play_bgm(), but starts silent and ramps up to full volume over
+// BGM_FADE_IN_SECONDS instead of starting at full volume immediately
+static void play_bgm_faded_in(BGM bgm)
+{
+    if (curr_bgm != NULL)
+        StopMusicStream(*curr_bgm);
+    curr_bgm_id = bgm;
+    curr_bgm = &bgm_tracks[bgm];
+    fade_in_elapsed = 0.0f;
+    SetMusicVolume(*curr_bgm, 0.0f);
     PlayMusicStream(*curr_bgm);
 }
 
