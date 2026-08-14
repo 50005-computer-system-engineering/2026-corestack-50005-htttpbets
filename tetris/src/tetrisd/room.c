@@ -336,10 +336,6 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
             slot->dirty = false;
             slot->idle_ticks = 0;
         }
-
-        // Whole room eliminated, nothing left to simulate
-        if (count_alive_players(&session) == 0)
-            break;
         
         usleep(TICK_MICROSECONDS); // Advance at a fixed rate
     }
