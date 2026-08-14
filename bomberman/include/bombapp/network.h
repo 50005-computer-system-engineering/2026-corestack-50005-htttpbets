@@ -17,7 +17,9 @@ bool network_connect(const char* server_ip);
 bool network_wait_for_map(void);
 
 // Reads held movement/bomb keys and sends the appropriate packet: UDP for
-// movement (frequent, loss-tolerant), TCP for bomb placement (must land)
+// movement (frequent, loss-tolerant), TCP for bomb placement (must land).
+// While the local player is dead, this instead flies a free-roaming
+// spectator camera around the map with the same keys and sends nothing
 void network_send_input(void);
 
 // Drains incoming packets and applies them to the shared render state
@@ -36,5 +38,9 @@ uint32_t network_get_player_id(int index);
 bool network_is_player_alive(int index);
 bool network_game_over(void);
 uint32_t network_winner_id(void);
+
+// What the camera should be looking at this frame: the local player's real
+// position while alive, or the free-flying spectator position once dead
+Vector2 network_get_camera_target(void);
 
 #endif

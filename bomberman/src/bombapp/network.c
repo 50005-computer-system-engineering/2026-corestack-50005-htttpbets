@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "raylib.h"
+#include <raymath.h>
 #include "network.h"
 #include "config.h"
 #include "events.h"
@@ -24,6 +25,11 @@ static int player_count = 0;
 static bool has_map = false;
 static bool game_over = false;
 static uint32_t winner_id = 0;
+
+// Once dead, WASD flies this free-roaming camera target around the map
+// instead of moving a body, clamped so it can't drift past the border walls
+#define SPECTATOR_CAM_SPEED 6.0f // Grid units/sec
+static Vector2 spectator_cam_pos = {1.0f, 1.0f};
 
 /* ----- CONNECTION ----- */
 bool network_connect(const char* server_ip)
@@ -153,6 +159,7 @@ static void apply_state(const StatePayload* payload)
         bool now_alive = entry->alive != 0;
         if (player_alive[slot] && !now_alive && entry->player_id == local_id) {
             event_bus_trigger(EVENT_PLAYER_DIED, NULL);
+            spectator_cam_pos = bm->box.position; // Start flying from where we died
         }
         player_alive[slot] = now_alive;
     }
@@ -268,8 +275,41 @@ void network_poll(void)
 }
 
 /* ----- INPUT ----- */
+// Moves the spectator camera with WASD and clamps it inside the map, leaving
+// a 1-tile margin so it never sits on top of the border wall
+static void update_spectator_camera(void)
+{
+    float dx = (IsKeyDown(CONFIG.KEYS.MOVE_RIGHT) ? 1.0f : 0.0f) - (IsKeyDown(CONFIG.KEYS.MOVE_LEFT) ? 1.0f : 0.0f);
+    float dy = (IsKeyDown(CONFIG.KEYS.MOVE_DOWN) ? 1.0f : 0.0f) - (IsKeyDown(CONFIG.KEYS.MOVE_UP) ? 1.0f : 0.0f);
+
+    if (dx != 0.0f || dy != 0.0f) {
+        Vector2 move = Vector2Scale(Vector2Normalize((Vector2){dx, dy}), SPECTATOR_CAM_SPEED * GetFrameTime());
+        spectator_cam_pos = Vector2Add(spectator_cam_pos, move);
+    }
+
+    float max_coord = (float)map_size - 1.0f;
+    if (spectator_cam_pos.x < 1.0f) {
+        spectator_cam_pos.x = 1.0f;
+    } else if (spectator_cam_pos.x > max_coord) {
+        spectator_cam_pos.x = max_coord;
+    }
+    if (spectator_cam_pos.y < 1.0f) {
+        spectator_cam_pos.y = 1.0f;
+    } else if (spectator_cam_pos.y > max_coord) {
+        spectator_cam_pos.y = max_coord;
+    }
+}
+
 void network_send_input(void)
 {
+    int slot = network_local_slot();
+    if (slot < 0 || !player_alive[slot]) {
+        // Dead (or not yet assigned a slot): nothing to move server-side,
+        // WASD flies the spectator camera instead
+        update_spectator_camera();
+        return;
+    }
+
     int dx = IsKeyDown(CONFIG.KEYS.MOVE_RIGHT) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_LEFT) ? -1
                                                                                        : 0;
     int dy = IsKeyDown(CONFIG.KEYS.MOVE_UP) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_DOWN) ? -1
@@ -304,6 +344,17 @@ int network_local_slot(void)
         }
     }
     return -1;
+}
+
+// What the camera should be looking at: the local player's real position
+// while alive, or the free-flying spectator position once dead
+Vector2 network_get_camera_target(void)
+{
+    int slot = network_local_slot();
+    if (slot >= 0 && player_alive[slot]) {
+        return players[slot].box.position;
+    }
+    return spectator_cam_pos;
 }
 
 int network_player_count(void) { return player_count; }

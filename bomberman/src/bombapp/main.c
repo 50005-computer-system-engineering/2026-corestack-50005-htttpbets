@@ -69,10 +69,7 @@ void update_loop()
             bomberman_update(network_get_player(i));
         }
 
-        int slot = network_local_slot();
-        if (slot >= 0) {
-            camera_update(network_get_player(slot)->box.position);
-        }
+        camera_update(network_get_camera_target());
     } else {
         bombs_tick();
         input_update();
