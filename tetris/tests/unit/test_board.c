@@ -23,7 +23,7 @@ void test_srs_wall_kick_branch(void)
 
     // L10.2 Path Coverage: The 0th kick {0,0} will now definitively fail.
     // Logic MUST fall through to the {1, 0} kick and succeed.
-    bool success = testRotate(&test_state, ROT_2);
+    bool success = test_rotate(&test_state, ROT_2);
 
     TEST_ASSERT_TRUE(success);
     // If it started at -2 and kicked right by +1, x should now be -1

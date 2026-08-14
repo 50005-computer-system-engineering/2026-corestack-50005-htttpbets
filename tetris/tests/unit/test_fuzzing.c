@@ -22,7 +22,7 @@ void test_garbage_fuzzer_boundary(void)
     // L11.1 Random Fuzzing: Blast the engine with 100 random, out-of-bounds payloads
     for (int i = 0; i < 100; i++) {
         int random_garbage = (rand() % 300) - 100; // Generate negatives and massive positives
-        addGarbage(&test_state, random_garbage);
+        add_garbage(&test_state, random_garbage);
     }
 
     // L11.2 Safety Constraint: Board array index must not under/overflow.

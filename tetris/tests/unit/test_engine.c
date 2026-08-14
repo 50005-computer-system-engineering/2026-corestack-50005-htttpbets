@@ -19,7 +19,7 @@ void test_garbage_mitigation_integration(void)
     test_state.pending_garbage = 3;
 
     // Module 1 (Garbage) generates damage
-    int damage = calculateGarbage(&test_state, 4, false); // Tetris = 4
+    int damage = calculate_garbage(&test_state, 4, false); // Tetris = 4
     TEST_ASSERT_EQUAL_INT(4, damage);
 
     // Module 2 (Engine) mitigation logic
@@ -35,7 +35,7 @@ void test_garbage_mitigation_integration(void)
 
 void test_queue_garbage_stores_in_pending_meter(void)
 {
-    queueGarbage(&test_state, 2);
+    queue_garbage(&test_state, 2);
 
     TEST_ASSERT_EQUAL_UINT32(2, test_state.pending_garbage);
     TEST_ASSERT_EQUAL_INT(0, test_state.board.cells[0][0]);

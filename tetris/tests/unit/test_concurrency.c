@@ -14,7 +14,7 @@ void* killfeed_spammer(void* arg)
 {
     (void)arg;
     for (int i = 0; i < 5000; i++) {
-        addKillFeed(1, 2, 4);
+        add_kill_feed(1, 2, 4);
     }
     return NULL;
 }
