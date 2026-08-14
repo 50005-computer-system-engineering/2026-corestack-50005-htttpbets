@@ -5,8 +5,11 @@
 #include "clientll.h"
 
 typedef struct {
-    Endpoint* self;
-    ClientLinkedList* clients;
+    Endpoint* self;            // the room's own endpoint
+    ClientLinkedList* clients; // clients in this room
+    uint16_t tcp_port;         // where this server listens, each room worker gets its own
+    uint16_t udp_port;         // unicast UDP port, also per-room so rooms never collide
+    uint32_t next_id;          // next player id to hand out, master sets the base per room
 } Server;
 
 static MessageQueue server_messages;
@@ -38,6 +41,13 @@ int listen_on_tcp(Server* server_ptr)
         LOG_E("[listenOnTCP()] sockets in Sockets invalid");
         return -1;
     }
+
+    // Allow fast restarts and room-slot port reuse
+    int reuse = 1;
+    // Tell kernel to relax its default use abt reusing ports on this specific socket
+    // (bc kernel doesn't free TCP socket's port immediately on dropped, prevents any stray packets from getting confused from new ones)
+    // SO_REUSEADDR to 1: allow multiple sockets to bind to the same port even if they aren't live (eg: TIME_WAIT after disconn)
+    setsockopt(server_ptr->self->socks->tcp, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
     // Bind sockets to port
     struct sockaddr_in server_addr = {

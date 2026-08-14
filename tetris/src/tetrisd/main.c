@@ -16,8 +16,33 @@
 #include "lib/libtetrislog/logclient.h"
 #include "game.h"
 
-// MAX_LOBBY_SIZE defined in protocol.h
-#define MIN_LOBBY_SIZE 1
+// TODO: Move to tetrisrc
+// Keep in sync with libbattleroyale's PORT_TCP
+#define MASTER_PORT 6700
+
+/* ----- MASTER STATE ----- */
+// One per-room worker process, as the master sees it
+typedef struct
+{
+    bool used;
+    bool ready;   // Worker has bound its port, safe to redirect clients
+    bool started; // Match is running in this room
+    pid_t pid;
+    int hub_fd;
+    uint16_t port;
+    int redirected;                  // Clients pointed at this room (but might have be joined yet)
+    int joined;                      // Arrivals the worker has confirmed
+    int pending_fds[MAX_LOBBY_SIZE]; // "Waiting Room", parked sockets until worker has initialised
+    int pending_count;
+} Room;
+
+// One joined player anywhere in the match
+typedef struct
+{
+    uint32_t id;
+    int room; // Slot index, used to route garbage to the right worker
+    bool alive;
+} PlayerRec;
 
 // Instantiate logger
 static LogClient log_client;
@@ -313,6 +338,7 @@ int main(void)
         }
     }
 
+<<<<<<< Updated upstream
     if (winner_id != 0) // Found a winner
     {
         printf("\n[tetrisd] MATCH OVER! Winner: P%u\n", winner_id);
@@ -340,6 +366,15 @@ int main(void)
         HyperText state_ht;
         convert_to_hypertext(&state_msg, state_ht);
         brserver_send_to_all(server, (unsigned char*)state_ht);
+=======
+    /* --- SHUTDOWN --- */
+    // Closing the hubs is the shutdown signal,
+    // workers treat EOF as game over
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].used) {
+            close_room(i);
+        }
+>>>>>>> Stashed changes
     }
 
     log_message(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", log_client_get_dropped_count(&log_client));

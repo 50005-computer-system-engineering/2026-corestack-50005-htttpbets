@@ -49,12 +49,11 @@ LAUNCHER_BIN := bombapp
 # 2) If not found, download the source tarball and built it locally using raylib's own Makefile
 # Result is a static library at deps/raylib-<ver>/src/librarylib.a
 # ----------------------------------------------------------------------
-RAYLIB_VERSION := 6.0
-RAYLIB_URL     := https://github.com/raysan5/raylib/archive/refs/tags/$(RAYLIB_VERSION).tar.gz
-RAYLIB_LOCAL   := $(DEPS_DIR)/raylib-$(RAYLIB_VERSION)
-RAYLIB_STATIC  := $(RAYLIB_LOCAL)/src/libraylib.a
-RAYLIB_BINS := bombapp
-CFLAGS += $(RAYLIB_CFLAGS)
+RAYLIB_VERSION   := 6.0
+RAYLIB_URL       := https://github.com/raysan5/raylib/archive/refs/tags/$(RAYLIB_VERSION).tar.gz
+RAYLIB_LOCAL     := $(DEPS_DIR)/raylib-$(RAYLIB_VERSION)
+RAYLIB_ARTIFACT  := $(RAYLIB_LOCAL)/src/libraylib.a
+RAYLIB_BUILD_CMD := $(MAKE) -C $(RAYLIB_LOCAL)/src PLATFORM=PLATFORM_DESKTOP
 
 # Platform-specific system libraries raylib depends on when linking statically.
 # (pkg-config --libs includes these automatically for system installs.)
@@ -86,252 +85,50 @@ else
     $(info raylib: Not found! Will build locally in $(RAYLIB_LOCAL))
 endif
 
-# The name of the binaries (matching a src/ directory or flat file) that
-# links raylib. Only this target receives the extra RAYLIB_* flags
-# Space-separated list! (eg: RAYLIB_BINS := bombapp bombui)
-RAYLIB_BINS := bombapp
+# Bridge into common.mk's generic extra-dependency hooks - bombapp is the only
+# binary here that needs raylib, everything else (including bombfuzzer) doesn't
+EXTRA_DEP_BINS    := bombapp
+EXTRA_DEP_CFLAGS  := $(RAYLIB_CFLAGS)
+EXTRA_DEP_LDFLAGS := $(RAYLIB_LDFLAGS)
+EXTRA_DEP_DEPS    := $(RAYLIB_DEP)
 
-# ----------------------------------------------------------------------
-# RayLib Download & Build Rule
-# Only runs when RAYLIB_DEP is non-empty (ie: no system install)
-# 1) Download source tarball using curl/wget
-# 2) Build static library using raylib's own Makefile
-# 3) Store result (libraylib.a) in deps/
-# This is NOT cleaned by 'make clean' so we don't have to re-download every clean
-# Use make distclean to clean everything
-# ----------------------------------------------------------------------
-$(RAYLIB_STATIC):
-	@echo "==> Downloading raylib $(RAYLIB_VERSION)..."
-	@mkdir -p $(DEPS_DIR)
-	@if command -v curl > /dev/null 2>&1; then \
-	    curl -fsSL $(RAYLIB_URL) | tar -xz -C $(DEPS_DIR); \
-	elif command -v wget > /dev/null 2>&1; then \
-	    wget -qO- $(RAYLIB_URL) | tar -xz -C $(DEPS_DIR); \
-	else \
-	    echo "Error: neither curl nor wget found."; \
-	    echo "Install one, or install raylib manually and re-run make."; \
-	    exit 1; \
-	fi
-	@echo "==> Building raylib $(RAYLIB_VERSION) (this may take a moment)..."
-	$(MAKE) -C $(RAYLIB_LOCAL)/src PLATFORM=PLATFORM_DESKTOP
-	@echo "==> raylib ready at $(RAYLIB_STATIC)"
-
-# Convenience target: fetch and build dependencies without building the project.
-deps: $(RAYLIB_DEP)
-	@echo "==> All dependencies ready."
-
-# ----------------------------------------------------------------------
-# Library Auto-Discovery (src/lib/<libname>)
-# Scans src/lib for subdirectories/files, and builds them as static libraries
-# ----------------------------------------------------------------------
-# ** Directory-based libs (eg: src/lib/libtest/ -> build/lib/libtest.a) **
-# Lists every subdirectory and strips trailing slash off each result
-_LIB_SRCDIRS_ALL := $(patsubst %/,%,$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/*/))
-# Loops over every directory found and drop those without .c files
-_LIB_SRCDIRS     := $(foreach d,$(_LIB_SRCDIRS_ALL),$(if $(wildcard $(d)/*.c),$(d)))
-# Get folder names by stripping leading path to each directory
-LIB_NAMES        := $(notdir $(_LIB_SRCDIRS))
-
-# ** Flat File libs (eg: src/lib/libtest.c -> build/lib/libtest.a) **
-# Lists every .c file sitting directly in /src/lib/
-FLAT_LIB_SRCS  := $(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/*.c)
-# Get file names by stripping leading path and .c extension from each file
-FLAT_LIB_NAMES := $(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/%.c,%,$(FLAT_LIB_SRCS))
-
-# ** Linker Flags **
-# Converts every library name into a -l flag, stripping 'lib' prefix (eg: libtest -> -ltest)
-LOCAL_LDLIBS := $(patsubst lib%,-l%,$(LIB_NAMES))
-# Assigns final set of -l flags to LDLIBS, including corestack libraries
-LDLIBS       := $(LOCAL_LDLIBS) $(CS_LDLIBS) -lm
-
-# Final container of all libraries, empty for now
-ALL_LIB_ARCHIVES :=
-
-# Directory Library Template: Subdirectory -> Archive
-# $(1) is the argument supplied to this function, the library name (eg: libtest)
-# Note that we include each directory's own path to the CFLAGS to
-# (eg: Allow src/lib/libhtttp/client.c to #include "client.h" instead of "libhtttp/client.h")
-# 1) Convert every .c file found in directory to an object file (eg: src/lib/libtest/test.c -> build/obj/libtest/test.o)
-# 2) Compile corresponding .c file whenever a .o is needed, creating the directory if hasn't existed yet
-# 3) Bundle all .o files into the static archive (eg: build/lib/libtest.a), where $$@ is the archive, $$^ is all the .o files
-# 4) Append built archive to running list of libraries to build at top-level
-# See: https://devdocs.io/gnu_make/automatic-variables (we write $$ to escape inside a define block)
-define LIB_template =
-$(1)_SRC := $$(wildcard $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/*.c)
-$(1)_OBJ := $$(patsubst $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c, \
-             $(OBJ_DIR)/$(1)/%.o,$$($(1)_SRC))
-$(1)_CFLAGS := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/$(1)
-
-$(OBJ_DIR)/$(1)/%.o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1)/%.c | $$(RAYLIB_DEP)
-	@mkdir -p $$(dir $$@)
-	$(CC) $$($(1)_CFLAGS)  -c $$< -o $$@
-
-$(LIB_OUT)/$(1).a: $$($(1)_OBJ)
-	@mkdir -p $(LIB_OUT)
-	$(AR) $$@ $$^
-
-ALL_LIB_ARCHIVES += $(LIB_OUT)/$(1).a
-endef
-
+# Shared library/binary auto-discovery, testing scaffold, and dependency fetching
 include ../common.mk
 include ../common-test.mk
 include ../common-deps.mk
 
-# Flat Library Template: Single .c file -> Archive
-# 1) Compile single flat source file directory into a .o
-# 2) Archive the single .o into .a
-# 3) Append built archive to running list of libraries to build
-define FLAT_LIB_template =
-$(OBJ_DIR)/$(1).o: $(SRC_DIR)/$(LIB_SUBDIR)/$(1).c | $$(RAYLIB_DEP)
-	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $(RAYLIB_CFLAGS) -c $$< -o $$@
+# common.mk's LIB_template (unlike its BIN_template) has no per-library extra-flags hook, and
+# already captured libbombbrain_CFLAGS (via :=, at include time, before raylib was known) while
+# processing its own internal $(foreach lib,$(LIB_NAMES),...) above - libbombbrain includes
+# raylib.h directly, so override the captured value now that RAYLIB_CFLAGS is known. The compile
+# rule itself looks this variable up lazily at build time, so a later plain assignment like this
+# still takes effect.
+libbombbrain_CFLAGS := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/libbombbrain
 
-$(LIB_OUT)/$(1).a: $(OBJ_DIR)/$(1).o
-	@mkdir -p $(LIB_OUT)
-	$(AR) $$@ $$^
+# Generates the $(RAYLIB_ARTIFACT) download+build rule (fetch tarball, build via
+# RAYLIB_BUILD_CMD). NOT cleaned by 'make clean' so we don't re-download every clean -
+# use 'make distclean' to force that.
+$(eval $(call FETCH_TARBALL_template,RAYLIB))
 
-ALL_LIB_ARCHIVES += $(LIB_OUT)/$(1).a
-endef
-
-# Runs template once per flat library
-$(foreach lib,$(FLAT_LIB_NAMES),$(eval $(call FLAT_LIB_template,$(lib))))
-
-# ----------------------------------------------------------------------
-# Binary Auto-Discovery (src/<name>)
-# Builds everything under src/ that is NOT inside src/lib as binaries
-# ----------------------------------------------------------------------
-# ** Directory-based Binaries (eg: src/test/ -> build/bin/test) **
-# Lists every subdirectory inside src/ and strips trailing slash off each result
-_ALL_SRCDIRS_ALL := $(patsubst %/,%,$(wildcard $(SRC_DIR)/*/))
-# Drop any directories inside /lib folder
-_BIN_SRCDIRS_ALL := $(filter-out $(SRC_DIR)/$(LIB_SUBDIR),$(_ALL_SRCDIRS_ALL))
-# Drop any directories without .c files
-_BIN_SRCDIRS     := $(foreach d,$(_BIN_SRCDIRS_ALL),$(if $(wildcard $(d)/*.c),$(d)))
-# Get file names by stripping leading paths
-BIN_NAMES        := $(notdir $(_BIN_SRCDIRS))
-
-# ** Flat File Binaries (eg: src/test.c -> build/bin/test) **
-# Every .c file sitting directly in /src
-FLAT_BIN_SRCS  := $(wildcard $(SRC_DIR)/*.c)
-# Get file names by stripping leading path and .c extension from each file
-FLAT_BIN_NAMES := $(patsubst $(SRC_DIR)/%.c,%,$(FLAT_BIN_SRCS))
-
-ALL_BINS :=
-
-# Directory Binary Template: Subdirectory -> Binary
-# Extra Variables set for binaries that require raylib, empty strings for others
-# $(1)_EXTRA_CFLAGS		adds raylib's include path (-I) only for that binary.
-# $(1)_EXTRA_LDFLAGS 	adds -lraylib and platform libs only for that binary.
-# $(1)_EXTRA_DEPS		if raylib needs to be built locally, makes the binary
-#                      	depend on the local libraylib.a (order-only).
-#                      	Empty for system installs. Nothing extra to build.
-# 
-# Similar to library templates.
-# 1) Create list of every .c file found in directory
-# 2) Declare binary as target with prerequisites src (normal), libraries & extra deps (order-only)
-# ie: src is rebuilt whenever it's modified, libraries/deps are rebuilt only if its existence changes
-# See: https://devdocs.io/gnu_make/prerequisite-types
-# 3) Also include each directory's own path to the search path 
-# (eg: Allow src/tetrisu/test.c to #include "test.h" instead of "tetrisu/test.h")
-# 4) Compile every file to binary, including linker paths
-# 5) Append compiled binary to running list of binaries to build at top-level
-define BIN_template =
-$(1)_SRC          := $$(wildcard $(SRC_DIR)/$(1)/*.c)
-$(1)_CFLAGS := $(CFLAGS) -I$(INC_DIR)/$(1)
-$(1)_EXTRA_CFLAGS  := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_CFLAGS))
-$(1)_EXTRA_LDFLAGS := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_LDFLAGS))
-$(1)_EXTRA_DEPS    := $$(if $$(filter $(RAYLIB_BINS),$(1)),$(RAYLIB_DEP))
-
-$(BIN_OUT)/$(1): $$($(1)_SRC) | $(ALL_LIB_ARCHIVES) $$($(1)_EXTRA_DEPS)
-	@mkdir -p $$(dir $$@)
-	$(CC) $$($(1)_CFLAGS) $$($(1)_EXTRA_CFLAGS) $$($(1)_SRC) -o $$@ \
-		$(LDFLAGS) $(LDLIBS) $$($(1)_EXTRA_LDFLAGS)
-
-ALL_BINS += $(BIN_OUT)/$(1)
-endef
-
-# Runs template once per directory binary name
-$(foreach bin,$(BIN_NAMES),$(eval $(call BIN_template,$(bin))))
-
-# Flat Binary Template: Single .c File -> Binary
-# Identical to BIN_template except source is a single named file ($$<) rather than 
-# a wildcard over a directory
-define FLAT_BIN_template =
-$(1)_EXTRA_CFLAGS  := $$(if $$(filter $(RAYLIB_BIN),$(1)),$(RAYLIB_CFLAGS))
-$(1)_EXTRA_LDFLAGS := $$(if $$(filter $(RAYLIB_BIN),$(1)),$(RAYLIB_LDFLAGS))
-$(1)_EXTRA_DEPS    := $$(if $$(filter $(RAYLIB_BIN),$(1)),$(RAYLIB_DEP))
-
-$(BIN_OUT)/$(1): $(SRC_DIR)/$(1).c | $(ALL_LIB_ARCHIVES) $$($(1)_EXTRA_DEPS)
-	@mkdir -p $$(dir $$@)
-	$(CC) $(CFLAGS) $$($(1)_EXTRA_CFLAGS) $$< -o $$@ \
-		$(LDFLAGS) $(LDLIBS) $$($(1)_EXTRA_LDFLAGS)
-
-ALL_BINS += $(BIN_OUT)/$(1)
-endef
-
-# Runs template once per flat binary
-$(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
-
-# ----------------------------------------------------------------------
-# Top-Level Targets
-# ----------------------------------------------------------------------
-.PHONY: all init deps run unit integration test clean clean-deps distclean
-
-# 'all' is ran by default when make is ran with no arguments
-.DEFAULT_GOAL := all
-all: $(ALL_LIB_ARCHIVES) $(ALL_BINS) $(TARGET)
-
-# Print a Bomb emoji for Bomberman :D
-# TODO: Implement pretty-print for other commands
-init: 
-	make clean
-	bear -- make
-	@printf "\U0001F4A3 Created compile_commands for Intellisense!\n"
-
-# ----------------------------------------------------------------------
-# Testing
-# Placeholder for now, to change later!
-# ----------------------------------------------------------------------
-TESTS_DIR := ./tests
-UNIT_DIR  := $(TESTS_DIR)/unit
-INT_DIR   := $(TESTS_DIR)/integration
-UNITY_DIR := $(TESTS_DIR)/unity
-UNIT_BIN  := $(UNIT_DIR)/bin
-
-# New variables for the Fuzzer
-FUZZ_DIR  := $(TESTS_DIR)/fuzz
-FUZZ_BIN  := $(FUZZ_DIR)/bin
-
-UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
-UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
-
-# Tests never link raylib — test game logic through libbombbrain directly.
-TEST_CFLAGS  := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(UNITY_DIR)
-TEST_LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB) -lpthread
-TEST_LDLIBS  := $(LDLIBS)
-
-# --- Unit Tests ---
-$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
-	@mkdir -p $(UNIT_BIN)
-	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
+$(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
+	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
 
 .PHONY: run deps distclean
 
-# --- Integration Tests ---
-integration: all
-	@echo "==> Running bomberman integration tests"
-	@pass=0; fail=0; \
-	for s in $(INT_DIR)/*.sh; do \
-	  [ -f "$$s" ] || continue; \
-	  echo "--- $$s ---"; \
-	  if bash $$s; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
-	done; \
-	echo ""; \
-	echo "Integration tests: $$pass passed, $$fail failed"; \
-	test $$fail -eq 0
+run: $(TARGET)
+	./$(TARGET)
 
+# Fetch and build dependencies without building the project
+deps: $(RAYLIB_DEP)
+	@echo "==> All dependencies ready."
 
-# --- Fuzzing & Valgrind Memory Checks ---
+# ----------------------------------------------------------------------
+# Game-logic fuzzer (libbombbrain) & Valgrind
+# unit/integration/test targets come from common-test.mk
+# ----------------------------------------------------------------------
+FUZZ_DIR := $(TESTS_DIR)/fuzz
+FUZZ_BIN := $(FUZZ_DIR)/bin
+
 $(FUZZ_BIN)/fuzz_harness: $(FUZZ_DIR)/fuzz_harness.c | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $(FUZZ_BIN)
 	$(CC) $(TEST_CFLAGS) $< -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS) $(RAYLIB_LDFLAGS)
@@ -345,14 +142,75 @@ fuzz: $(FUZZ_BIN)/fuzz_harness
 # --- Master Test Target ---
 test: unit integration fuzz
 
+# --- bombfuzzer: custom adversarial-input fuzzer for corestack (docs/THREAT_MODEL.md 2.4) ---
+# Targets the shared libraries bombd will be built on (libbattleroyale/libhypertext/libhtttp) -
+# not tetrisd or any other bomberman-external binary. Kept out of `unit integration` -> `test`
+# since its Valgrind passes are slow - run explicitly with `make bombfuzzer`.
+BOMBFUZZER_DIR    := $(TESTS_DIR)/bombfuzzer
+BOMBFUZZER_BIN    := $(BOMBFUZZER_DIR)/bin
+BOMBFUZZER_COMMON := $(BOMBFUZZER_DIR)/bombfuzzer_common.c
+
+# message.h/common.h (libbattleroyale) are private headers, not under CS_INC
+BOMBFUZZER_CFLAGS := $(TEST_CFLAGS) -I$(CORESTACK_DIR)/src/lib/libbattleroyale
+BOMBFUZZER_SRCS   := bombfuzzer_bytes bombfuzzer_message bombfuzzer_hypertext bombfuzzer_htttp
+# only needs corestack, not $(LDLIBS)'s default -lbombbrain (bomberman's own game logic)
+BOMBFUZZER_LDLIBS := $(CS_LDLIBS) $(SYS_LDLIBS)
+
+$(CS_LIB)/libbattleroyale.a:
+	$(MAKE) -C $(CORESTACK_DIR)
+
+$(BOMBFUZZER_BIN)/%: $(BOMBFUZZER_DIR)/%.c $(BOMBFUZZER_COMMON) | $(CS_LIB)/libbattleroyale.a
+	@mkdir -p $(BOMBFUZZER_BIN)
+	$(CC) $(BOMBFUZZER_CFLAGS) $< $(BOMBFUZZER_COMMON) -o $@ $(TEST_LDFLAGS) $(BOMBFUZZER_LDLIBS)
+
+# `|| echo ...` keeps one crashing layer from hiding whether the others are clean
+VALGRIND := valgrind --leak-check=full --track-origins=yes
+
+bombfuzzer: $(addprefix $(BOMBFUZZER_BIN)/,$(BOMBFUZZER_SRCS))
+	@mkdir -p $(BOMBFUZZER_DIR)/findings
+	@echo "==> bombfuzzer: Adversarial Input Handling (THREAT_MODEL.md 2.4)"
+	./$(BOMBFUZZER_BIN)/bombfuzzer_bytes || echo "==> WARNING: bombfuzzer_bytes crashed"
+	./$(BOMBFUZZER_BIN)/bombfuzzer_message || echo "==> WARNING: bombfuzzer_message crashed"
+	./$(BOMBFUZZER_BIN)/bombfuzzer_hypertext || echo "==> WARNING: bombfuzzer_hypertext crashed"
+	./$(BOMBFUZZER_BIN)/bombfuzzer_htttp || echo "==> WARNING: bombfuzzer_htttp crashed"
+	@echo "==> bombfuzzer: Memory Safety under Valgrind (THREAT_MODEL.md 2.2)"
+	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_bytes 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_bytes.log \
+		|| echo "==> WARNING: bombfuzzer_bytes crashed under Valgrind - see findings/valgrind_bytes.log"
+	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_message 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_message.log \
+		|| echo "==> WARNING: bombfuzzer_message crashed under Valgrind - see findings/valgrind_message.log"
+	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_hypertext 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_hypertext.log \
+		|| echo "==> WARNING: bombfuzzer_hypertext crashed under Valgrind - see findings/valgrind_hypertext.log"
+	$(VALGRIND) ./$(BOMBFUZZER_BIN)/bombfuzzer_htttp 2>&1 | tee $(BOMBFUZZER_DIR)/findings/valgrind_htttp.log \
+		|| echo "==> WARNING: bombfuzzer_htttp crashed under Valgrind - see findings/valgrind_htttp.log"
+	@echo "==> bombfuzzer: findings (if any) logged under $(BOMBFUZZER_DIR)/findings/"
+
+# --- bombfuzzer coverage report (node/edge coverage via gcov) ---
+# Rebuilds message.c and libhypertext.c with --coverage, linked against their harness. Each pair
+# builds into its own subdirectory so their .gcno files can't collide with each other.
+COVERAGE_DIR          := $(BOMBFUZZER_DIR)/coverage
+COVERAGE_LIBBR         := $(CORESTACK_DIR)/src/lib/libbattleroyale
+COVERAGE_LIBHYPERTEXT := $(CORESTACK_DIR)/src/lib/libhypertext.c
+
+define coverage_pair
+@mkdir -p $(COVERAGE_DIR)/$(1)
+$(CC) $(BOMBFUZZER_CFLAGS) --coverage -O0 -c $(BOMBFUZZER_DIR)/bombfuzzer_$(1).c -o $(COVERAGE_DIR)/$(1)/bombfuzzer_$(1).o
+$(CC) $(BOMBFUZZER_CFLAGS) --coverage -O0 -c $(BOMBFUZZER_COMMON) -o $(COVERAGE_DIR)/$(1)/bombfuzzer_common.o
+$(CC) $(BOMBFUZZER_CFLAGS) --coverage -O0 -c $(2) -o $(COVERAGE_DIR)/$(1)/$(3).o
+$(CC) --coverage $(COVERAGE_DIR)/$(1)/bombfuzzer_$(1).o $(COVERAGE_DIR)/$(1)/bombfuzzer_common.o $(COVERAGE_DIR)/$(1)/$(3).o \
+	-o $(COVERAGE_DIR)/$(1)/coverage_run -lpthread
+cd $(COVERAGE_DIR)/$(1) && ./coverage_run
+@echo "==> bombfuzzer-coverage: node/edge coverage of $(3).c reached by bombfuzzer_$(1)"
+cd $(COVERAGE_DIR)/$(1) && gcov $(3).o
+endef
+
+bombfuzzer-coverage:
+	@echo "==> bombfuzzer-coverage: building message.c + libhypertext.c with --coverage"
+	$(call coverage_pair,message,$(COVERAGE_LIBBR)/message.c,message)
+	$(call coverage_pair,hypertext,$(COVERAGE_LIBHYPERTEXT),libhypertext)
+
 # ----------------------------------------------------------------------
 # Cleaning
 # ----------------------------------------------------------------------
-# Keeps /deps intact while cleaning build artifacts
-clean:
-	rm -rf ./build $(UNIT_BIN)
-	rm -f $(TARGET)
-
-# Remove /deps and build artifacts
+# Remove /deps and build artifacts (clean itself comes from common.mk)
 distclean: clean
 	rm -rf $(DEPS_DIR)

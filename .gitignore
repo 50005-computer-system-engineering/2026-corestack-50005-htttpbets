@@ -61,5 +61,10 @@ dkms.conf
 **/launcher
 tetris/var/
 
+# bombfuzzer output - built binaries, gcov coverage artifacts, and logged findings
+**/tests/bombfuzzer/bin/
+**/tests/bombfuzzer/coverage/
+**/tests/bombfuzzer/findings/*.log
+
 # Ignore compile_commands, as this is unique to each user
 compile_commands.json

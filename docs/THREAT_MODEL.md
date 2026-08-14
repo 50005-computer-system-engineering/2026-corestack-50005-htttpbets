@@ -27,10 +27,11 @@ Active verification will be conducted using **JMeter** for load generation, **Va
 * **Success Criteria:** Client-side injection of forged game states (e.g., claiming a false coordinate position) is actively rejected by the server's validation logic, ensuring no client can inject or spoof the authoritative state.
 
 ### 2.4. Adversarial Input Handling (Mitigating Tampering)
-* **Property:** WebSocket listeners must reliably reject malicious payloads without crashing.
+* **Property:** Network listeners must reliably reject malicious payloads without crashing.
 * **Threat Addressed:** Exploitation of parsers via buffer overflows, unhandled exceptions, or command injection.
-* **Verification Strategy:** Active execution of **`bombfuzzer`** (custom fuzzer) directed at the server's WebSocket endpoints.
+* **Verification Strategy:** Active execution of **`bombfuzzer`** (custom fuzzer) directed at the server's listeners.
 * **Success Criteria:** The server successfully catches and drops malformed frames, oversized payloads, and injected command sequences without halting the main thread or dropping legitimate connections.
+* **Note (2026-08-14):** this property originally referred to "WebSocket listeners," but there is no WebSocket layer in the codebase - the real transport is `libbattleroyale`'s TCP/UDP framing, with a text-based request protocol (`libhypertext`/`libhtttp`) layered on top. `bombfuzzer` targets those instead. If WebSocket support is added later, this section and `bombfuzzer` should be revisited together.
 
 ### 2.5. Latency (Performance Under Load)
 * **Property:** Player input round trip times must remain highly responsive.
@@ -41,4 +42,6 @@ Active verification will be conducted using **JMeter** for load generation, **Va
 ---
 
 ## 3. Execution Plan
-As per the current project tracker, the execution of the `bombfuzzer` and load testing suite is actively deferred. Testing will commence immediately once the foundational networked server architecture is deemed stable enough to support continuous connections.
+As per the current project tracker, the execution of the JMeter-based load testing suite (2.1, 2.5) and full state-consistency verification (2.3) is actively deferred until `bombd` exists - there is currently no server binary for JMeter to target, and no code tying `libhtttp` to the authoritative game state in `libtetrisbrain`/`libbombbrain`.
+
+**Update (2026-08-14):** `bombfuzzer` (2.4) is no longer deferred - it now actively runs, via `make bombfuzzer` in `bomberman/`, against the corestack libraries `bombd` will be built on: `libbattleroyale` (raw framing), `libhypertext` (text protocol), `libhtttp` (methods/payloads). Each also runs under Valgrind, giving partial coverage of 2.2 (Memory Safety) for that parsing/framing code. `bombfuzzer` targets only these shared libraries, not any other binary in the repo, and does not exercise a live connect/disconnect cycle against a running server - that part of 2.2 stays deferred until `bombd` exists. See `bomberman/tests/bombfuzzer/` for the harnesses and `bomberman/tests/bombfuzzer/findings/` for any logged results.
