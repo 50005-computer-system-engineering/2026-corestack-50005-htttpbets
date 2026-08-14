@@ -45,13 +45,30 @@ The system is composed of **5 binaries** and **3 static libraries**, extended wi
 
 ---
 
-## 🌐 Network Layer: Dual-Transport Design
+## libbattleroyale
+> flexible transport layer for games
 
-Our network design leverages the strengths of both TCP and UDP to deliver a responsive, secure, and accurate multiplayer experience:
+libbattleroyale is our implementation of libssh. It provides the transport layer support for our games, by handling both data transmission and security.
+* **Message Format:** A simple messaging protocol was created for the passing of messages between server and clients. Simple message codes allow for the server to communicate key changes in the life cycle of the game.
+* **TCP and UDP:** We provide flexibility, offering both transport layer protocols as options for data transmission. TCP can be used for all important information which requires guarenteed delivery, while UDP can be used for speedy sending of non-essential updates.
+* **Authentication:** Our clients and server perform a simple authentication handshake upon starting the connection. The server has a signed certificate which the client verifies.
+* **Encryption:** All unicast communication, UDP or TCP is encrypted using AES-256. Keys are generated and passed by the client to the server using RSA.
+    * Broadcasts remain enencrypted, as they are public and expected to be seen by multiple clients, rendering symmetric encryption unecessary.
 
-* **TCP (Secure, Reliable, State-Changing):** Carries all state-changing and reliable messages (JOIN, LEAVE, Placed Blocks, Line Clears, STATE frames). All TCP traffic is securely wrapped by `libtetrissh` using AES-256 session encryption.
-* **UDP (High-Frequency, Loss-Tolerant):** Handles live position updates of falling pieces across player screens and cosmetic broadcasts (e.g., score, "T-SPIN!"). Packets are raw POSIX `SOCK_DGRAM`. 
-    * *Note: UDP data is used strictly for display interpolation. The server remains fully authoritative for game logic.*
+### Authoritative Server
+Our library offers developers a suite of functions which can be integrated seamlessly into a game server or client's codebase. They may interact with our library with a variety of asynchronous function calls.
+* We design around an authoritative server, where all information must be passed to and evaluated by the server. When the server processes a change in state, its state should be taken as absolute truth by the client.
+* Clients never directly interact with one another, but they can be made aware of one another if updated by the server.
+
+### Background Thread
+To ensure that the operation of the server or client does not block primary function of developer applications, a worker thread is spawned, which mainly functions as a listener.
+* The server uses the background thread to accept connections and listen to developer made application layer messages.
+* The client uses the background thread to listen for server updates, those for libbattleroyale and application layer purposes.
+
+## libhypertext and libhtttp
+A library to help implement HTTP-alike protocols, providing tools like parsers and standardised structs which emulate HTTP formatting. It was designed as 2 libraries, with libhtttp implementing libhypertext.
+* When designing the library, libhypertext was intended as a generic so that tetris and bomberman could have their own independent protocols
+* libhtttp implemented with methods and header specification specific to tetrish. Also included are functions for encoding and decoding specific payloads. This is because a pre-existing protocol used for early testing of tetris was adapted into the htttp.
 
 ---
 
