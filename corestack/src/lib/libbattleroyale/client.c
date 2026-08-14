@@ -9,13 +9,13 @@ static pthread_mutex_t client_messages_lock;
 static int pc_flags[2] = {0, 0};
 
 // private functions
-int connect_on_tcp(Sockets* socks, char* server_ip)
+int connect_on_tcp(Sockets* socks, char* server_ip, uint16_t port)
 {
-    LOG_I("[connectToServer()] Attempting connection to server at %s:%d...", server_ip, PORT_TCP);
+    LOG_I("[connectToServer()] Attempting connection to server at %s:%u...", server_ip, port);
     // sockaddr_in of server to connect to
     struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT_TCP),
+        .sin_port = htons(port),
     };
     if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) < 0) {
         perror("[client connectToServer()] inet_pton");
@@ -249,10 +249,41 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
 
     LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ip_address);
 
-    // TALKING TO SERVER
-    // connect on TCP first
-    if (connect_on_tcp(this_client->socks, ip_address) < 0) {
+    // TALKING TO MASTER
+    // the master only deals out rooms, connect and ask for one
+    if (connect_on_tcp(this_client->socks, ip_address, PORT_TCP) < 0) {
         LOG_E("[startClientHandshake()] failed to connect to server at IP");
+        return -1;
+    }
+
+    // master answers with the TCP port of the room worker this player was dealt into
+    unsigned char* port_buffer = malloc(sizeof(uint32_t));
+    if (port_buffer == NULL) {
+        perror("[brclient_join()] malloc");
+        return -1;
+    }
+    if (read_bytes(this_client->socks->tcp, &port_buffer, sizeof(uint32_t)) < 0) {
+        LOG_E("[brclient_join()] failed to read room port from master");
+        free(port_buffer);
+        return -1;
+    }
+    uint32_t port_bytes;
+    memcpy(&port_bytes, port_buffer, sizeof(port_bytes));
+    uint16_t room_port = (uint16_t)ntohl(port_bytes);
+    free(port_buffer);
+    port_buffer = NULL;
+
+    // TALKING TO ROOM WORKER
+    // drop the master connection and reconnect straight to the assigned room
+    LOG_I("[brclient_join()] master redirected us to room port %u, reconnecting...", room_port);
+    close(this_client->socks->tcp);
+    this_client->socks->tcp = socket(AF_INET, SOCK_STREAM, 0);
+    if (this_client->socks->tcp < 0) {
+        perror("[brclient_join()] socket");
+        return -1;
+    }
+    if (connect_on_tcp(this_client->socks, ip_address, room_port) < 0) {
+        LOG_E("[brclient_join()] failed to connect to assigned room");
         return -1;
     }
 

@@ -4,35 +4,59 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <signal.h>
+#include <poll.h>
 #include <arpa/inet.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <net/if.h>
-#include "lib/libbattleroyale/server.h"
 #include "lib/libtetrisprotocol/protocol.h"
-#include "lib/libtetrisbrain/garbage.h"
 #include "lib/libtetrislog/logclient.h"
-#include "game.h"
+#include "hub.h"
+#include "room.h"
 
-// MAX_LOBBY_SIZE defined in protocol.h
-#define MIN_LOBBY_SIZE 1
+// TODO: Move to tetrisrc
+// Keep in sync with libbattleroyale's PORT_TCP
+#define MASTER_PORT 6700
 
-// Instantiate logger
-static LogClient log_client;
-
-// Non-blocking check for a pressed ENTER key -> signifiy transition to GAME state
-static bool enter_pressed(void)
+/* ----- MASTER STATE ----- */
+// One per-room worker process, as the master sees it
+typedef struct
 {
-    fd_set fds;
-    struct timeval tv = {0, 0};
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds);
-    if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0) {
-        int c = getchar();
-        return c == '\n';
-    }
-    return false;
+    bool used;
+    bool ready;   // Worker has bound its port, safe to redirect clients
+    bool started; // Match is running in this room
+    pid_t pid;
+    int hub_fd;
+    uint16_t port;
+    int redirected; // Clients pointed at this room (but might have be joined yet)
+    int joined; // Arrivals the worker has confirmed
+    int pending_fds[MAX_LOBBY_SIZE]; // "Waiting Room", parked sockets until worker has initialised
+    int pending_count;
+} Room;
+
+// One joined player anywhere in the match
+typedef struct
+{
+    uint32_t id;
+    int room; // Slot index, used to route garbage to the right worker
+    bool alive;
+} PlayerRec;
+
+static LogClient log_client;
+static Room rooms[MAX_ROOMS];
+static PlayerRec players[HUB_MAX_PLAYERS];
+static uint32_t player_count = 0;
+static uint32_t room_seq = 0; // Grows forever so player ids never repeat
+static int room_size = MAX_LOBBY_SIZE;
+static int listen_fd = -1;
+static bool any_room_started = false;
+static volatile sig_atomic_t stop_requested = 0;
+
+static void on_sigint(int sig)
+{
+    (void)sig;
+    stop_requested = 1; // Set flag, to cleanup on next iteration of main loop
 }
 
 static void log_message(LogLevel level, const char* fmt, ...)
@@ -43,294 +67,461 @@ static void log_message(LogLevel level, const char* fmt, ...)
     vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
-    printf("%s\n", message);                      // Unchanged terminal output
+    printf("%s\n", message);
     log_client_push(&log_client, level, message); // Forwarded, non-blocking, may be dropped
 }
 
+/* ----- SETUP HELPERS ----- */
+// Selects the first non-loopback IPv4 address, for display only for others to join
+static void find_lan_ip(char host_ip[INET_ADDRSTRLEN])
+{
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) != 0) {
+        return;
+    }
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET || (ifa->ifa_flags & IFF_LOOPBACK)) {
+            continue;
+        }
+        struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;
+        if (inet_ntop(AF_INET, &sa->sin_addr, host_ip, INET_ADDRSTRLEN) != NULL) {
+            break; // First candidate found
+        }
+    }
+    freeifaddrs(ifaddr);
+}
+
+static int master_listen(void)
+{
+    // Create a plain TCP socket, not yet bound to any port
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        perror("[tetrisd] socket");
+        return -1;
+    }
+
+    // Let a restarted master rebind MASTER_PORT immediately, skipping TIME_WAIT
+    int reuse = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+    // Listen on every local interface, on the one well-known player-facing port
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(MASTER_PORT),
+        .sin_addr.s_addr = INADDR_ANY};
+    // Claim the port, then start queuing incoming connections (backlog 100)
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0 || listen(fd, 100) < 0) {
+        perror("[tetrisd] bind/listen");
+        close(fd);
+        return -1;
+    }
+    return fd; // Ready for accept() in the main loop
+}
+
+/* ----- ROOMS ----- */
+// Forks a fresh worker into a free slot; the worker binds its own port
+static int spawn_room(void)
+{
+    int slot = -1;
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (!rooms[i].used) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        return -1; // Every slot has a live room
+    }
+
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv) < 0) {
+        perror("[tetrisd] socketpair");
+        return -1;
+    }
+
+    // A forever-growing base keeps ids unique even when slots are reused
+    uint32_t id_base = 1 + room_seq * MAX_LOBBY_SIZE;
+    uint16_t port = (uint16_t)(ROOM_PORT_BASE + slot);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("[tetrisd] fork");
+        close(sv[0]);
+        close(sv[1]);
+        return -1;
+    }
+    if (pid == 0) {
+        // Worker: shed every master-only fd, then run the room until it ends
+        close(sv[0]);
+        close(listen_fd);
+        for (int i = 0; i < MAX_ROOMS; i++) {
+            if (rooms[i].used) {
+                close(rooms[i].hub_fd);
+            }
+        }
+        room_worker_run(sv[1], port, id_base, slot);
+        _exit(0); // Not reached, room_worker_run exits itself
+    }
+
+    close(sv[1]);
+    memset(&rooms[slot], 0, sizeof(Room));
+    rooms[slot].used = true;
+    rooms[slot].pid = pid;
+    rooms[slot].hub_fd = sv[0];
+    rooms[slot].port = port;
+    room_seq++;
+
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Room %d spawned (pid %d, port %u).", slot, pid, port);
+    return slot;
+}
+
+// The room currently taking new players, spawning one if none is open
+static int filling_room(void)
+{
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].used && !rooms[i].started && rooms[i].redirected < room_size) {
+            return i;
+        }
+    }
+    return spawn_room();
+}
+
+// Redirection of clients to a worker: one port number, then the client reconnects to the worker
+static void send_redirect(int client_fd, uint16_t port)
+{
+    uint32_t port_bytes = htonl(port);
+    send(client_fd, &port_bytes, sizeof(port_bytes), MSG_NOSIGNAL); // Best effort
+    close(client_fd);
+}
+
+static void accept_client(void)
+{
+    int client_fd = accept(listen_fd, NULL, NULL);
+    if (client_fd < 0) {
+        return;
+    }
+
+    int slot = filling_room();
+    if (slot < 0) {
+        log_message(LOG_LEVEL_WARN, "[tetrisd] All %d rooms are full, refusing a connection.", MAX_ROOMS);
+        close(client_fd);
+        return;
+    }
+
+    Room* room = &rooms[slot];
+    if (room->ready) {
+        send_redirect(client_fd, room->port);
+    } else if (room->pending_count < MAX_LOBBY_SIZE) {
+        room->pending_fds[room->pending_count++] = client_fd; // Parked until HUB_READY
+    } else {
+        close(client_fd);
+        return;
+    }
+
+    room->redirected++;
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Player dealt into room %d (%d/%d).", slot, room->redirected, room_size);
+}
+
+/* ----- GLOBAL MATCH TRACKING ----- */
+// Pushes the master's alive/dead view to every running room
+static void broadcast_roster(void)
+{
+    HubMsg msg = {.type = HUB_ROSTER};
+    msg.roster.count = player_count;
+    for (uint32_t i = 0; i < player_count && i < HUB_MAX_PLAYERS; i++) {
+        msg.roster.ids[i] = players[i].id;
+        msg.roster.alive[i] = players[i].alive ? 1 : 0;
+    }
+
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].used && rooms[i].started) {
+            hub_send(rooms[i].hub_fd, &msg);
+        }
+    }
+}
+
+static void start_room(int slot)
+{
+    Room* room = &rooms[slot];
+    if (!room->used || room->started || room->joined < 1) {
+        return;
+    }
+
+    HubMsg msg = {.type = HUB_START, .expected_players = (uint32_t)room->redirected};
+    hub_send(room->hub_fd, &msg);
+    room->started = true;
+    any_room_started = true;
+
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Room %d starting with %d player(s).", slot, room->joined);
+    broadcast_roster(); // Fresh rooms need the current global view right away
+}
+
+// Starts every room that has anyone waiting in it. Rooms are purely a backend
+// sharding detail, so this is the only way a match starts, either the whole
+// daemon reaches capacity or the operator presses ENTER
+static void start_all_rooms(void)
+{
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        start_room(i);
+    }
+}
+
+// The match ends when one player stands across every room; solo runs until top out
+static void check_global_end(void)
+{
+    if (player_count == 0) {
+        return;
+    }
+
+    uint32_t alive = 0;
+    uint32_t last_alive_id = 0;
+    for (uint32_t i = 0; i < player_count; i++) {
+        if (players[i].alive) {
+            alive++;
+            last_alive_id = players[i].id;
+        }
+    }
+
+    bool over = (player_count >= 2) ? (alive <= 1) : (alive == 0);
+    if (!over) {
+        return;
+    }
+
+    uint32_t winner_id = (alive == 1) ? last_alive_id : 0;
+    HubMsg msg = {.type = HUB_GAMEOVER, .winner_id = winner_id};
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].used) {
+            hub_send(rooms[i].hub_fd, &msg);
+        }
+    }
+
+    if (winner_id != 0) {
+        printf("\n[tetrisd] MATCH OVER! Winner: P%u\n", winner_id);
+    } else {
+        printf("\n[tetrisd] MATCH OVER! No survivors.\n");
+    }
+}
+
+// A closed hub means the room ended (or crashed); its players leave the match
+static void close_room(int slot)
+{
+    Room* room = &rooms[slot];
+    close(room->hub_fd);
+    for (int i = 0; i < room->pending_count; i++) {
+        close(room->pending_fds[i]);
+    }
+    room->used = false;
+
+    bool changed = false;
+    for (uint32_t i = 0; i < player_count; i++) {
+        if (players[i].room == slot && players[i].alive) {
+            players[i].alive = false; // Crash isolation: a dead room only kills its own
+            changed = true;
+        }
+    }
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Room %d closed.", slot);
+
+    if (changed) {
+        broadcast_roster();
+        check_global_end();
+    }
+}
+
+/* ----- HUB TRAFFIC ----- */
+static void handle_hub_msg(int slot, const HubMsg* msg)
+{
+    Room* room = &rooms[slot];
+
+    switch (msg->type) {
+    case HUB_READY:
+        room->ready = true;
+        // Flush everyone who connected before the worker's port was bound
+        for (int i = 0; i < room->pending_count; i++) {
+            send_redirect(room->pending_fds[i], room->port);
+        }
+        room->pending_count = 0;
+        break;
+
+    case HUB_JOINED:
+        if (player_count < HUB_MAX_PLAYERS) {
+            players[player_count++] = (PlayerRec){.id = msg->player_id, .room = slot, .alive = true};
+        }
+        room->joined++;
+        log_message(LOG_LEVEL_INFO, "[tetrisd] P%u joined room %d. %u player(s) in the match.", msg->player_id, slot, player_count);
+        broadcast_roster();
+
+        // Upon reaching maximum players, start all rooms!
+        if (player_count >= (uint32_t)(room_size * MAX_ROOMS)) {
+            log_message(LOG_LEVEL_INFO, "[tetrisd] Daemon at capacity (%u players), starting all rooms.", player_count);
+            start_all_rooms();
+        }
+        break;
+
+    case HUB_ELIMINATED:
+        for (uint32_t i = 0; i < player_count; i++) {
+            if (players[i].id == msg->player_id) {
+                players[i].alive = false;
+            }
+        }
+        broadcast_roster();
+        check_global_end();
+        break;
+
+    case HUB_ATTACK: {
+        // Route garbage to whichever room holds the victim
+        const HubAttack* attack = &msg->attack;
+        for (uint32_t i = 0; i < player_count; i++) {
+            if (players[i].id != attack->victim_id || !players[i].alive) {
+                continue;
+            }
+            Room* target = &rooms[players[i].room];
+            if (target->used && target->started) {
+                HubMsg garbage = {.type = HUB_GARBAGE, .attack = *attack};
+                hub_send(target->hub_fd, &garbage);
+                log_message(LOG_LEVEL_INFO, " <!> [tetrisd] ROUTED: P%u (room %d) attacked P%u (room %d) with %u lines!", attack->attacker_id, slot, attack->victim_id, players[i].room, attack->lines);
+            }
+            break;
+        }
+        break; // Unknown or dead victims mean the damage is dropped
+    }
+
+    default:
+        break;
+    }
+}
+
+/* ----- MAIN LOOP ----- */
 int main(void)
 {
     // Line-buffered so logs survive being piped to a file
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    // Setup Logger
+    // Workers are reaped automatically, and dead sockets report errors instead
+    // of killing the daemon with SIGPIPE
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, on_sigint);
+
     if (!log_client_init(&log_client, LOG_DEFAULT_IPC_PATH, "tetrisd")) {
         printf("[tetrisd] Warning: could not set up logging client, continuing without it.\n");
     }
 
-    // Initialize server connection
-    BRServer* server = NULL;
-
-    // Helper: select first non-loopback IPv4 address
-    char host_ip[INET_ADDRSTRLEN] = {0}; // Init to store potential IPV4 addr -> for display only!!
-    struct ifaddrs *ifaddr, *ifa;
-    if (getifaddrs(&ifaddr) == 0) // Queries and returns a linked list of all the network interfaces currently active
-    {
-        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) // Start at the first network interface, keep looping until reach end of chain
-        {
-            if (ifa->ifa_addr == NULL) // Active network interface but no IP addr
-            {
-                continue;
-            }
-            if (ifa->ifa_addr->sa_family != AF_INET) // Not IPV4 format
-            {
-                continue;
-            }
-            if (ifa->ifa_flags & IFF_LOOPBACK) // Skip loopback interface
-            {
-                continue;
-            }
-
-            struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;             // Cast to sockaddr_in (IPV4) to process
-            if (inet_ntop(AF_INET, &sa->sin_addr, host_ip, INET_ADDRSTRLEN) != NULL) // Convert binary address into readable texts
-            {
-                break; // First candidate found
-            }
+    // Optional room size override for demos and tests
+    const char* size_env = getenv("TETRISD_ROOM_SIZE");
+    if (size_env != NULL) {
+        int parsed = atoi(size_env);
+        if (parsed >= 1 && parsed <= MAX_LOBBY_SIZE) {
+            room_size = parsed;
         }
-        freeifaddrs(ifaddr); // To prevent memory leak
     }
 
-    int init_res = brserver_init(&server); // Always bind to every interface, so both LAN And clients are reachable
-    // Tell the host which IPV4 addr to hand out to other players
-    if (host_ip[0] != '\0') // Valid IP addr found
-    {
+    // Tell the host which IPv4 address to hand out to other players
+    char host_ip[INET_ADDRSTRLEN] = {0};
+    find_lan_ip(host_ip);
+    if (host_ip[0] != '\0') {
         log_message(LOG_LEVEL_INFO, "[tetrisd] Players on this network should enter: %s", host_ip);
     } else {
-        // No IPV4 addr found, only local play is possible
         log_message(LOG_LEVEL_WARN, "[tetrisd] No non-loopback IPv4 found, local play only (127.0.0.1).");
     }
     printf("[tetrisd] Players on this machine can use the default 127.0.0.1\n");
 
-    if (init_res < 0) // Failed
-    {
+    listen_fd = master_listen();
+    if (listen_fd < 0) {
         log_message(LOG_LEVEL_ERROR, "[tetrisd] Could not create server!");
         return -1;
     }
-    log_message(LOG_LEVEL_INFO, "[tetrisd] Server created successfully! Opening lobby...");
 
-    // LOBBY state and assign player IDs
-    if (brserver_open(server) < 0) // Blocking server call, waits until lobby is filled
-    {
-        log_message(LOG_LEVEL_ERROR, "[tetrisd] Could not create lobby!");
-        return -1;
-    }
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Master listening on port %d, dealing players into rooms of %d.", MASTER_PORT, room_size);
+    printf("[tetrisd] Full rooms start automatically. Press ENTER to start partially filled rooms.\n");
 
-    // Pre-allocation for clients
-    uint32_t lobby_size = 0;
-    uint32_t client_ids[MAX_LOBBY_SIZE] = {0};
+    bool stdin_open = true;
+    while (!stop_requested) {
+        // Rebuilt every pass because rooms come and go
+        struct pollfd pfds[2 + MAX_ROOMS];
+        int room_of_pfd[2 + MAX_ROOMS];
+        int nfds = 0;
 
-    // Wait dynamically for lobby to fill
-    printf("[tetrisd] Lobby open! Need at least %d player(s).\n", MIN_LOBBY_SIZE);
-    printf("[tetrisd] Press ENTER at any time once ready to start the game.\n");
-    uint32_t last_reported = UINT32_MAX;
-    while (1) {
-        brserver_client_info(server, &lobby_size, client_ids);
-        // Only announce on actual change
-        if (lobby_size != last_reported) {
-            log_message(LOG_LEVEL_INFO, "[tetrisd] %u player(s) connected...", lobby_size);
-            last_reported = lobby_size;
+        // Always poll the public port for new connections
+        pfds[nfds++] = (struct pollfd){.fd = listen_fd, .events = POLLIN};
+        // Poll stdin only until it closes (piped runs shouldn't spin on it)
+        if (stdin_open) {
+            pfds[nfds++] = (struct pollfd){.fd = STDIN_FILENO, .events = POLLIN};
         }
-
-        if (lobby_size >= MIN_LOBBY_SIZE && enter_pressed()) {
-            log_message(LOG_LEVEL_INFO, "[tetrisd] Starting game with %u players!", lobby_size);
-            break;
-        }
-        if (lobby_size >= MAX_LOBBY_SIZE) {
-            log_message(LOG_LEVEL_INFO, "[tetrisd] Lobby full (%u), starting automatically.", lobby_size);
-            break;
-        }
-        usleep(100000); // Poll every 100ms
-    }
-
-    // Once lobby is full
-    {
-        char roster_line[LOG_MSG_LENGTH];
-        int offset = snprintf(roster_line, sizeof(roster_line), "[tetrisd] Lobby filled! %u player(s) connected:", lobby_size);
-        for (uint32_t i = 0; i < lobby_size && offset < (int)sizeof(roster_line); i++) {
-            offset += snprintf(roster_line + offset, sizeof(roster_line) - offset, " P%u", client_ids[i]);
-        }
-        log_message(LOG_LEVEL_INFO, "%s", roster_line);
-    }
-
-    // Signal listening for events -> switch to GAME state to start
-    if (brserver_start(server) < 0) {
-        log_message(LOG_LEVEL_ERROR, "[tetrisd] Failed to start game!");
-        return -1;
-    }
-    log_message(LOG_LEVEL_INFO, "[tetrisd] Server is now in GAME state. Awaiting events...");
-
-    // Tell every client the players in the lobby
-    {
-        // Populate roster via RosterPayload
-        RosterPayload roster = {0};
-        roster.count = lobby_size; // Total number of players
-        for (uint32_t i = 0; i < lobby_size && i < MAX_LOBBY_SIZE; i++) {
-            roster.ids[i] = client_ids[i]; // Add dynamically to array
-        }
-        unsigned char roster_buffer[512] = {0}; // Empty buffer
-        pack_roster(roster_buffer, &roster);    // Handles tag and byte order
-
-        // Send setup data (explicitly uses TCP here)
-        if (brserver_send_to_all(server, roster_buffer) < 0) {
-            log_message(LOG_LEVEL_WARN, "[tetrisd] Warning: failed to broadcast player roster.");
-        } else {
-            log_message(LOG_LEVEL_INFO, "[tetrisd] Roster broadcast to all %u players.", lobby_size);
-        }
-    }
-
-    // Build the authoritative match, one real GameState per connected player
-    // From here the server owns the boards, clients only render copies of them
-    GameSession session;
-    init_session(&session, client_ids, lobby_size);
-    log_message(LOG_LEVEL_INFO, "[tetrisd] Authoritative session started for %d player(s).", session.count);
-
-    // Array buffer for message queue
-    unsigned char buffer[1024] = {0};
-
-    // A battle royale ends when only one player is left standing. A solo match
-    // (single player testing on localhost) instead runs until that player tops out
-    int min_alive = (session.count > 1) ? 2 : 1;
-
-    // Authoritative tick loop; non-blocking
-    while (count_alive_players(&session) >= min_alive) {
-        /* --- Drain whatever the clients sent since the last tick --- */
-        // Bounded so a flood of packets can never starve the simulation below
-        for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++) {
-            if (brserver_get_app_msg(buffer) != 1) {
-                break; // Queue is empty
-            }
-
-            uint32_t tag = read_packet_tag(buffer);
-
-            if (tag == PACKET_INPUT) {
-                InputPayload input;
-                unpack_input(buffer, &input);
-
-                // Perform the requested action on that player's real board
-                PlayerSlot* slot = find_player(&session, input.player_id);
-                apply_action(&session, slot, (PlayerAction)input.action);
-            }
-            // Any other tag is ignored
-        }
-
-        /* --- Advance every board by one tick --- */
-        tick_session(&session);
-        log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH);
-        // Elimination Check
-        for (int i = 0; i < session.count; i++) {
-            PlayerSlot* slot = &session.players[i];
-            if (slot->state.game_over && slot->active) // just topped out this tick
-            {
-                log_message(LOG_LEVEL_INFO, "[tetrisd] P%u has been eliminated.", slot->player_id);
+        // Everything from here on is a room hub fd, remember where they start
+        int first_room_pfd = nfds;
+        // One entry per live room, room_of_pfd maps a poll index back to its slot
+        for (int i = 0; i < MAX_ROOMS; i++) {
+            if (rooms[i].used) {
+                room_of_pfd[nfds] = i;
+                pfds[nfds++] = (struct pollfd){.fd = rooms[i].hub_fd, .events = POLLIN};
             }
         }
 
-        /* --- Route any garbage the tick produced --- */
-        for (int i = 0; i < session.count; i++) {
-            PlayerSlot* attacker = &session.players[i];
+        if (poll(pfds, (nfds_t)nfds, 100) < 0) {
+            continue; // Interrupted by a signal, loop re-checks stop_requested
+        }
 
-            if (attacker->state.outgoing_garbage == 0) {
+        // New connection on the public port
+        if (pfds[0].revents & POLLIN) {
+            accept_client();
+        }
+
+        // ENTER starts every waiting room that has at least one player
+        if (stdin_open && (pfds[1].revents & POLLIN)) {
+            char input[64];
+            ssize_t got = read(STDIN_FILENO, input, sizeof(input));
+            if (got <= 0) {
+                stdin_open = false; // stdin closed (piped run), stop polling it
+            } else if (memchr(input, '\n', (size_t)got) != NULL) {
+                start_all_rooms();
+            }
+        }
+
+        // Worker traffic: drain each active hub, close rooms whose worker ended
+        for (int p = first_room_pfd; p < nfds; p++) {
+            if (pfds[p].revents == 0) {
                 continue;
             }
-
-            uint32_t lines = attacker->state.outgoing_garbage;
-            attacker->state.outgoing_garbage = 0; // Consumed
-
-            // Resolve the victim using the server's roster
-            uint32_t victim_id = resolve_target_id(&attacker->state, &session.roster);
-            PlayerSlot* victim = find_player(&session, victim_id);
-
-            if (victim == NULL || victim == attacker || victim->state.game_over) {
-                continue; // No valid target, damage is dropped
+            int slot = room_of_pfd[p];
+            HubMsg msg;
+            int got;
+            while ((got = hub_recv(rooms[slot].hub_fd, &msg)) == 1) {
+                handle_hub_msg(slot, &msg);
             }
-
-            queue_garbage(&victim->state, (int)lines);
-            victim->state.last_attacker_id = attacker->player_id;
-            victim->dirty = true; // Their board changed, push it
-
-            log_message(LOG_LEVEL_INFO, " <!> EVENT ROUTED: P%u attacked P%u with %u lines!", attacker->player_id, victim_id, lines);
-
-            // Broadcast the attack itself so every client's kill feed updates
-            AttackPayload feed = {
-                .source_player = attacker->player_id,
-                .target_player = victim_id,
-                .lines = lines};
-
-            unsigned char feed_buffer[512] = {0};
-            pack_attack(feed_buffer, &feed);
-            brserver_send_to_all(server, feed_buffer);
-        }
-
-        /* --- Push state to anyone whose board changed --- */
-        // Send-on-change keeps traffic low, the keepalive repairs dropped UDP packets
-        for (int i = 0; i < session.count; i++) {
-            PlayerSlot* slot = &session.players[i];
-
-            if (!slot->dirty && slot->idle_ticks < KEEPALIVE_TICKS) {
-                slot->idle_ticks++;
-                continue; // Nothing new to say about this player yet
+            if (got < 0) {
+                close_room(slot);
             }
-
-            StatePayload snapshot;
-            build_state_payload(&slot->state, &snapshot);
-
-            unsigned char state_buffer[512] = {0};
-            pack_state(state_buffer, &snapshot);
-            brserver_send_to_all(server, state_buffer);
-
-            slot->dirty = false;
-            slot->idle_ticks = 0;
         }
 
-        usleep(TICK_MICROSECONDS); // Advance at a fixed rate
-    }
+        log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH);
 
-    /* --- MATCH OVER --- */
-    // Announce the survivor, if there is one
-    uint32_t winner_id = 0;
-    for (int i = 0; i < session.count; i++) // Loop through all players
-    {
-        if (session.players[i].active && !session.players[i].state.game_over) // Player must be active and have not topped out
-        {
-            winner_id = session.players[i].player_id;
-            break;
+        // The daemon's job is done once a match ran and every room wound down
+        if (any_room_started) {
+            bool any_open = false;
+            for (int i = 0; i < MAX_ROOMS; i++) {
+                if (rooms[i].used) {
+                    any_open = true;
+                    break;
+                }
+            }
+            if (!any_open) {
+                break;
+            }
         }
     }
 
-    if (winner_id != 0) // Found a winner
-    {
-        printf("\n[tetrisd] MATCH OVER! Winner: P%u\n", winner_id);
-    } else {
-        // No winner found
-        printf("\n[tetrisd] MATCH OVER! No survivors.\n");
-    }
-
-    // Mark everyone finished and push one final state each so every client can exit its loop cleanly
-    for (int i = 0; i < session.count; i++) {
-        PlayerSlot* slot = &session.players[i];
-
-        if (!slot->active) {
-            continue; // Already gone, nothing listening
+    /* --- SHUTDOWN --- */
+    // Closing the hubs is the shutdown signal, 
+    // workers treat EOF as game over
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].used) {
+            close_room(i);
         }
-
-        slot->state.game_over = true;
-        slot->state.winner_id = winner_id;
-
-        StatePayload snapshot;
-        build_state_payload(&slot->state, &snapshot);
-
-        unsigned char state_buffer[512] = {0};
-        pack_state(state_buffer, &snapshot);
-        brserver_send_to_all(server, state_buffer);
     }
+    close(listen_fd);
 
     log_message(LOG_LEVEL_INFO, "[tetrisd] Shutting down. %u log record(s) dropped this run.", log_client_get_dropped_count(&log_client));
     log_client_drain(&log_client, LOG_CLIENT_DRAIN_BATCH); // Send that very last line too
     log_client_close(&log_client);
-
-    // Give the final broadcast a moment to land before tearing down the sockets
-    usleep(500000); // 500ms
-
-    // Clean up
-    brserver_end(server);
     return 0;
 }

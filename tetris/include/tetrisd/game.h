@@ -25,6 +25,7 @@ typedef struct
     uint32_t player_id; // Server-assigned ID this slot belongs to
     bool active;        // Slot is in use
     bool dirty;         // Something changed since the last broadcast
+    bool elim_reported; // Master has already been told this player is out
     int idle_ticks;     // Ticks since this player's state was last sent
 } PlayerSlot;
 
