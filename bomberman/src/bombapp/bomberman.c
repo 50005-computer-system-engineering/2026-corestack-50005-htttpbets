@@ -4,6 +4,7 @@
 #include "bomberman.h"
 #include "spritesheet.h"
 #include "lib/libbombbrain/inventory.h"
+#include "lib/libbombbrain/sim_config.h"
 
 Bomberman bomberman_create_default(Vector2 position)
 {
@@ -21,8 +22,8 @@ Bomberman bomberman_create_default(Vector2 position)
     bomberman.is_moving = false;
 
     // Spawn in center of tile, at position
-    bomberman.box.position = Vector2Add(position, (Vector2){0.35f, 0.1f});
-    bomberman.box.size = (Vector2){0.42f, 0.85f};
+    bomberman.box.position = Vector2Add(position, (Vector2){SIM_PLAYER_BOX_OFFSET_X, SIM_PLAYER_BOX_OFFSET_Y});
+    bomberman.box.size = (Vector2){SIM_PLAYER_BOX_SIZE_X, SIM_PLAYER_BOX_SIZE_Y};
 
     // Powerups
     bomberman.inventory.num_bombs = 2;

@@ -1,6 +1,7 @@
 #ifndef COLLISION_H
 #define COLLISION_H
 #include "raylib.h"
+#include <raymath.h>
 
 // Actual positions at top left, then visible position is moved in-between tiles
 typedef struct {

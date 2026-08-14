@@ -274,50 +274,59 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
 
     // while the GAME state is active, monitor for messages to each port
     while (server_ptr->self->state == GAME) {
-        // poll for any tcp activity
-        int socket_activity = poll(listen_fd_tcp, server_ptr->clients->count, 50);
-        if (socket_activity <= 0) // timeout configured to prevent perma-blocking
-        {
-            continue; // skip if nothing
-        }
-
-        // listen to each message and handle
+        // poll for any tcp activity. Timeout dropped from 50ms to 5ms: a
+        // 60Hz stream of unicast UDP (eg: Bomberman's movement input) queues
+        // up in the kernel receive buffer far faster than one loop iteration
+        // every ~50-100ms can drain, so this loop needs to cycle quickly
+        int socket_activity = poll(listen_fd_tcp, server_ptr->clients->count, 5);
         Message msg;
-        for (uint32_t i = 0; i < server_ptr->clients->count && socket_activity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
-        {
-            if (listen_fd_tcp[i].revents == POLLIN) {
-                int fd = listen_fd_tcp[i].fd;
-                socket_activity--;
-                if (receive_message_tcp(fd, &msg) < 0) {
-                    LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
-                    listen_fd_tcp[i].fd = -1; // Set disconnected socket to -1 to prevent triggering infinite EOF loop
-                    continue;
-                }
-                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 
-                // enqueue a message if its an application layer message
-                if (msg.msg_type == MSG_APP) // Shifted this inside the successful TCP read block to prevent queuing stale / uninitialized messages
-                {
-                    LOG_D("[serverGameState()] Message received for application");
-                    if (pc_flags[0]) {
-                        pc_flags[1] = 1;
-                        LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
-                        sched_yield();
+        // listen to each message and handle. Deliberately NOT an early
+        // "continue" when socket_activity <= 0: that used to skip the UDP
+        // poll below entirely on every tick with no TCP traffic, which
+        // starves UDP unicast (eg: Bomberman's movement packets) whenever
+        // nothing happens to be arriving over TCP in the same 50ms window
+        if (socket_activity > 0) {
+            for (uint32_t i = 0; i < server_ptr->clients->count && socket_activity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
+            {
+                if (listen_fd_tcp[i].revents == POLLIN) {
+                    int fd = listen_fd_tcp[i].fd;
+                    socket_activity--;
+                    if (receive_message_tcp(fd, &msg) < 0) {
+                        LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
+                        listen_fd_tcp[i].fd = -1; // Set disconnected socket to -1 to prevent triggering infinite EOF loop
+                        continue;
                     }
-                    pthread_mutex_lock(&server_messages_lock);
-                    Message_enqueue(&server_messages, msg);
-                    pthread_mutex_unlock(&server_messages_lock);
-                    pc_flags[1] = 0;
+                    LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
+
+                    // enqueue a message if its an application layer message
+                    if (msg.msg_type == MSG_APP) // Shifted this inside the successful TCP read block to prevent queuing stale / uninitialized messages
+                    {
+                        LOG_D("[serverGameState()] Message received for application");
+                        if (pc_flags[0]) {
+                            pc_flags[1] = 1;
+                            LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
+                            sched_yield();
+                        }
+                        pthread_mutex_lock(&server_messages_lock);
+                        Message_enqueue(&server_messages, msg);
+                        pthread_mutex_unlock(&server_messages_lock);
+                        pc_flags[1] = 0;
+                    }
                 }
             }
         }
 
-        if ((poll(&listen_fd_udp, 1, 50) > 0) && (listen_fd_udp.revents & POLLIN)) // also poll for a UDP message
-        {
+        // Drain every UDP datagram currently waiting, not just one per loop
+        // iteration: a single message per pass can't keep up with a 60Hz
+        // unicast stream, so the backlog would just grow and every message
+        // actually processed would be increasingly stale. poll() with a 0
+        // timeout here is a non-blocking "is there more?" check
+        while (poll(&listen_fd_udp, 1, 0) > 0 && (listen_fd_udp.revents & POLLIN)) {
             int fd = listen_fd_udp.fd;
             if (receive_message_udp(fd, &msg) < 0) {
                 LOG_E("[serverGameState()] could not read message from UDP unicast socket fd %d", fd);
-                continue;
+                break;
             }
             LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 

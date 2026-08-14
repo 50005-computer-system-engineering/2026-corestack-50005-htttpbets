@@ -54,6 +54,28 @@ int prepare_udp(Sockets* socks, char* server_ip)
     return 0;
 }
 
+// connect()'s the unicast UDP socket to the server, so brclient_send_msg_udp
+// can just send() without re-specifying the destination each call
+int connect_udp_uni(Sockets* socks, char* server_ip)
+{
+    LOG_I("[connectUDPUni()] connecting unicast UDP socket to server at %s:%u...", server_ip, PORT_UDP_UNI);
+
+    struct sockaddr_in server_addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_UNI)};
+    if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) < 0) {
+        perror("[connectUDPUni()] inet_pton");
+        return -1;
+    }
+    if (connect(socks->udp_uni, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("[connectUDPUni()] connect");
+        return -1;
+    }
+
+    LOG_I("[connectUDPUni()] unicast UDP socket connected");
+    return 0;
+}
+
 // private state functions
 typedef void (*StateLoops)(Endpoint* client);
 
@@ -320,6 +342,11 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
         LOG_E("[brclient_join()] could not prepare UDP port to receive broadcasts");
         return -1;
     }
+    // Point the unicast UDP socket at the server so brclient_send_msg_udp can just send()
+    if (connect_udp_uni(this_client->socks, ip_address) < 0) {
+        LOG_E("[brclient_join()] could not connect unicast UDP socket to server");
+        return -1;
+    }
 
     // joining lobby successful, enter lobby state
     this_client->state = LOBBY;
@@ -365,6 +392,28 @@ int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024])
 
 fail:
     return -1;
+}
+
+// Unicast UDP send: best-effort, unordered, use for high-frequency/loss-tolerant traffic
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024])
+{
+    Endpoint* this_client = client_ptr;
+
+    // build message
+    Message msg = {
+        .source_id = this_client->id,
+        .msg_type = MSG_APP,
+    };
+    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
+
+    // send via the already-connect()'d unicast UDP socket
+    if (send_message_udp_unicast(this_client->socks->udp_uni, msg) < 0) {
+        LOG_E("[brclient_send_msg_udp()] sending has failed");
+        return -1;
+    }
+
+    LOG_I("[brclient_send_msg_udp()] message has been sent");
+    return 0;
 }
 
 /*

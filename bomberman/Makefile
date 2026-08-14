@@ -88,7 +88,9 @@ endif
 # The name of the binaries (matching a src/ directory or flat file) that
 # links raylib. Only this target receives the extra RAYLIB_* flags
 # Space-separated list! (eg: EXTRA_DEP_BINS := bombapp bombui)
-EXTRA_DEP_BINS    := bombapp
+# bombd needs it too: libbombbrain's collision/movement math (Vector2Add etc)
+# are real raylib symbols in this raylib build, not header-only inlines
+EXTRA_DEP_BINS    := bombapp bombd
 EXTRA_DEP_CFLAGS  := $(RAYLIB_CFLAGS)
 EXTRA_DEP_LDFLAGS := $(RAYLIB_LDFLAGS)
 EXTRA_DEP_DEPS    := $(RAYLIB_DEP)
@@ -100,7 +102,7 @@ include ../common-deps.mk
 # The name of the binaries (matching a src/ directory or flat file) that
 # links raylib. Only this target receives the extra RAYLIB_* flags
 # Space-separated list! (eg: RAYLIB_BINS := bombapp bombui)
-RAYLIB_BINS := bombapp
+RAYLIB_BINS := bombapp bombd
 
 # Generate template for fetching and building raylib
 # NOT cleaned by make clean so we don't have to re-download each time
@@ -109,7 +111,7 @@ $(eval $(call FETCH_TARBALL_template,RAYLIB))
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
 	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
 
-.PHONY: run deps distclean
+.PHONY: run deps distclean kill-server
 
 run: $(TARGET)
 	./$(TARGET)
@@ -130,3 +132,12 @@ clean:
 distclean: 
 	clean
 	rm -rf $(DEPS_DIR)
+
+SERVER_BIN := bombd
+CLIENT_BIN := bombu
+SERVER_PORT := 6700
+
+kill-server:
+	@pkill -9 -x "${SERVER_BIN}" 2>/dev/null; \
+	fuser -k ${SERVER_PORT}/tcp 2>/dev/null; \
+	echo "Killed any ${SERVER_BIN} process and freed port ${SERVER_PORT}."

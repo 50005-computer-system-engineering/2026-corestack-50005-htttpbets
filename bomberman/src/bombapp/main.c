@@ -1,4 +1,8 @@
 #include "raylib.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 
 #include "lib/libeventbus.h"
 #include "camera.h"
@@ -9,51 +13,72 @@
 #include "tiles.h"
 #include "bomberman.h"
 #include "bomb_render.h"
+#include "network.h"
 
-// TODO: Dynamically spawn and assign me!
+// Standalone (no server IP given) keeps the original single-player demo
+// exactly as before. Networked mode is driven entirely by bombd's authoritative
+// state; the local input handlers in player.c are never wired up for it
+static bool networked = false;
+static char server_ip[64] = {0};
+
+// Standalone-only: the one locally-simulated player
 Bomberman player_bm;
 
 void initalise()
 {
-    // Initialise event bus
     event_bus_init(EVENT_COUNT);
 
-    // Init map
+    // Loads tile textures and a throwaway local map; networked mode replaces
+    // the map as soon as bombd's PACKET_MAP_INIT arrives
     tiles_init();
-
-    // Initialise player
-    player_bm = bomberman_create_default((Vector2){1, 1});
-    player_init(&player_bm);
-
-    // Init Camera after player
-    camera_init(player_bm.box.position);
-
-    // Init Bombs
     bombs_init();
-
-    // Initialise audio
     audio_init();
 
-    // Start playing battle music
+    if (networked) {
+        if (!network_connect(server_ip) || !network_wait_for_map()) {
+            printf("[bombapp] Could not join a networked match, exiting.\n");
+            CloseWindow();
+            exit(1);
+        }
+
+        int slot = network_local_slot();
+        Vector2 start_pos = (slot >= 0) ? network_get_player(slot)->box.position : (Vector2){1, 1};
+        camera_init(start_pos);
+    } else {
+        player_bm = bomberman_create_default((Vector2){1, 1});
+        player_init(&player_bm);
+        camera_init(player_bm.box.position);
+    }
+
     play_bgm(BGM_BATTLE);
 }
 
 void update_loop()
 {
-    // Update audio
     audio_update();
 
-    // Update bombs
-    bombs_tick();
+    if (networked) {
+        network_poll();
+        network_tick_explosions(GetFrameTime());
 
-    // Update input
-    input_update();
+        if (!network_game_over()) {
+            network_send_input();
+        }
 
-    // Update player state
-    bomberman_update(&player_bm);
+        for (int i = 0; i < network_player_count(); i++) {
+            bomberman_update(network_get_player(i));
+        }
 
-    // Update camera after player movement
-    camera_update(player_bm.box.position);
+        int slot = network_local_slot();
+        if (slot >= 0) {
+            camera_update(network_get_player(slot)->box.position);
+        }
+    } else {
+        bombs_tick();
+        input_update();
+        bomberman_update(&player_bm);
+        camera_update(player_bm.box.position);
+    }
 }
 
 void draw_loop()
@@ -61,38 +86,66 @@ void draw_loop()
     BeginDrawing();
     ClearBackground(SKYBLUE);
 
-    // World-Space Renders
     BeginMode2D(camera);
     tiles_draw();
     bombs_draw();
-    bomberman_draw(&player_bm, WHITE);
+
+    if (networked) {
+        int local_slot = network_local_slot();
+        for (int i = 0; i < network_player_count(); i++) {
+            Color tint = (i == local_slot) ? WHITE : (Color){190, 210, 255, 255};
+            bomberman_draw(network_get_player(i), tint);
+        }
+    } else {
+        bomberman_draw(&player_bm, WHITE);
+    }
     EndMode2D();
 
     // Static UI Renders
-    DrawText(TextFormat("Bombs: %i/%i | Fire: %i", player_bm.inventory.remaining_bombs, player_bm.inventory.num_bombs, player_bm.inventory.num_fires), 40, 40, 40, BLACK);
+    if (networked) {
+        int slot = network_local_slot();
+        if (slot >= 0) {
+            Bomberman* local_bm = network_get_player(slot);
+            DrawText(TextFormat("Bombs: %i/%i | Fire: %i", local_bm->inventory.remaining_bombs, local_bm->inventory.num_bombs, local_bm->inventory.num_fires), 40, 40, 40, BLACK);
+        }
+        if (network_game_over()) {
+            uint32_t winner = network_winner_id();
+            const char* message = (winner == 0) ? "NO SURVIVORS"
+                : (winner == network_local_player_id())     ? "YOU WIN!"
+                                                              : TextFormat("P%u WINS!", winner);
+            int width = MeasureText(message, 80);
+            DrawText(message, GetScreenWidth() / 2 - width / 2, GetScreenHeight() / 2 - 40, 80, RED);
+        }
+    } else {
+        DrawText(TextFormat("Bombs: %i/%i | Fire: %i", player_bm.inventory.remaining_bombs, player_bm.inventory.num_bombs, player_bm.inventory.num_fires), 40, 40, 40, BLACK);
+    }
     EndDrawing();
 }
 
 void cleanup()
 {
-    // Free event bus
     event_bus_free();
-
-    // Free map
     tiles_cleanup();
-
-    // Free bombs
     bombs_cleanup();
 
-    // Free player
-    bomberman_cleanup(&player_bm);
+    if (networked) {
+        for (int i = 0; i < network_player_count(); i++) {
+            bomberman_cleanup(network_get_player(i));
+        }
+    } else {
+        bomberman_cleanup(&player_bm);
+    }
 
-    // Free bgm & sfx
     audio_cleanup();
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (argc >= 2) {
+        networked = true;
+        strncpy(server_ip, argv[1], sizeof(server_ip) - 1);
+    }
+
     // (1) Init App
     // Force the program to look in the directory where the executable is running
     ChangeDirectory(GetApplicationDirectory());

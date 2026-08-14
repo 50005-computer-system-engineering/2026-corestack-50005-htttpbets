@@ -36,5 +36,7 @@ int receive_message_tcp(int sockfd, Message* return_ptr);
 int receive_message_udp(int sockfd, Message* return_ptr);
 int send_message_tcp(int sockfd, const Message COMPLETE_MSG);
 int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG);
+// Unicast UDP send on a socket already connect()'d to its target (see connect_udp_uni)
+int send_message_udp_unicast(int sockfd, const Message COMPLETE_MSG);
 
 #endif

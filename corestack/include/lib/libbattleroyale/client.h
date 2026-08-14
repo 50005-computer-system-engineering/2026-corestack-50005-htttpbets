@@ -19,6 +19,8 @@ int brclient_get_state(BRClient* client_ptr);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
 int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024]); // use defined value instead of explicit number
+// Unicast UDP send: unreliable/unordered, use for high-frequency, loss-tolerant traffic (eg: movement)
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024]);
 
 int brclient_get_app_msg(unsigned char return_msg[1024]);
 

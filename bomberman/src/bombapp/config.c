@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include "config.h"
+#include "lib/libbombbrain/sim_config.h"
 
 const int PLAYER_FPS = 10;
 const float PLAYER_SCALE = 2.0f;
@@ -19,8 +20,8 @@ const Config CONFIG = {
     .PHYSICS = {
         .TILE_SIZE = 120.0f,
         .PICKUP_SIZE = 80.0f,
-        .PLAYER_SPEED = 3.0f,
-        .PLAYER_SPRINT_SPEED = 5.5f
+        .PLAYER_SPEED = SIM_PLAYER_SPEED,
+        .PLAYER_SPRINT_SPEED = SIM_PLAYER_SPRINT_SPEED
     },
     
     .ASSETS = {

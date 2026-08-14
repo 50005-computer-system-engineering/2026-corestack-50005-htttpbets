@@ -169,4 +169,18 @@ int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG)
     return 0;
 }
 
-// TODO unicasting with UDP
+// Unicast UDP send: the caller's socket must already be connect()'d to its
+// single target (see connect_udp_uni in client.c), so this is just one send()
+// of the whole struct, same shape as send_broadcast_udp's single sendto()
+int send_message_udp_unicast(int sockfd, const Message COMPLETE_MSG)
+{
+    LOG_I("[sendMessageUDPUnicast()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
+
+    if (send(sockfd, (const unsigned char*)&COMPLETE_MSG, sizeof(Message), 0) < 0) {
+        perror("[sendMessageUDPUnicast()] send");
+        return -1;
+    }
+
+    LOG_I("[sendMessageUDPUnicast()] unicast message has been sent");
+    return 0;
+}
