@@ -51,6 +51,7 @@ static uint32_t room_seq = 0; // Grows forever so player ids never repeat
 static int room_size = MAX_LOBBY_SIZE;
 static int listen_fd = -1;
 static bool any_room_started = false;
+static bool match_ended = false; // Set once the real winner is decided and broadcast
 static volatile sig_atomic_t stop_requested = 0;
 
 static void on_sigint(int sig)
@@ -266,10 +267,12 @@ static void start_all_rooms(void)
     }
 }
 
-// The match ends when one player stands across every room; solo runs until top out
+// The match ends when one player stands across every room; solo runs until top out.
+// Runs at most once: a room exiting normally after this already fired must not
+// be mistaken for a crash and re-decide the outcome (see close_room)
 static void check_global_end(void)
 {
-    if (player_count == 0) {
+    if (match_ended || player_count == 0) {
         return;
     }
 
@@ -287,6 +290,7 @@ static void check_global_end(void)
         return;
     }
 
+    match_ended = true;
     uint32_t winner_id = (alive == 1) ? last_alive_id : 0;
     HubMsg msg = {.type = HUB_GAMEOVER, .winner_id = winner_id};
     for (int i = 0; i < MAX_ROOMS; i++) {
@@ -302,7 +306,9 @@ static void check_global_end(void)
     }
 }
 
-// A closed hub means the room ended (or crashed); its players leave the match
+// A closed hub means the room's worker exited, either:
+// (1) It crashed mid-match (a real elimination event other rooms need to hear about)
+// (2) It finished normally after the match already ended (no need to re-announce)
 static void close_room(int slot)
 {
     Room* room = &rooms[slot];
@@ -311,6 +317,11 @@ static void close_room(int slot)
         close(room->pending_fds[i]);
     }
     room->used = false;
+    log_message(LOG_LEVEL_INFO, "[tetrisd] Room %d closed.", slot);
+
+    if (match_ended) {
+        return; // Normal post-match exit, no crash to react to
+    }
 
     bool changed = false;
     for (uint32_t i = 0; i < player_count; i++) {
@@ -319,7 +330,6 @@ static void close_room(int slot)
             changed = true;
         }
     }
-    log_message(LOG_LEVEL_INFO, "[tetrisd] Room %d closed.", slot);
 
     if (changed) {
         broadcast_roster();
@@ -383,6 +393,20 @@ static void handle_hub_msg(int slot, const HubMsg* msg)
             break;
         }
         break; // Unknown or dead victims mean the damage is dropped
+    }
+
+    case HUB_FEED: {
+        // Every room's kill feed should show every attack, not just its own,
+        // so the match looks like one giant room from the outside. Only
+        // fan-out here, never touch garbage: the actual damage already
+        // landed via HUB_GARBAGE (or locally) before this arrived.
+        HubMsg feed = {.type = HUB_FEED, .attack = msg->attack};
+        for (int i = 0; i < MAX_ROOMS; i++) {
+            if (i != slot && rooms[i].used && rooms[i].started) {
+                hub_send(rooms[i].hub_fd, &feed);
+            }
+        }
+        break;
     }
 
     default:

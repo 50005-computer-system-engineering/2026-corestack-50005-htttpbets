@@ -8,6 +8,7 @@ typedef struct {
     Endpoint* self; // the room's own endpoint
     ClientLinkedList* clients; // clients in this room
     uint16_t tcp_port; // where this server listens, each room worker gets its own
+    uint16_t udp_port; // unicast UDP port, also per-room so rooms never collide
     uint32_t next_id; // next player id to hand out, master sets the base per room
 } Server;
 
@@ -83,17 +84,21 @@ int prepare_unicast_udp(Server* server_ptr)
 {
     LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
 
-    // Bind sockets to port
+    // Same reasoning as the TCP listener: let a respawned worker rebind fast
+    int reuse = 1;
+    setsockopt(server_ptr->self->socks->udp_uni, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+    // Bind sockets to this room's own port, never the shared default
     struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT_UDP_UNI),
+        .sin_port = htons(server_ptr->udp_port),
         .sin_addr.s_addr = INADDR_ANY // any interface address
     };
     if (bind(server_ptr->self->socks->udp_uni, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("[prepareUnicastUDP()] bind");
         return -1;
     }
-    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
+    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %u", server_ptr->udp_port);
 
     LOG_I("[prepareUnicastUDP()] UDP unicast port ready to receive");
 
@@ -381,7 +386,7 @@ SERVER will start in IDLE state and await a state change triggered by user progr
 Listens on tcp_port and assigns player ids from id_base upward, so a master
 process can give every room worker its own port and id range
 */
-int brserver_init_room(BRServer** server_ptr, uint16_t tcp_port, uint32_t id_base)
+int brserver_init_room(BRServer** server_ptr, uint16_t tcp_port, uint16_t udp_port, uint32_t id_base)
 {
     // allocate memory for it
     Server* new_server = calloc(1, sizeof(Server));
@@ -390,6 +395,7 @@ int brserver_init_room(BRServer** server_ptr, uint16_t tcp_port, uint32_t id_bas
         return -1;
     }
     new_server->tcp_port = tcp_port;
+    new_server->udp_port = udp_port;
     new_server->next_id = id_base;
 
     LOG_I("[brserver_init()] creating HTTTP server...");
@@ -444,7 +450,7 @@ fail:
 // Legacy single-room behaviour: well-known port, ids counted from 1
 int brserver_init(BRServer** server_ptr)
 {
-    return brserver_init_room(server_ptr, PORT_TCP, 1);
+    return brserver_init_room(server_ptr, PORT_TCP, PORT_UDP_UNI, 1);
 }
 
 /*

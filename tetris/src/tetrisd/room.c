@@ -119,9 +119,12 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
     }
 
     // Initialize the room's server
+    // UDP unicast gets its own per-room port too, same reason as TCP: two
+    // rooms binding the same fixed port would make the second one fail
+    uint16_t udp_port = (uint16_t)(ROOM_UDP_PORT_BASE + room_index);
     BRServer* server = NULL;
-    if (brserver_init_room(&server, tcp_port, id_base) < 0) {
-        room_log_msg(LOG_LEVEL_ERROR, "[room %d] Could not bind port %u, giving up.", room_index, tcp_port);
+    if (brserver_init_room(&server, tcp_port, udp_port, id_base) < 0) {
+        room_log_msg(LOG_LEVEL_ERROR, "[room %d] Could not bind TCP %u / UDP %u, giving up.", room_index, tcp_port, udp_port);
         exit(1);
     }
     if (brserver_open(server) < 0) {
@@ -238,6 +241,13 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
             case HUB_GARBAGE:
                 apply_remote_garbage(server, &session, &msg.attack);
                 break;
+            case HUB_FEED:
+                // Purely visual: the damage already landed wherever the real
+                // victim is, this just shows the event in this room's kill feed
+                room_log_msg(LOG_LEVEL_INFO, " <!> [room %d] feed: P%u attacked P%u with %u lines (elsewhere)",
+                            room_index, msg.attack.attacker_id, msg.attack.victim_id, msg.attack.lines);
+                broadcast_feed(server, msg.attack.attacker_id, msg.attack.victim_id, msg.attack.lines);
+                break;
             case HUB_ROSTER:
                 global = msg.roster;
                 break;
@@ -297,6 +307,11 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
 
                 room_log_msg(LOG_LEVEL_INFO, " <!> [room %d] EVENT ROUTED: P%u attacked P%u with %u lines!", room_index, attacker->player_id, victim_id, lines);
                 broadcast_feed(server, attacker->player_id, victim_id, lines);
+
+                // Every other room's kill feed should see this too, even
+                // though the damage itself never leaves this room
+                HubMsg feed = {.type = HUB_FEED, .attack = {.attacker_id = attacker->player_id, .victim_id = victim_id, .lines = lines}};
+                hub_send(hub_fd, &feed);
             }
             // (2) Victim not found, but victim_id is valid! Send over to the master
             else if (victim == NULL && victim_id != 0 && victim_id != attacker->player_id) {
@@ -305,6 +320,11 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
 
                 room_log_msg(LOG_LEVEL_INFO, " <!> [room %d] outgoing: P%u attacked P%u with %u lines!", room_index, attacker->player_id, victim_id, lines);
                 broadcast_feed(server, attacker->player_id, victim_id, lines);
+
+                // The victim's own room will show this too (see apply_remote_garbage),
+                // but every OTHER, uninvolved room still needs telling for its feed
+                HubMsg feed = {.type = HUB_FEED, .attack = {.attacker_id = attacker->player_id, .victim_id = victim_id, .lines = lines}};
+                hub_send(hub_fd, &feed);
             }
             // Anything else (self, dead local victim) is dropped
         }

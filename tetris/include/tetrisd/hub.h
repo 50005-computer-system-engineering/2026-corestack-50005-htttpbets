@@ -19,12 +19,17 @@
 // Following room slot N will bind ROOM_PORT_BASE + N
 #define ROOM_PORT_BASE 6710
 
+// Same for UDP port, its own block so that TCP & UDP ranges can never collide
+#define ROOM_UDP_PORT_BASE 6910
+
 // Messages
 typedef enum {
     HUB_READY,      // [worker -> master]: room port is bound, safe to redirect clients here!
     HUB_JOINED,     // [worker -> master]: a redirected client completed its join
     HUB_ATTACK,     // [worker -> master]: garbage aimed at a player in another room
     HUB_ELIMINATED, // [worker -> master]: a local player topped out or quit
+    HUB_FEED,       // [worker -> master]: an attack happened, tell every other room's kill feed
+                    // [master -> worker]: relayed attack, show it, do NOT apply garbage
     HUB_START,      // [master -> worker]: begin the match with everyone joined so far
     HUB_GARBAGE,    // [master -> worker]: apply garbage to one of this room's players
     HUB_ROSTER,     // [master -> worker]: refreshed global alive/dead view
@@ -54,7 +59,7 @@ typedef struct
         uint32_t expected_players; // HUB_START
         uint32_t player_id;        // HUB_JOINED / HUB_ELIMINATED
         uint32_t winner_id;        // HUB_GAMEOVER
-        HubAttack attack;          // HUB_ATTACK / HUB_GARBAGE
+        HubAttack attack;          // HUB_ATTACK / HUB_GARBAGE / HUB_FEED
         HubRoster roster;          // HUB_ROSTER
     };
 } HubMsg;
