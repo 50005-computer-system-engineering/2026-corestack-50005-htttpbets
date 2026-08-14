@@ -10,7 +10,8 @@
 typedef enum {
     TARGET_MANUAL, // Manual cycling
     TARGET_RANDOM, // Random opponent
-    TARGET_KO,     // Highest stack
+    TARGET_KO,     // Highest stack (retaliation)
+    TARGET_HIGHEST, // Highest score
     TARGET_MODE_COUNT
 } TargetingMode;
 

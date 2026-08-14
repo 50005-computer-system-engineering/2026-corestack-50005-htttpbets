@@ -41,6 +41,7 @@ typedef struct
     uint32_t id;
     int room; // Slot index, used to route garbage to the right worker
     bool alive;
+    int score; // Score of the player in the room
 } PlayerRec;
 
 static LogClient log_client;
@@ -232,6 +233,7 @@ static void broadcast_roster(void)
     for (uint32_t i = 0; i < player_count && i < HUB_MAX_PLAYERS; i++) {
         msg.roster.ids[i] = players[i].id;
         msg.roster.alive[i] = players[i].alive ? 1 : 0;
+        msg.roster.scores[i] = players[i].score;
     }
 
     for (int i = 0; i < MAX_ROOMS; i++) {

@@ -13,6 +13,7 @@ typedef struct
     uint32_t ids[MAX_LOBBY_PLAYERS];    // Stores all 32-bit player IDs in the lobby
     bool eliminated[MAX_LOBBY_PLAYERS]; // Tracks life/death status of each player -> used to determine targeting
     int count;                          // Total num of active players in the lobby
+    int score;
 } Roster;
 
 // Cycle target mode selection

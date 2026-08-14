@@ -95,11 +95,25 @@ static uint32_t resolve_victim(GameSession* session, PlayerSlot* attacker, const
         }
 
         // If KO retaliation is enabled, and the last attacker is still alive, retaliate
-        if (state->target_mode == TARGET_KO && state->last_attacker_id != 0 && state->last_attacker_id != attacker->player_id) {
+        else if (state->target_mode == TARGET_KO && state->last_attacker_id != 0 && state->last_attacker_id != attacker->player_id) {
             for (uint32_t i = 0; i < global->count && i < HUB_MAX_PLAYERS; i++) {
                 if (global->ids[i] == state->last_attacker_id && global->alive[i])
                     return state->last_attacker_id;
             }
+        } else if (state->target_mode == TARGET_HIGHEST) {
+            int* highest = NULL; // Highest score
+            int* highest_player_id = NULL;
+            
+            // Loop through every player and find the highest score
+            // Should probably cache this somewhere :(
+            for (uint32_t i = 0; i < global->count && i < HUB_MAX_PLAYERS; i++) {
+                if (global->ids[i] != attacker->player_id && global->alive[i] && global->scores[i] > *highest) {
+                    *highest = global->scores[i];
+                    *highest_player_id = global->ids[i];
+                }
+            }
+
+            return *highest_player_id;
         }
     }
 

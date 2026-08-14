@@ -17,6 +17,7 @@ typedef struct {
 typedef struct {
     uint32_t count; // Determined lobby size
     uint32_t ids[]; // Connected players
+    int scores[];
 } RosterPayload;
 
 // A single requested action from one client

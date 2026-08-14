@@ -50,6 +50,7 @@ typedef struct
     uint32_t count;
     uint32_t ids[HUB_MAX_PLAYERS];
     uint8_t alive[HUB_MAX_PLAYERS];
+    uint8_t scores[HUB_MAX_PLAYERS];
 } HubRoster;
 
 typedef struct
