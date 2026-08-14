@@ -93,6 +93,9 @@ void draw_loop()
     if (networked) {
         int local_slot = network_local_slot();
         for (int i = 0; i < network_player_count(); i++) {
+            if (!network_is_player_alive(i)) {
+                continue; // Caught in an explosion: sprite disappears
+            }
             Color tint = (i == local_slot) ? WHITE : (Color){190, 210, 255, 255};
             bomberman_draw(network_get_player(i), tint);
         }
@@ -113,6 +116,12 @@ void draw_loop()
             const char* message = (winner == 0) ? "NO SURVIVORS"
                 : (winner == network_local_player_id())     ? "YOU WIN!"
                                                               : TextFormat("P%u WINS!", winner);
+            int width = MeasureText(message, 80);
+            DrawText(message, GetScreenWidth() / 2 - width / 2, GetScreenHeight() / 2 - 40, 80, RED);
+        } else if (slot >= 0 && !network_is_player_alive(slot)) {
+            // Match is still going (winner not yet decided): let the local
+            // player know they're out, without interrupting everyone else
+            const char* message = "You died!";
             int width = MeasureText(message, 80);
             DrawText(message, GetScreenWidth() / 2 - width / 2, GetScreenHeight() / 2 - 40, 80, RED);
         }

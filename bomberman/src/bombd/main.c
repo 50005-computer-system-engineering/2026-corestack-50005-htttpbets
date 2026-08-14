@@ -328,6 +328,19 @@ int main(void)
             }
         }
 
+        // (1b) A closed window, killed process, or dropped connection never
+        // sends a graceful "I'm leaving" packet, so this is the only way we
+        // learn about it: kill their character so they don't just sit there
+        uint32_t disconnected_id;
+        while (brserver_get_disconnected(&disconnected_id) == 1) {
+            BombPlayer* gone = find_bomb_player(&session, disconnected_id);
+            if (gone != NULL && gone->alive) {
+                gone->alive = false;
+                session.dirty = true;
+                printf("[bombd] P%u disconnected, eliminated.\n", disconnected_id);
+            }
+        }
+
         // (2) Advance the shared simulation by one tick
         tick_session(&session, delta_time, on_explosion_triggered, server);
 

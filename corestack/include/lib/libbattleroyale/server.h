@@ -20,4 +20,9 @@ int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024]);
 
 int brserver_get_app_msg(unsigned char return_msg[1024]);
 
+// Drains one forced-disconnect (dropped TCP connection: closed window,
+// killed process, network drop) at a time. Returns 1 and writes the client's
+// id to return_id if one was pending, 0 if none
+int brserver_get_disconnected(uint32_t* return_id);
+
 #endif

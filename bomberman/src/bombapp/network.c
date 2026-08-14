@@ -5,6 +5,8 @@
 #include "raylib.h"
 #include "network.h"
 #include "config.h"
+#include "events.h"
+#include "lib/libeventbus.h"
 #include "lib/libbattleroyale/client.h"
 #include "lib/libbombprotocol/protocol.h"
 #include "lib/libbombbrain/map.h"
@@ -16,6 +18,7 @@ static uint32_t local_id = 0;
 static Bomberman players[BOMBD_MAX_PLAYERS];
 static uint32_t player_ids[BOMBD_MAX_PLAYERS];
 static bool player_slot_used[BOMBD_MAX_PLAYERS] = {0};
+static bool player_alive[BOMBD_MAX_PLAYERS];
 static int player_count = 0;
 
 static bool has_map = false;
@@ -85,6 +88,7 @@ static int find_or_add_slot(uint32_t player_id)
         if (!player_slot_used[i]) {
             player_slot_used[i] = true;
             player_ids[i] = player_id;
+            player_alive[i] = true;
             players[i] = bomberman_create_default((Vector2){1, 1});
             if (i >= player_count) {
                 player_count = i + 1;
@@ -145,6 +149,12 @@ static void apply_state(const StatePayload* payload)
         bm->inventory.num_bombs = (int)entry->num_bombs;
         bm->inventory.remaining_bombs = (int)entry->remaining_bombs;
         bm->inventory.num_fires = (int)entry->num_fires;
+
+        bool now_alive = entry->alive != 0;
+        if (player_alive[slot] && !now_alive && entry->player_id == local_id) {
+            event_bus_trigger(EVENT_PLAYER_DIED, NULL);
+        }
+        player_alive[slot] = now_alive;
     }
 
     // Re-sync the ticking-bomb visuals straight from the server instead of
@@ -172,6 +182,12 @@ static void apply_explosion(const ExplosionPayload* payload)
     explosion.spread_positions_size = 0;
     explosion.timer = EXPLODE_LIFETIME;
     Explodes_enqueue(&explodes_queue, explosion);
+
+    // The server is the one that actually calls trigger_explosion()
+    // (libbombbrain), so it's the only place EVENT_BOMB_EXPLODED normally
+    // fires from - but bombd never has audio initialised. Firing it here
+    // too is what makes audio.c's listener actually play the SFX locally
+    event_bus_trigger(EVENT_BOMB_EXPLODED, &(TileEventArgs){.x = (int)payload->center_x, .y = (int)payload->center_y});
 }
 
 void network_tick_explosions(float delta_time)
@@ -196,6 +212,10 @@ static void apply_game_over(const GameOverPayload* payload)
 {
     game_over = true;
     winner_id = payload->winner_id;
+
+    if (winner_id != 0 && winner_id == local_id) {
+        event_bus_trigger(EVENT_MATCH_WON, NULL);
+    }
 }
 
 /* ----- POLLING ----- */
@@ -289,5 +309,6 @@ int network_local_slot(void)
 int network_player_count(void) { return player_count; }
 Bomberman* network_get_player(int index) { return &players[index]; }
 uint32_t network_get_player_id(int index) { return player_ids[index]; }
+bool network_is_player_alive(int index) { return player_alive[index]; }
 bool network_game_over(void) { return game_over; }
 uint32_t network_winner_id(void) { return winner_id; }

@@ -7,9 +7,19 @@
 /* ----- SHARED LIMITS ----- */
 // Bomberman is played on one shared arena, unlike tetris's per-player boards,
 // so these bound the single shared world rather than a per-room lobby size
-#define BOMBD_MAX_PLAYERS 4     // Matches map.c's 4-corner spawn layout
-#define BOMBD_MAX_BOMBS 16      // Ticking bombs visible on the shared map at once
-#define BOMBD_MAX_MAP_DIM 16    // Covers calc_map_size(BOMBD_MAX_PLAYERS) + border (12x12 at 4 players), with room to spare
+#define BOMBD_MAX_PLAYERS 25
+#define BOMBD_MAX_BOMBS 100      // Ticking bombs visible on the shared map at once
+#define BOMBD_MAX_MAP_DIM 20    // Covers calc_map_size(BOMBD_MAX_PLAYERS) + border (20x20 at 100 players)
+
+// Every packet is capped at 512 bytes (MSG_CONTENT_LENGTH is 1024, but this
+// protocol only ever uses the first 512). At 36 bytes/player and 12
+// bytes/bomb, BOMBD_MAX_PLAYERS x BOMBD_MAX_BOMBS worth of StatePayload data
+// doesn't come close to fitting in one packet, so pack_state()/unpack_state()
+// clamp to these counts instead.
+// TODO: page StatePayload across multiple packets to lift this ceiling (and
+// BOMBD_MAX_MAP_DIM has the same problem for very large maps/MapInitPayload)
+#define STATE_PACKET_MAX_PLAYERS 8
+#define STATE_PACKET_MAX_BOMBS 16
 
 /* ----- PACKET TAGS ----- */
 // Every packet on the app-message channel opens with one of these as a 4-byte

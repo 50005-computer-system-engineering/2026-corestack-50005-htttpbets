@@ -33,6 +33,7 @@ int network_local_slot(void); // Index into network_get_player()/ids for the loc
 int network_player_count(void);
 Bomberman* network_get_player(int index);
 uint32_t network_get_player_id(int index);
+bool network_is_player_alive(int index);
 bool network_game_over(void);
 uint32_t network_winner_id(void);
 

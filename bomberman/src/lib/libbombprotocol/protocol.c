@@ -173,67 +173,103 @@ void unpack_tile_update(const unsigned char buffer[512], TileUpdatePayload* payl
 }
 
 /* ----- STATE ----- */
+// BOMBD_MAX_PLAYERS x BOMBD_MAX_BOMBS worth of entries doesn't fit in a
+// 512-byte packet (see the TODO on STATE_PACKET_MAX_PLAYERS in protocol.h),
+// so this writes only the clamped counts, field by field, rather than
+// memcpy-ing the oversized fixed-size StatePayload struct wholesale - that
+// used to walk straight past the end of the caller's buffer
 void pack_state(unsigned char buffer[512], const StatePayload* payload)
 {
     unsigned char* out = write_tag(buffer, PACKET_STATE);
 
-    StatePayload net = {0};
-    net.player_count = htonl(payload->player_count);
-    for (uint32_t i = 0; i < payload->player_count && i < BOMBD_MAX_PLAYERS; i++) {
+    uint32_t player_count = payload->player_count;
+    if (player_count > STATE_PACKET_MAX_PLAYERS) {
+        player_count = STATE_PACKET_MAX_PLAYERS;
+    }
+    uint32_t bomb_count = payload->bomb_count;
+    if (bomb_count > STATE_PACKET_MAX_BOMBS) {
+        bomb_count = STATE_PACKET_MAX_BOMBS;
+    }
+
+    uint32_t net_player_count = htonl(player_count);
+    memcpy(out, &net_player_count, sizeof(net_player_count));
+    out += sizeof(net_player_count);
+
+    for (uint32_t i = 0; i < player_count; i++) {
         const PlayerStateEntry* src = &payload->players[i];
-        PlayerStateEntry* dst = &net.players[i];
-        dst->player_id = htonl(src->player_id);
-        write_net_float(&dst->x, src->x);
-        write_net_float(&dst->y, src->y);
-        dst->direction = htonl(src->direction);
-        dst->is_moving = htonl(src->is_moving);
-        dst->alive = htonl(src->alive);
-        dst->num_bombs = htonl(src->num_bombs);
-        dst->remaining_bombs = htonl(src->remaining_bombs);
-        dst->num_fires = htonl(src->num_fires);
+        PlayerStateEntry net_entry;
+        net_entry.player_id = htonl(src->player_id);
+        write_net_float(&net_entry.x, src->x);
+        write_net_float(&net_entry.y, src->y);
+        net_entry.direction = htonl(src->direction);
+        net_entry.is_moving = htonl(src->is_moving);
+        net_entry.alive = htonl(src->alive);
+        net_entry.num_bombs = htonl(src->num_bombs);
+        net_entry.remaining_bombs = htonl(src->remaining_bombs);
+        net_entry.num_fires = htonl(src->num_fires);
+        memcpy(out, &net_entry, sizeof(net_entry));
+        out += sizeof(net_entry);
     }
 
-    net.bomb_count = htonl(payload->bomb_count);
-    for (uint32_t i = 0; i < payload->bomb_count && i < BOMBD_MAX_BOMBS; i++) {
-        write_net_float(&net.bombs[i].x, payload->bombs[i].x);
-        write_net_float(&net.bombs[i].y, payload->bombs[i].y);
-        write_net_float(&net.bombs[i].timer, payload->bombs[i].timer);
-    }
+    uint32_t net_bomb_count = htonl(bomb_count);
+    memcpy(out, &net_bomb_count, sizeof(net_bomb_count));
+    out += sizeof(net_bomb_count);
 
-    memcpy(out, &net, sizeof(StatePayload));
+    for (uint32_t i = 0; i < bomb_count; i++) {
+        BombStateEntry net_bomb;
+        write_net_float(&net_bomb.x, payload->bombs[i].x);
+        write_net_float(&net_bomb.y, payload->bombs[i].y);
+        write_net_float(&net_bomb.timer, payload->bombs[i].timer);
+        memcpy(out, &net_bomb, sizeof(net_bomb));
+        out += sizeof(net_bomb);
+    }
 }
 
 void unpack_state(const unsigned char buffer[512], StatePayload* payload)
 {
-    StatePayload net;
-    memcpy(&net, payload_start(buffer), sizeof(StatePayload));
+    const unsigned char* in = payload_start(buffer);
 
-    payload->player_count = ntohl(net.player_count);
-    if (payload->player_count > BOMBD_MAX_PLAYERS) {
-        payload->player_count = BOMBD_MAX_PLAYERS; // Failsafe against a malformed packet
+    uint32_t net_player_count;
+    memcpy(&net_player_count, in, sizeof(net_player_count));
+    in += sizeof(net_player_count);
+    payload->player_count = ntohl(net_player_count);
+    if (payload->player_count > STATE_PACKET_MAX_PLAYERS) {
+        payload->player_count = STATE_PACKET_MAX_PLAYERS; // Failsafe against a malformed packet
     }
+
     for (uint32_t i = 0; i < payload->player_count; i++) {
-        const PlayerStateEntry* src = &net.players[i];
+        PlayerStateEntry net_entry;
+        memcpy(&net_entry, in, sizeof(net_entry));
+        in += sizeof(net_entry);
+
         PlayerStateEntry* dst = &payload->players[i];
-        dst->player_id = ntohl(src->player_id);
-        dst->x = read_net_float(src->x);
-        dst->y = read_net_float(src->y);
-        dst->direction = ntohl(src->direction);
-        dst->is_moving = ntohl(src->is_moving);
-        dst->alive = ntohl(src->alive);
-        dst->num_bombs = ntohl(src->num_bombs);
-        dst->remaining_bombs = ntohl(src->remaining_bombs);
-        dst->num_fires = ntohl(src->num_fires);
+        dst->player_id = ntohl(net_entry.player_id);
+        dst->x = read_net_float(net_entry.x);
+        dst->y = read_net_float(net_entry.y);
+        dst->direction = ntohl(net_entry.direction);
+        dst->is_moving = ntohl(net_entry.is_moving);
+        dst->alive = ntohl(net_entry.alive);
+        dst->num_bombs = ntohl(net_entry.num_bombs);
+        dst->remaining_bombs = ntohl(net_entry.remaining_bombs);
+        dst->num_fires = ntohl(net_entry.num_fires);
     }
 
-    payload->bomb_count = ntohl(net.bomb_count);
-    if (payload->bomb_count > BOMBD_MAX_BOMBS) {
-        payload->bomb_count = BOMBD_MAX_BOMBS;
+    uint32_t net_bomb_count;
+    memcpy(&net_bomb_count, in, sizeof(net_bomb_count));
+    in += sizeof(net_bomb_count);
+    payload->bomb_count = ntohl(net_bomb_count);
+    if (payload->bomb_count > STATE_PACKET_MAX_BOMBS) {
+        payload->bomb_count = STATE_PACKET_MAX_BOMBS;
     }
+
     for (uint32_t i = 0; i < payload->bomb_count; i++) {
-        payload->bombs[i].x = read_net_float(net.bombs[i].x);
-        payload->bombs[i].y = read_net_float(net.bombs[i].y);
-        payload->bombs[i].timer = read_net_float(net.bombs[i].timer);
+        BombStateEntry net_bomb;
+        memcpy(&net_bomb, in, sizeof(net_bomb));
+        in += sizeof(net_bomb);
+
+        payload->bombs[i].x = read_net_float(net_bomb.x);
+        payload->bombs[i].y = read_net_float(net_bomb.y);
+        payload->bombs[i].timer = read_net_float(net_bomb.timer);
     }
 }
 
