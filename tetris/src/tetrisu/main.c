@@ -17,7 +17,7 @@
 #include "lib/libbattleroyale/client.h"
 
 // How long to wait for the host to start the match before giving up (1 minutes)
-#define LOBBY_WAIT_TIMEOUT_MS (60 * 1000)
+#define LOBBY_WAIT_TIMEOUT_MS (300 * 1000)
 
 // Global network client
 BRClient* network_client = NULL;

@@ -5,8 +5,11 @@
 #include "clientll.h"
 
 typedef struct {
-    Endpoint* self;
-    ClientLinkedList* clients;
+    Endpoint* self; // the room's own endpoint
+    ClientLinkedList* clients; // clients in this room
+    uint16_t tcp_port; // where this server listens, each room worker gets its own
+    uint16_t udp_port; // unicast UDP port, also per-room so rooms never collide
+    uint32_t next_id; // next player id to hand out, master sets the base per room
 } Server;
 
 static MessageQueue server_messages;
@@ -39,10 +42,17 @@ int listen_on_tcp(Server* server_ptr)
         return -1;
     }
 
+    // Allow fast restarts and room-slot port reuse
+    int reuse = 1;
+    // Tell kernel to relax its default use abt reusing ports on this specific socket 
+    // (bc kernel doesn't free TCP socket's port immediately on dropped, prevents any stray packets from getting confused from new ones)
+    // SO_REUSEADDR to 1: allow multiple sockets to bind to the same port even if they aren't live (eg: TIME_WAIT after disconn)
+    setsockopt(server_ptr->self->socks->tcp, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
     // Bind sockets to port
     struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT_TCP),
+        .sin_port = htons(server_ptr->tcp_port),
         .sin_addr.s_addr = INADDR_ANY};
     if (bind(server_ptr->self->socks->tcp, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("[listenOnTCP()] bind");
@@ -54,7 +64,7 @@ int listen_on_tcp(Server* server_ptr)
         perror("[listenOnTCP()] listen");
         return -1;
     }
-    LOG_I("[listenOnTCP()] server now listening for TCP connections on port %d", PORT_TCP);
+    LOG_I("[listenOnTCP()] server now listening for TCP connections on port %u", server_ptr->tcp_port);
     return 0;
 }
 
@@ -74,17 +84,21 @@ int prepare_unicast_udp(Server* server_ptr)
 {
     LOG_I("[prepareUnicastUDP()] preparing UDP unicast port");
 
-    // Bind sockets to port
+    // Same reasoning as the TCP listener: let a respawned worker rebind fast
+    int reuse = 1;
+    setsockopt(server_ptr->self->socks->udp_uni, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+    // Bind sockets to this room's own port, never the shared default
     struct sockaddr_in server_addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT_UDP_UNI),
+        .sin_port = htons(server_ptr->udp_port),
         .sin_addr.s_addr = INADDR_ANY // any interface address
     };
     if (bind(server_ptr->self->socks->udp_uni, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("[prepareUnicastUDP()] bind");
         return -1;
     }
-    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %d", PORT_UDP_UNI);
+    LOG_D("[prepareUnicastUDP()] UDP socket bound to port %u", server_ptr->udp_port);
 
     LOG_I("[prepareUnicastUDP()] UDP unicast port ready to receive");
 
@@ -152,9 +166,6 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
 {
     LOG_I("[serverLobbyState()] SERVER entering LOBBY state, accepting clients...");
 
-    // tracking the id assigned
-    int prev_assigned_id = 0;
-
     // preparing TCP socket for polling
     struct pollfd accept_port;
     accept_port.fd = server_ptr->self->socks->tcp; // socket to start connection with the poll
@@ -176,11 +187,13 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             LOG_E("[serverLobbyState()] accept failed to find client, skipping loop iteration...");
             continue;
         }
-        LOG_D("[serverLobbyState()] accept succses, assigning player id %u to new connection", ++prev_assigned_id);
+        // ids come from a per-room base so they stay unique across every room
+        uint32_t new_id = server_ptr->next_id++;
+        LOG_D("[serverLobbyState()] accept succses, assigning player id %u to new connection", new_id);
 
         // creating client endpoint of newly connected client
         Endpoint new_client = {
-            .id = prev_assigned_id,
+            .id = new_id,
             .socks = malloc(sizeof(Sockets))};
         new_client.socks->tcp = client_fd;
 
@@ -370,8 +383,10 @@ void* server_thread_func(void* server)
 /*
 Creates SERVER in memory and a background thread for listener
 SERVER will start in IDLE state and await a state change triggered by user program
+Listens on tcp_port and assigns player ids from id_base upward, so a master
+process can give every room worker its own port and id range
 */
-int brserver_init(BRServer** server_ptr)
+int brserver_init_room(BRServer** server_ptr, uint16_t tcp_port, uint16_t udp_port, uint32_t id_base)
 {
     // allocate memory for it
     Server* new_server = calloc(1, sizeof(Server));
@@ -379,6 +394,9 @@ int brserver_init(BRServer** server_ptr)
         perror("server malloc");
         return -1;
     }
+    new_server->tcp_port = tcp_port;
+    new_server->udp_port = udp_port;
+    new_server->next_id = id_base;
 
     LOG_I("[brserver_init()] creating HTTTP server...");
 
@@ -427,6 +445,12 @@ fail:
     free(new_server);
     new_server = NULL;
     return -1;
+}
+
+// Legacy single-room behaviour: well-known port, ids counted from 1
+int brserver_init(BRServer** server_ptr)
+{
+    return brserver_init_room(server_ptr, PORT_TCP, PORT_UDP_UNI, 1);
 }
 
 /*
