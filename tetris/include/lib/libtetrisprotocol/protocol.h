@@ -7,7 +7,7 @@
 #include "lib/libhtttp/payload.h"
 
 /* ----- SHARED LIMITS ----- */
-#define MAX_LOBBY_SIZE 16 // TO BE KEPT IN SYNC with libtetrisbrain's MAX_LOBBY_PLAYERS
+#define MAX_LOBBY_SIZE 2 // TO BE KEPT IN SYNC with libtetrisbrain's MAX_LOBBY_PLAYERS
 
 /* ----- PLAYER ACTIONS ----- */
 // Every key press the client can ask the server to perform on its behalf
@@ -26,6 +26,8 @@ typedef enum {
 } PlayerAction;
 
 /* ----- GAMESTATE <-> STATEPAYLOAD ----- */
+// AttackPayload / RosterPayload / InputPayload / StatePayload now live in
+// lib/libhtttp/payload.h, sent over HTTTP instead of these raw tagged packets
 // Server side: flatten its authoritative GameState into a sendable snapshot
 void build_state_payload(const GameState* state, StatePayload* payload);
 

@@ -6,6 +6,8 @@
 typedef void BRServer;
 
 int brserver_init(BRServer** server_ptr);
+// Room-worker variant: binds its own TCP and UDP ports, hands out ids from id_base
+int brserver_init_room(BRServer** server_ptr, uint16_t tcp_port, uint16_t udp_port, uint32_t id_base);
 int brserver_open(BRServer* server_ptr);
 int brserver_start(BRServer* server_ptr);
 int brserver_end(BRServer* server_ptr);

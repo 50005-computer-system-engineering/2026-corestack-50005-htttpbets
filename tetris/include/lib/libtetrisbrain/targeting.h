@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define MAX_LOBBY_PLAYERS 16 // TO BE KEPT IN SYNC
+#define MAX_LOBBY_PLAYERS 2 // TO BE KEPT IN SYNC
 
 // Client POV, populated from server broadcast at game start -> also updated accordingly via elim broadcasts
 typedef struct
