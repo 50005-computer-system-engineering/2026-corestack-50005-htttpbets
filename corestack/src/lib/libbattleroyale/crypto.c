@@ -501,6 +501,13 @@ int encrypt_message(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], 
 
 int decrypt_message(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len)
 {
+    // reject lengths that don't fit in the actual msg_content buffer before
+    // treating them as a trusted token length
+    if (msg->msg_len > MSG_CONTENT_LENGTH) {
+        LOG_E("decrypt_message: msg_len %u exceeds MSG_CONTENT_LENGTH", msg->msg_len);
+        return -1;
+    }
+
     // decrypt
     unsigned char* decrypted = session_decrypt(sesskey, msg->msg_content, msg->msg_len, out_len);
     if (decrypted == NULL) {

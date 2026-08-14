@@ -357,8 +357,11 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
                             continue; // drop message
                         }
                         unsigned char decrypted[MSG_CONTENT_LENGTH];
-                        size_t decrypted_len;
-                        decrypt_message(&msg, sender.sesskey, decrypted, &decrypted_len);
+                        size_t decrypted_len = 0;
+                        if (decrypt_message(&msg, sender.sesskey, decrypted, &decrypted_len) < 0) {
+                            LOG_E("[serverGameState()] failed to decrypt message from source %u, dropping", msg.source_id);
+                            continue; // drop message
+                        }
                         msg.msg_len = (uint32_t)decrypted_len;
                         memcpy(msg.msg_content, decrypted, decrypted_len);
                         msg.msg_type = MSG_APP;

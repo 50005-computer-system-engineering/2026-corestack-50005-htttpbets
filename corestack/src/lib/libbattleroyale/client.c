@@ -156,8 +156,11 @@ void client_game_state(Endpoint* client)
                         if (msg.msg_type == MSG_APP_ENC) {
                             LOG_D("decrypting content");
                             unsigned char decrypted[MSG_CONTENT_LENGTH];
-                            size_t decrypted_len;
-                            decrypt_message(&msg, client->sesskey, decrypted, &decrypted_len);
+                            size_t decrypted_len = 0;
+                            if (decrypt_message(&msg, client->sesskey, decrypted, &decrypted_len) < 0) {
+                                LOG_E("[clientGameState()] failed to decrypt message from %d, dropping", listen_fd[i].fd);
+                                continue;
+                            }
                             msg.msg_len = (uint32_t)decrypted_len;
                             memcpy(msg.msg_content, decrypted, decrypted_len);
                             msg.msg_type = MSG_APP;
