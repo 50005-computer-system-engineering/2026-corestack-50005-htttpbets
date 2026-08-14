@@ -1,4 +1,5 @@
 # =============================================================================
+# // BOMBERMAN // Game rendered using RayLib
 # Detects if RayLib is found via pkg-config
 # if not, downloaded and built locally into /deps folder
 # Automatically discovers and builds all shared libraries and any binary found under src/
@@ -29,26 +30,10 @@
 # Include corestack variables
 include ../config.mk
 
-# ----------------------------------------------------------------------
-# Toolchain
-# ----------------------------------------------------------------------
-# GCC Compiler
-CC := gcc
-
-# Archiver that builds .o files into static library
-# r = insert/replace, c=create if missing, s=add symbol index
-AR := ar rcs
-
-# ----------------------------------------------------------------------
-# Directories
-# ----------------------------------------------------------------------
-SRC_DIR    := ./src
-LIB_SUBDIR := lib
-INC_DIR    := include
-OBJ_DIR    := ./build/obj
-LIB_OUT    := ./build/lib
-BIN_OUT    := ./build/bin
-DEPS_DIR   := ./deps
+# Bomb emoji
+INIT_MSG     := \U0001F4A3
+PROJECT_NAME := bomberman
+DEPS_DIR := ./deps
 
 # ----------------------------------------------------------------------
 # Launcher
@@ -56,28 +41,7 @@ DEPS_DIR   := ./deps
 # This is a symlink into build/bin so it always reflects latest build
 # ----------------------------------------------------------------------
 TARGET       := launcher
-# Main entry point
 LAUNCHER_BIN := bombapp
-
-$(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
-	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
-
-run: $(TARGET)
-	./$(TARGET)
-
-# ----------------------------------------------------------------------
-# Compiler Flags
-# ----------------------------------------------------------------------
-# -I$(INC_DIR)                find headers in include/
-# -I$(INC_DIR)/$(LIB_SUBDIR)  find headers in include/lib/ (library-specific headers)
-# -I$(CS_INC)                 also search corestack/include/ for shared library headers
-# $(COMMON_CFLAGS)            expands to: -Wall -Wextra -g -pthread (defined in config file)
-CFLAGS  := -I$(INC_DIR) -I$(INC_DIR)/$(LIB_SUBDIR) -I$(CS_INC) $(COMMON_CFLAGS)
-
-# LDFLAGS: flags for the linker (search paths and system libs)
-# CSLIB comes from included config file
-# LDLIBS is filled in after library auto-discovery below!
-LDFLAGS := -L$(LIB_OUT) -L$(CS_LIB) -lpthread
 
 # ----------------------------------------------------------------------
 # RayLib Config
@@ -95,11 +59,11 @@ CFLAGS += $(RAYLIB_CFLAGS)
 # Platform-specific system libraries raylib depends on when linking statically.
 # (pkg-config --libs includes these automatically for system installs.)
 UNAME := $(shell uname)
-ifeq ($(UNAME), Darwin)
+ifeq ($(UNAME), Darwin) # Apple
     RAYLIB_PLATFORM_LIBS := -framework OpenGL -framework Cocoa \
                             -framework IOKit -framework CoreAudio -framework CoreVideo
-else
-    RAYLIB_PLATFORM_LIBS := -lGL -lm -ldl -lrt -lX11
+else # Linux
+    RAYLIB_PLATFORM_LIBS := -lGL -ldl -lrt -lX11
 endif
 
 # Detect system raylib via pkg-config.
@@ -118,7 +82,7 @@ else
     # No system raylib: build locally. RAYLIB_DEP triggers the build rule.
     RAYLIB_CFLAGS  := -I$(RAYLIB_LOCAL)/src
     RAYLIB_LDFLAGS := -L$(RAYLIB_LOCAL)/src -lraylib $(RAYLIB_PLATFORM_LIBS)
-    RAYLIB_DEP     := $(RAYLIB_STATIC)
+    RAYLIB_DEP     := $(RAYLIB_ARTIFACT)
     $(info raylib: Not found! Will build locally in $(RAYLIB_LOCAL))
 endif
 
@@ -209,8 +173,9 @@ $(LIB_OUT)/$(1).a: $$($(1)_OBJ)
 ALL_LIB_ARCHIVES += $(LIB_OUT)/$(1).a
 endef
 
-# Runs template once per directory library name
-$(foreach lib,$(LIB_NAMES),$(eval $(call LIB_template,$(lib))))
+include ../common.mk
+include ../common-test.mk
+include ../common-deps.mk
 
 # Flat Library Template: Single .c file -> Archive
 # 1) Compile single flat source file directory into a .o
@@ -350,16 +315,7 @@ $(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIV
 	@mkdir -p $(UNIT_BIN)
 	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
 
-unit: $(UNIT_BINS)
-	@echo "==> Running bomberman unit tests"
-	@pass=0; fail=0; \
-	for t in $(UNIT_BINS); do \
-	  echo "--- $$t ---"; \
-	  if $$t; then pass=$$((pass+1)); else fail=$$((fail+1)); fi; \
-	done; \
-	echo ""; \
-	echo "Unit tests: $$pass passed, $$fail failed"; \
-	test $$fail -eq 0
+.PHONY: run deps distclean
 
 # --- Integration Tests ---
 integration: all

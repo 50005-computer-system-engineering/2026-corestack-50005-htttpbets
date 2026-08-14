@@ -1,6 +1,6 @@
 #ifndef POWERUP_CONTROL_H
 #define POWERUP_CONTROL_H
-#include <raylib.h>
+#include "raylib.h"
 #include "bomb_control.h"
 
 void powerup_init();

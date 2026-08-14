@@ -2,8 +2,7 @@
 #define TETRISBRAIN_PIECE_H
 
 /* ----- TETRIS PIECES ----- */
-typedef enum
-{
+typedef enum {
     PIECE_NONE = 0,
     PIECE_I = 1, // Straight line of 4 blocks
     PIECE_O = 2, // Square block
@@ -15,8 +14,7 @@ typedef enum
 } PieceType;
 
 /* ----- ROTATION (SUPER ROTATION SYSTEM) ----- */
-typedef enum
-{
+typedef enum {
     ROT_0 = 0, // SPAWN
     ROT_1 = 1, // RIGHT
     ROT_2 = 2, // 180 DEG
@@ -32,5 +30,7 @@ typedef struct
     int y; // Location on the board (y-axis)
 } Piece;
 
-extern const int tetrominoes[7][16];
+// 7 pieces, 4X4 bounding box = 16 individual cells
+extern const int TETROMINOES[7][16];
+
 #endif

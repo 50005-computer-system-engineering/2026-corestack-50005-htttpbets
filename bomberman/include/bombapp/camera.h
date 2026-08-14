@@ -1,6 +1,6 @@
 #ifndef CAMERA_H
 #define CAMERA_H
-#include <raylib.h>
+#include "raylib.h"
 
 extern Camera2D camera;
 

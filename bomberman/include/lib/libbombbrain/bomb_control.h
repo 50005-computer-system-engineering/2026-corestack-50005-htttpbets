@@ -1,6 +1,6 @@
 #ifndef BOMB_CONTROL_H
 #define BOMB_CONTROL_H
-#include <raylib.h>
+#include "raylib.h"
 #include "utils/queue.h"
 #include "inventory.h"
 
@@ -15,7 +15,7 @@ typedef struct {
 
 typedef struct {
     Vector2 center;
-    int spread_amt[4]; // U/D/L/R Spread in each direction, each dir can be blocked
+    int spread_amt[4];         // U/D/L/R Spread in each direction, each dir can be blocked
     Vector2* spread_positions; // Positions of spread tiles
     int spread_positions_size;
     float timer; // Lifetime

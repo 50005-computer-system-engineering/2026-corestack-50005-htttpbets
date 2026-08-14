@@ -4,10 +4,10 @@
 #include "board.h"
 #include "piece.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 /* ----- GAME STATE ----- */
-typedef enum
-{
+typedef enum {
     TARGET_MANUAL, // Manual cycling
     TARGET_RANDOM, // Random opponent
     TARGET_KO,     // Highest stack
@@ -20,8 +20,8 @@ typedef struct
     Piece current;
     Piece next;
     TargetingMode target_mode;
-    int player_id;
-    int target_player_id;
+    uint32_t player_id;
+    uint32_t target_player_id;
     int gravity_timer;
     int lock_timer;
     int held_type;
@@ -32,19 +32,22 @@ typedef struct
     int tetrises;
     int t_spins;
     bool last_action_rotation;
-    int pending_garbage;
-    int outgoing_garbage;
+    uint32_t pending_garbage;
+    uint32_t outgoing_garbage;
+    uint32_t last_attacker_id;
     int score;
     int lines_cleared;
+    int combo;
+    bool b2b;
     int level;
     int game_over;
+    uint32_t winner_id;
 } GameState;
 
-// Spawn game state(s)
-extern GameState gamestate_p1;
-extern GameState gamestate_p2;
+// Establish game state
+extern GameState gamestate_player;
 
 // Function call to start the game
-void startGame(GameState *state);
+void start_game(GameState* state);
 
 #endif

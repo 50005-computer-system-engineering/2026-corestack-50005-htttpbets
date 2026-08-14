@@ -6,25 +6,25 @@
 
 /* ----- PIECE LOGISTICS ----- */
 // Convert 2D (x,y) coordinates into 1D index for array
-int getRotationIndex(int x, int y, Rotation rot);
+int get_rotation_index(int x, int y, Rotation rot);
 
 // Wall kick helper function
-bool testRotate(GameState *state, int nextRot);
+bool test_rotate(GameState* state, int next_rot);
 
 // Rotate clockwise logic
-void rotateCurrentPiece(GameState *state);
+void rotate_current_piece(GameState* state);
 
 // Rotate counter clockwise logic
-void rotateCounterClockwise(GameState *state);
+void rotate_counter_clockwise(GameState* state);
 
 /* ----- BOARD LOGISTICS ----- */
 // Check for collisions
-bool isValidPos(GameState *state, PieceType type, Rotation rot, int posX, int posY);
+bool is_valid_pos(GameState* state, PieceType type, Rotation rot, int pos_x, int pos_y);
 
 // Locking the piece after it finalizes its position
-void lockPiece(GameState *state);
+void lock_piece(GameState* state);
 
 // Tetris
-int clearLines(GameState *state);
+int clear_lines(GameState* state);
 
 #endif

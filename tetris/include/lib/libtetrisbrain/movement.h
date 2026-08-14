@@ -1,15 +1,16 @@
 #ifndef TETRISBRAIN_MOVEMENT_H
 #define TETRISBRAIN_MOVEMENT_H
+
 #include <stdbool.h>
 #include "state.h"
 
 /* INPUTS */
-bool moveLeft(GameState *state);
+bool move_left(GameState* state);
 
-bool moveRight(GameState *state);
+bool move_right(GameState* state);
 
-bool softDrop(GameState *state);
+bool soft_drop(GameState* state);
 
-int hardDrop(GameState *state);
+int hard_drop(GameState* state);
 
 #endif
