@@ -1,6 +1,19 @@
 #include "bombfuzzer_common.h"
-#include "lib/libhtttp.h"
+#include "lib/libhypertext.h"
+#include "lib/libhtttp/payload.h"
 #include <string.h>
+
+// Deliberately NOT #include "lib/libhtttp.h": it defines HTTTP_METHODS/N_HTTTP_METHODS/
+// htttp_headers/N_HTTTP_HEADERS directly in the header with external linkage (no `static`, no
+// `extern`). Any second translation unit that both includes it and links against libhtttp.a - like
+// this file - gets "multiple definition" from the linker. Declaring only what we call routes around it.
+typedef enum { UNKNOWN = 0, REQ_MOVE, REQ_DROP, REQ_ROTATE, REQ_STATE, REQ_ATTACK } MethodHTTTP;
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formatted_msg);
+void req_create_state(uint32_t id, StatePayload *payload, ParsedMsgHT *formatted_msg);
+void req_create_attack(uint32_t id, AttackPayload *payload, ParsedMsgHT *formatted_msg);
+// req_extract_info() also has no prototype in libhtttp.h at all - declared here to call it. It's
+// currently a no-op stub (writes nothing to method/id/body) - see case_req_extract_info_correctness
+void req_extract_info(ParsedMsgHT formatted_msg, MethodHTTTP *method, uint32_t *id, char **body);
 
 // fuzzes libhtttp - the method/payload layer built on top of libhypertext (payload_encode/
 // decode_*, req_create_*, req_extract_info). Bodies here are plain sscanf/sprintf text produced
@@ -146,7 +159,7 @@ static void case_req_extract_info_correctness(unsigned int seed)
     MethodHTTTP method = UNKNOWN;
     uint32_t id = 0;
     char *body = NULL;
-    req_extract_info(&msg, &method, &id, &body);
+    req_extract_info(msg, &method, &id, &body);
 
     int correct = (method == REQ_MOVE) && (id == 42) && (body != NULL) && (strstr(body, "action-id: 7") != NULL);
     bombfuzzer_report(correct, "bombfuzzer_htttp", "req_extract_info correctness", seed, NULL, 0,

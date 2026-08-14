@@ -1,8 +1,34 @@
 #include "bombfuzzer_common.h"
-#include "lib/libhtttp.h"
+#include "lib/libhypertext.h"
+#include "lib/libhtttp/payload.h"
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#include <setjmp.h>
+#include <signal.h>
+
+// per-thread crash guard: a bug in the code under test (eg. convert_to_hypertext's OOB read) can
+// segfault a whole thread with no isolation otherwise - fork-per-op like the other harnesses use
+// would defeat the point of a throughput test, so this catches SIGSEGV/SIGBUS in-process instead
+// and treats it as a failed round trip. __thread makes the jump target and guard flag distinct per
+// thread; the handler is process-wide (POSIX signal handlers always are) but only acts if the
+// specific thread it interrupted had actually armed its own guard.
+static __thread sigjmp_buf crashJmpBuf;
+static __thread volatile sig_atomic_t crashArmed = 0;
+
+static void crashHandler(int sig)
+{
+    (void)sig;
+    if (crashArmed)
+    {
+        siglongjmp(crashJmpBuf, 1);
+    }
+}
+
+// Deliberately NOT #include "lib/libhtttp.h" - see bombfuzzer_htttp.c's top comment for why
+// (multiple-definition linker bug). Declaring only what we call routes around it.
+typedef enum { UNKNOWN = 0, REQ_MOVE, REQ_DROP, REQ_ROTATE, REQ_STATE, REQ_ATTACK } MethodHTTTP;
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formatted_msg);
 
 // concurrency/volume stress: hammers the pure parsing/encoding functions from many threads at
 // once. Each thread checks its own round trips stay correct despite everyone else running at the
@@ -36,6 +62,13 @@ typedef struct {
 // round trip matched, 0 otherwise.
 static int roundTripOnce(int threadIdx, int iter)
 {
+    if (sigsetjmp(crashJmpBuf, 1) != 0)
+    {
+        crashArmed = 0;
+        return 0;   // landed here via crashHandler - treat the crash itself as a failed round trip
+    }
+    crashArmed = 1;
+
     uint32_t id = (uint32_t)(threadIdx * 1000000 + iter);
 
     // hypertext request round trip
@@ -51,15 +84,13 @@ static int roundTripOnce(int threadIdx, int iter)
     }
     ParsedMsgHT parsed;
     memset(&parsed, 0, sizeof(parsed));
-    if (parse_hypertext(ht, &parsed) < 0)
-    {
-        return 0;
-    }
-    MethodHTTTP method = UNKNOWN;
-    uint32_t extractedId = 0;
-    char *body = NULL;
-    req_extract_info(&parsed, &method, &extractedId, &body);
-    if (method != REQ_MOVE || extractedId != id)
+    parse_hypertext(ht, &parsed);
+    // checked directly rather than via req_extract_info(), which is currently a no-op stub - see
+    // bombfuzzer_htttp.c's case_req_extract_info_correctness
+    char expectedPath[64];
+    snprintf(expectedPath, sizeof(expectedPath), "/room/0/player/%u", id);
+    if (parsed.token1 == NULL || strcmp(parsed.token1, "MOVE") != 0 || parsed.token2 == NULL ||
+        strcmp(parsed.token2, expectedPath) != 0)
     {
         return 0;
     }
@@ -117,7 +148,9 @@ static void *threadMain(void *arg)
     ThreadArg *t = (ThreadArg *)arg;
     for (int i = 0; i < t->iters; i++)
     {
-        if (!roundTripOnce(t->threadIdx, i))
+        int ok = roundTripOnce(t->threadIdx, i);
+        crashArmed = 0;   // disarm here - covers both normal return and the longjmp-recovery path
+        if (!ok)
         {
             t->mismatches++;
         }
@@ -128,6 +161,13 @@ static void *threadMain(void *arg)
 int main(void)
 {
     signal(SIGPIPE, SIG_IGN);
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = crashHandler;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+
     unsigned int seed = bombfuzzer_init_seed();
 
     int nThreads = threadsCount();
