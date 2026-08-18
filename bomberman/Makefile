@@ -42,6 +42,8 @@ DEPS_DIR := ./deps
 # ----------------------------------------------------------------------
 TARGET       := launcher
 LAUNCHER_BIN := bombapp
+SERVER_BIN := bombd
+CLIENT_BIN := bombu
 
 # ----------------------------------------------------------------------
 # RayLib Config
@@ -85,29 +87,20 @@ else
     $(info raylib: Not found! Will build locally in $(RAYLIB_LOCAL))
 endif
 
-# Bridge into common.mk's generic extra-dependency hooks - bombapp is the only
-# binary here that needs raylib, everything else (including bombfuzzer) doesn't
-EXTRA_DEP_BINS    := bombapp
+# The name of the binaries (matching a src/ directory or flat file) that
+# links raylib. Only this target receives the extra RAYLIB_* flags
+# Space-separated list!
+EXTRA_DEP_BINS    := bombapp bombd
 EXTRA_DEP_CFLAGS  := $(RAYLIB_CFLAGS)
 EXTRA_DEP_LDFLAGS := $(RAYLIB_LDFLAGS)
 EXTRA_DEP_DEPS    := $(RAYLIB_DEP)
 
-# Shared library/binary auto-discovery, testing scaffold, and dependency fetching
 include ../common.mk
 include ../common-test.mk
 include ../common-deps.mk
 
-# common.mk's LIB_template (unlike its BIN_template) has no per-library extra-flags hook, and
-# already captured libbombbrain_CFLAGS (via :=, at include time, before raylib was known) while
-# processing its own internal $(foreach lib,$(LIB_NAMES),...) above - libbombbrain includes
-# raylib.h directly, so override the captured value now that RAYLIB_CFLAGS is known. The compile
-# rule itself looks this variable up lazily at build time, so a later plain assignment like this
-# still takes effect.
-libbombbrain_CFLAGS := $(CFLAGS) $(RAYLIB_CFLAGS) -I$(INC_DIR)/$(LIB_SUBDIR)/libbombbrain
-
-# Generates the $(RAYLIB_ARTIFACT) download+build rule (fetch tarball, build via
-# RAYLIB_BUILD_CMD). NOT cleaned by 'make clean' so we don't re-download every clean -
-# use 'make distclean' to force that.
+# Generate template for fetching and building raylib
+# NOT cleaned by make clean so we don't have to re-download each time
 $(eval $(call FETCH_TARBALL_template,RAYLIB))
 
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
@@ -217,6 +210,11 @@ bombfuzzer-coverage:
 # ----------------------------------------------------------------------
 # Cleaning
 # ----------------------------------------------------------------------
-# Remove /deps and build artifacts (clean itself comes from common.mk)
+# Keeps /deps intact while cleaning build artifacts
+clean:
+	rm -rf ./build $(UNIT_BIN)
+	rm -f $(TARGET)
+
+# Remove /deps and build artifacts
 distclean: clean
 	rm -rf $(DEPS_DIR)
