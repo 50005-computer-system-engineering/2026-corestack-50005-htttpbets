@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libhtttp/payload.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libtetrisbrain/targeting.h"
 

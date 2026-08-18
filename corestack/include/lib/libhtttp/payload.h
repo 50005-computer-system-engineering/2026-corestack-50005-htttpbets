@@ -58,6 +58,7 @@ typedef struct {
     uint32_t target_mode;
 
     uint32_t game_over;
+    uint32_t winner_id;
 } StatePayload;
 
 /* ----- PACK / UNPACK ----- */

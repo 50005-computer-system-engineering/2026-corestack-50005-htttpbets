@@ -7,6 +7,7 @@
 #include "lib/libtetrisprotocol/protocol.h"
 #include "lib/libtetrisbrain/state.h"
 #include "lib/libbattleroyale/client.h"
+#include "lib/libhtttp.h"
 
 // Instantiate network client
 extern BRClient* network_client;
@@ -18,15 +19,15 @@ static void send_action(GameState* state, PlayerAction action)
         return; // No connection, nothing to ask
     }
 
-    InputPayload payload =
-        {
-            .player_id = state->player_id,
-            .action = (uint32_t)action};
+    InputPayload payload = {.action = (uint32_t)action};
 
-    unsigned char buffer[512] = {0};
-    pack_input(buffer, &payload);
+    ParsedMsgHT msg = {0};
+    req_create_action(state->player_id, REQ_ACTION, &payload, &msg);
 
-    brclient_send_msg(network_client, buffer);
+    HyperText ht;
+    convert_to_hypertext(&msg, ht);
+
+    brclient_send_msg(network_client, (unsigned char*)ht);
 }
 
 // Process all pending terminal inputs

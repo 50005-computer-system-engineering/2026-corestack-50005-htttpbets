@@ -1,7 +1,7 @@
 #ifndef LIBHT_H
 #define LIBHT_H
 
-#define MAX_BUF 1024   // kinda arbritrary rn
+#define MAX_BUF 2048   // must match libbattleroyale's MSG_CONTENT_LENGTH; brserver/brclient app-msg calls memcpy this many bytes in/out of a HyperText buffer
 #define MAX_HEADERS 16 // kinda arbritrary rn
 
 // hypertext separators

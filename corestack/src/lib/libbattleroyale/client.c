@@ -4,6 +4,9 @@
 #include "common.h"
 #include "crypto.h"
 
+static unsigned char sesskey[SESSION_KEY_LEN];
+static char server_ip_addr[INET_ADDRSTRLEN];
+
 static MessageQueue client_messages;
 static pthread_mutex_t client_messages_lock;
 static int pc_flags[2] = {0, 0};
@@ -170,8 +173,20 @@ void client_game_state(Endpoint* client)
                     }
 
                     LOG_D("[clientGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
-                    if (msg.msg_type == MSG_APP) {
+                    if (msg.msg_type == MSG_APP || msg.msg_type == MSG_APP_ENC) {
                         LOG_D("[clientGameState()] Message received for application");
+                        if (msg.msg_type == MSG_APP_ENC) {
+                            LOG_D("decrypting content");
+                            unsigned char decrypted[MSG_CONTENT_LENGTH];
+                            size_t decrypted_len = 0;
+                            if (decrypt_message(&msg, client->sesskey, decrypted, &decrypted_len) < 0) {
+                                LOG_E("[clientGameState()] failed to decrypt message from %d, dropping", listen_fd[i].fd);
+                                continue;
+                            }
+                            msg.msg_len = (uint32_t)decrypted_len;
+                            memcpy(msg.msg_content, decrypted, decrypted_len);
+                            msg.msg_type = MSG_APP;
+                        }
                         if (pc_flags[0]) {
                             pc_flags[1] = 1;
                             LOG_D("[clientGameState()] listener yielding CPU control for user polling queue");
@@ -271,6 +286,9 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
 
     LOG_I("[brclient_join()] attempting connection to lobby located at IP %s", ip_address);
 
+    // save server IP for future unicast UDP messaging
+    snprintf(server_ip_addr, sizeof(server_ip_addr), "%s", ip_address);
+
     // TALKING TO MASTER
     // the master only deals out rooms, connect and ask for one
     if (connect_on_tcp(this_client->socks, ip_address, PORT_TCP) < 0) {
@@ -309,25 +327,15 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
         return -1;
     }
 
-    // security - authentication
-    // nonce generation
-    unsigned char nonce[NONCE_LEN];
-    RAND_bytes(nonce, sizeof(nonce));
-    // receive server cert
-    // Message *msg;
-    // while (receiveMessageTCP(thisClient->socks->tcp, ))
-
-    // sendBytes(sockfd, (unsigned char *)nonce, noncefd);
-
     // receive user id and save to Endpoint
     unsigned char* buffer = NULL;
     buffer = malloc(sizeof(uint32_t));
     if (buffer == NULL) {
-        perror("[startClientHandshake()] malloc");
+        perror("malloc");
         return -1;
     }
     if (read_bytes(this_client->socks->tcp, &buffer, sizeof(uint32_t)) < 0) {
-        LOG_E("[startClientHandshake()] failed to read sourceId");
+        LOG_E("failed to read sourceId");
         return -1;
     }
     uint32_t source_bytes;
@@ -335,6 +343,77 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     this_client->id = ntohl(source_bytes);
     free(buffer);
     buffer = NULL;
+
+    // security - authentication
+    // nonce generation
+    unsigned char nonce[NONCE_LEN];
+    RAND_bytes(nonce, sizeof(nonce));
+
+    // receive server cert
+    Message msg;
+    do {
+        receive_message_tcp(this_client->socks->tcp, &msg);
+    } while (msg.msg_type != MSG_CERT);
+
+    unsigned char* cert_bytes = malloc(msg.msg_len);
+    X509* cert = load_cert_bytes(msg.msg_content, msg.msg_len);
+
+    // send nonce
+    msg.msg_type = MSG_AUTH;
+    msg.source_id = this_client->id;
+    snprintf(msg.msg_content, 2048, "%s", nonce);
+    send_message_tcp(this_client->socks->tcp, msg);
+
+    // receive signed nonce and verify
+    do {
+        receive_message_tcp(this_client->socks->tcp, &msg);
+    } while (msg.msg_type != MSG_AUTH);
+
+    if (!verify_message_pss(cert, msg.msg_content, msg.msg_len, nonce, sizeof(nonce))) {
+        LOG_E("server could not be authenticated");
+        return -1;
+    }
+
+    // authentication - symmetric key establishment
+    // get public key
+    EVP_PKEY* pubkey = X509_get_pubkey(cert);
+    if (pubkey == NULL) {
+        LOG_E("could not load pubkey from cert");
+        return -1;
+    }
+
+    // generate session key and encrypt with pubkey
+    if (generate_session_key(sesskey) < 0) {
+        LOG_E("Failed key generation");
+        return -1;
+    }
+
+    this_client->sesskey = malloc(SESSION_KEY_LEN);
+    if (this_client->sesskey == NULL) {
+        perror("malloc");
+        return -1;
+    }
+    memcpy(this_client->sesskey, sesskey, SESSION_KEY_LEN);
+
+    size_t enc_key_len;
+    unsigned char* enc_key = rsa_encrypt_block(pubkey, sesskey, SESSION_KEY_LEN, &enc_key_len, 0);
+
+    if (enc_key == NULL || enc_key_len > sizeof(msg.msg_content)) {
+        LOG_E("failed to encrypt session key");
+        free(enc_key);
+        return -1;
+    }
+
+    // send key to server
+    msg.source_id = this_client->id;
+    msg.msg_type = MSG_KEY;
+    msg.msg_len = enc_key_len;
+    memcpy(msg.msg_content, enc_key, msg.msg_len);
+    LOG_D("EEEE: %u", msg.msg_len);
+    free(enc_key);
+    if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
+        LOG_E("failed to send session key");
+    }
 
     // INDEPENDENT OF SERVER
     // prepare UDP ports for future use upon connection
@@ -368,17 +447,17 @@ int brclient_get_state(BRClient* client_ptr)
 }
 
 // message functions
-int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024])
+int brclient_send_msg(BRClient* client_ptr, unsigned char content[MAX_APP_PAYLOAD_LEN])
 {
     Endpoint* this_client = client_ptr;
 
     // build message
     Message msg = {
         .source_id = this_client->id,
-        .msg_type = MSG_APP,
+        .msg_type = MSG_APP_ENC,
     };
-    // snprintf(msg.msgContent, MSG_CONTENT_LENGTH, content);
-    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
+
+    encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     // send via socket
     if (send_message_tcp(this_client->socks->tcp, msg) < 0) {
@@ -394,8 +473,7 @@ fail:
     return -1;
 }
 
-// Unicast UDP send: best-effort, unordered, use for high-frequency/loss-tolerant traffic
-int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024])
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[2048])
 {
     Endpoint* this_client = client_ptr;
 
@@ -404,15 +482,17 @@ int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024])
         .source_id = this_client->id,
         .msg_type = MSG_APP,
     };
-    memcpy(msg.msg_content, content, MSG_CONTENT_LENGTH);
 
-    // send via the already-connect()'d unicast UDP socket
-    if (send_message_udp_unicast(this_client->socks->udp_uni, msg) < 0) {
+    encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);
+
+    // send message
+    if (send_unicast_udp(this_client->socks->udp_uni, server_ip_addr, msg) < 0) {
         LOG_E("[brclient_send_msg_udp()] sending has failed");
         return -1;
     }
 
     LOG_I("[brclient_send_msg_udp()] message has been sent");
+
     return 0;
 }
 
@@ -420,7 +500,7 @@ int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brclient_get_app_msg(unsigned char return_msg[1024])
+int brclient_get_app_msg(unsigned char return_msg[2048])
 {
     if (!Message_empty(&client_messages)) {
         if (pc_flags[1]) {
@@ -436,7 +516,6 @@ int brclient_get_app_msg(unsigned char return_msg[1024])
         LOG_I("[brclient_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     } else {
-        LOG_I("[brclient_get_app_msg()] queue is empty");
         return 0;
     }
 }

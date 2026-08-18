@@ -31,6 +31,9 @@ INIT_MSG     := \U0001F9F1
 PROJECT_NAME := tetris
 POST_INIT    := mkdir -p var/log var/run
 
+SERVER_BIN := tetrisd
+CLIENT_BIN := tetrisu
+
 # Include basic compiling logic
 include ../common.mk
 # Include testing logic
@@ -41,12 +44,7 @@ include ../common-test.mk
 # Dynamically find available terminal emulator
 TERM_CMD := $(shell which kitty || which gnome-terminal || which xfce4-terminal || which xterm)
 
-# Binaries
-SERVER_BIN := tetrisd
-CLIENT_BIN := tetrisu
-SERVER_PORT := 6700
-
-.PHONY: run run-server run-client kill-server
+.PHONY: run run-server run-client
 
 run-server:
 	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
@@ -58,8 +56,3 @@ run:
 	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
 	sleep 1;
 	${TERM_CMD} -- bash -c "${BIN_OUT}/${CLIENT_BIN}; exec bash" &
-
-kill-server:
-	@pkill -9 -x "${SERVER_BIN}" 2>/dev/null; \
-	fuser -k ${SERVER_PORT}/tcp 2>/dev/null; \
-	echo "Killed any ${SERVER_BIN} process and freed port ${SERVER_PORT}."

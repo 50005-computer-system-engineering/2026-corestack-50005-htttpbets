@@ -109,6 +109,7 @@ int remove_from_list(ClientLinkedList* list, uint32_t id)
             list->count--;
             return 0;
         }
+        checking = checking->next;
     }
     LOG_E("[removeFromList()] id could not be matched in list");
     return -1;
@@ -122,26 +123,19 @@ int get_from_list(ClientLinkedList* list, Endpoint* return_client, uint32_t id)
         return -1;
     }
 
-    // check every next node until new
-    ClientNode* checking = NULL;
-    checking = list->head;
-    while (checking->next != NULL) {
+    // check every node, including the tail
+    ClientNode* checking = list->head;
+    while (checking != NULL) {
         // match id
         if (checking->client.id == id) {
-            LOG_E("[getFromList()] id matched, breaking search");
-            goto found;
+            *return_client = checking->client;
+            LOG_I("[getFromList()] client assigned to return buffer");
+            return 0;
         }
         checking = checking->next;
     }
     LOG_E("[getFromList()] id could not be matched in list");
-    return_client = NULL;
     return -1;
-
-// return struct through pointer
-found:
-    *return_client = checking->client;
-    LOG_I("[getFromList()] client assigned to return buffer");
-    return 0;
 }
 
 int get_id_array(ClientLinkedList* list, uint32_t** ids)

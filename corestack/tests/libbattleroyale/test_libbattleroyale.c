@@ -100,7 +100,7 @@ int executeTestStage(BRClient* testClient, int id, enum TestStage stage)
     // execute test functions
     switch (stage) {
         // used in multiple tests
-        unsigned char msgContent[1024];
+        unsigned char msgContent[2048];
     case SETUP:
         // do nothing
         result = PASS;
@@ -110,6 +110,7 @@ int executeTestStage(BRClient* testClient, int id, enum TestStage stage)
         if (brclient_join(testClient, "127.0.0.1") < 0) {
             printf("client %d: failed to join the lobby\n", id);
             result = FAIL;
+            break;
             break;
         }
         printf("client %d: successfully joined lobby\n", id);

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define MSG_CONTENT_LENGTH 2048
+
 typedef void BRClient;
 
 // States to identify client state
@@ -18,11 +20,10 @@ int brclient_join(BRClient* client_ptr, char* ip_address);
 int brclient_get_state(BRClient* client_ptr);
 // int leaveLobby(LibhtttpClient *clientPtr);
 
-int brclient_send_msg(BRClient* client_ptr, unsigned char content[1024]); // use defined value instead of explicit number
-// Unicast UDP send: unreliable/unordered, use for high-frequency, loss-tolerant traffic (eg: movement)
-int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[1024]);
+int brclient_send_msg(BRClient* client_ptr, unsigned char content[MSG_CONTENT_LENGTH]); // use defined value instead of explicit number
+int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[MSG_CONTENT_LENGTH]);
 
-int brclient_get_app_msg(unsigned char return_msg[1024]);
+int brclient_get_app_msg(unsigned char return_msg[MSG_CONTENT_LENGTH]);
 
 int brclient_get_id(BRClient* client_ptr, uint32_t* id); // returns 0 on success, -1 on failure; writes id via out-param
 

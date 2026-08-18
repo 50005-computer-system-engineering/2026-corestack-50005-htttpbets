@@ -1,4 +1,4 @@
-// direct copy of common.h from PA2
+// slight modification of common.h from PA2
 
 /**
  * common.h
@@ -21,6 +21,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <signal.h>
+#include <sys/stat.h>
 
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -31,9 +40,27 @@
 #include <openssl/rand.h>
 #include <openssl/hmac.h>
 
+#include "message.h"
+
 /* ======================================================================
  * Constants
  * ====================================================================== */
+
+/** All length-prefix fields in the wire protocol are 8 bytes, big-endian. */
+#define INT_BYTES 8
+
+/** RSA key size used in this project (matches generate_keys.py: 1024-bit). */
+#define RSA_KEY_BITS 1024
+#define RSA_KEY_BYTES (RSA_KEY_BITS / 8) /* 128 bytes */
+
+/**
+ * Maximum plaintext that fits in one RSA-OAEP block with SHA-256:
+ *   floor(n/8) - 2*ceil(h/8) - 2 = 128 - 2*32 - 2 = 62 bytes
+ * For PKCS1v15: 128 - 11 = 117 bytes
+ */
+#define RSA_OAEP_CHUNK 62
+#define RSA_PKCS1_CHUNK 117
+#define TEST_CHUNK 128
 
 /** AES-128-CBC block and key sizes (used by our Fernet-equivalent). */
 #define AES_KEY_LEN 16
@@ -46,6 +73,11 @@
  * Session key length = HMAC key (16) + AES key (16) = 32 bytes.
  */
 #define SESSION_KEY_LEN (HMAC_KEY_LEN + AES_KEY_LEN)
+
+/**
+ * Largest app payload that can be encrypted within MESSAGE_CONTENT_LENGTH
+ */
+#define MAX_APP_PAYLOAD_LEN (MSG_CONTENT_LENGTH - AES_IV_LEN - HMAC_LEN - AES_BLOCK)
 
 /* ======================================================================
  * OpenSSL key/cert loading
@@ -107,6 +139,30 @@ int verify_message_pss(X509* cert,
                        const unsigned char* msg, size_t msg_len);
 
 /* ======================================================================
+ * RSA encryption / decryption (CP1 and key exchange in CP2)
+ * ====================================================================== */
+
+/**
+ * Encrypts a single block of plaintext with RSA-OAEP (SHA-256) or RSA-PKCS1v15.
+ * 'use_oaep' selects the padding mode.
+ *
+ * Returns a newly malloc'd ciphertext buffer (RSA_KEY_BYTES long),
+ * and writes its length to *out_len. Returns NULL on failure.
+ */
+unsigned char* rsa_encrypt_block(EVP_PKEY* pub_key,
+                                 const unsigned char* plain, size_t plain_len,
+                                 size_t* out_len, int use_oaep);
+
+/**
+ * Decrypts a single RSA-encrypted block.
+ * Returns a newly malloc'd plaintext buffer, writes length to *out_len.
+ * Returns NULL on failure.
+ */
+unsigned char* rsa_decrypt_block(EVP_PKEY* priv_key,
+                                 const unsigned char* cipher, size_t cipher_len,
+                                 size_t* out_len, int use_oaep);
+
+/* ======================================================================
  * Symmetric encryption (CP2)
  * ======================================================================
  */
@@ -138,6 +194,23 @@ unsigned char* session_encrypt(const unsigned char key[SESSION_KEY_LEN],
 unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
                                const unsigned char* token, size_t token_len,
                                size_t* out_len);
+
+/* ======================================================================
+ * Message encryption helpers
+ * ======================================================================
+ */
+
+/**
+ * Encrypts content for packet
+ * Returns 0 on success, -1 on failure.
+ */
+int encrypt_message(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len);
+
+/**
+ * Decrypts packet content
+ * Returns 0 on success, -1 on failure.
+ */
+int decrypt_message(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len);
 
 /* ======================================================================
  * Utility

@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#define MSG_CONTENT_LENGTH 1024
+#define MSG_CONTENT_LENGTH 2048
 
 typedef enum {
     // security related
@@ -16,11 +16,13 @@ typedef enum {
     MSG_START,
     MSG_END,
     // app related
-    MSG_APP
+    MSG_APP,    // plaintext
+    MSG_APP_ENC // ciphertext
 } MessageType;
 
 typedef struct {
     uint32_t source_id;
+    uint32_t msg_len;
     MessageType msg_type;
     unsigned char msg_content[MSG_CONTENT_LENGTH];
 } Message;
@@ -36,7 +38,6 @@ int receive_message_tcp(int sockfd, Message* return_ptr);
 int receive_message_udp(int sockfd, Message* return_ptr);
 int send_message_tcp(int sockfd, const Message COMPLETE_MSG);
 int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG);
-// Unicast UDP send on a socket already connect()'d to its target (see connect_udp_uni)
-int send_message_udp_unicast(int sockfd, const Message COMPLETE_MSG);
+int send_unicast_udp(int sockfd, const char* dest_ip, const Message COMPLETE_MSG);
 
 #endif

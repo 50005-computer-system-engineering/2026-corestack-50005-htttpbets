@@ -223,6 +223,108 @@ done:
 }
 
 /* ======================================================================
+ * RSA encryption / decryption
+ * ====================================================================== */
+
+unsigned char* rsa_encrypt_block(EVP_PKEY* pub_key,
+                                 const unsigned char* plain, size_t plain_len,
+                                 size_t* out_len, int use_oaep)
+{
+    /**
+     * Encrypts a single plaintext block with RSA.
+     *
+     * use_oaep=1: OAEP with SHA-256 (max 62 bytes for 1024-bit key)
+     * use_oaep=0: PKCS1v15 (max 117 bytes for 1024-bit key)
+     *
+     */
+    unsigned char* out = NULL;
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pub_key, NULL);
+    if (!ctx)
+        return NULL;
+
+    if (EVP_PKEY_encrypt_init(ctx) <= 0)
+        goto fail;
+
+    if (use_oaep) {
+        if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+            goto fail;
+        if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0)
+            goto fail;
+        if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0)
+            goto fail;
+    } else {
+        if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0)
+            goto fail;
+    }
+
+    /* Determine output size */
+    if (EVP_PKEY_encrypt(ctx, NULL, out_len, plain, plain_len) <= 0)
+        goto fail;
+
+    out = malloc(*out_len);
+    if (!out)
+        goto fail;
+
+    if (EVP_PKEY_encrypt(ctx, out, out_len, plain, plain_len) <= 0) {
+        free(out);
+        out = NULL;
+    }
+
+fail:
+    if (!out)
+        print_ssl_error("rsa_encrypt_block");
+    EVP_PKEY_CTX_free(ctx);
+    return out;
+}
+
+unsigned char* rsa_decrypt_block(EVP_PKEY* priv_key,
+                                 const unsigned char* cipher, size_t cipher_len,
+                                 size_t* out_len, int use_oaep)
+{
+    /**
+     * Decrypts a single RSA-encrypted block.
+     */
+    unsigned char* out = NULL;
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(priv_key, NULL);
+    if (!ctx)
+        return NULL;
+
+    if (EVP_PKEY_decrypt_init(ctx) <= 0)
+        goto fail;
+
+    if (use_oaep) {
+        if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+            goto fail;
+        if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0)
+            goto fail;
+        if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0)
+            goto fail;
+    } else {
+        if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0)
+            goto fail;
+    }
+
+    /* Determine output size */
+    if (EVP_PKEY_decrypt(ctx, NULL, out_len, cipher, cipher_len) <= 0)
+        goto fail;
+
+    out = malloc(*out_len);
+    if (!out)
+        goto fail;
+
+    if (EVP_PKEY_decrypt(ctx, out, out_len, cipher, cipher_len) <= 0) {
+        free(out);
+        out = NULL;
+    }
+
+fail:
+    if (!out)
+        print_ssl_error("rsa_decrypt_block");
+    EVP_PKEY_CTX_free(ctx);
+    return out;
+}
+
+/* ======================================================================
  * Symmetric encryption
  * ======================================================================
  */
@@ -364,6 +466,64 @@ unsigned char* session_decrypt(const unsigned char key[SESSION_KEY_LEN],
 
     *out_len = (size_t)(pt_len + final_len);
     return plain;
+}
+
+/* ======================================================================
+ * Message envelope helpers
+ * ====================================================================== */
+
+int encrypt_message(Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], const unsigned char* content, size_t content_len)
+{
+    // check if legal length
+    if (content_len > MAX_APP_PAYLOAD_LEN) {
+        LOG_E("content is too large for encryption, maximum is %d", MAX_APP_PAYLOAD_LEN);
+        return -1;
+    }
+
+    // encrypt
+    size_t enc_len;
+    unsigned char* encrypted = session_encrypt(sesskey, content, content_len, &enc_len);
+    if (encrypted == NULL) {
+        print_ssl_error("message_pack_encrypted");
+        LOG_E("encryption failed");
+        return -1;
+    }
+
+    // copy to content
+    msg->msg_len = (uint32_t)enc_len;
+    memcpy(msg->msg_content, encrypted, enc_len);
+    free(encrypted);
+
+    LOG_I("Successfully encrypted payload");
+
+    return 0;
+}
+
+int decrypt_message(const Message* msg, const unsigned char sesskey[SESSION_KEY_LEN], unsigned char out[MSG_CONTENT_LENGTH], size_t* out_len)
+{
+    // reject lengths that don't fit in the actual msg_content buffer before
+    // treating them as a trusted token length
+    if (msg->msg_len > MSG_CONTENT_LENGTH) {
+        LOG_E("decrypt_message: msg_len %u exceeds MSG_CONTENT_LENGTH", msg->msg_len);
+        return -1;
+    }
+
+    // decrypt
+    unsigned char* decrypted = session_decrypt(sesskey, msg->msg_content, msg->msg_len, out_len);
+    if (decrypted == NULL) {
+        print_ssl_error("message_unpack_encrypted");
+        LOG_E("encryption failed");
+        return -1;
+    }
+
+    // output to buffer
+    memset(out, 0, MSG_CONTENT_LENGTH);
+    memcpy(out, decrypted, *out_len);
+    free(decrypted);
+
+    LOG_I("Successfully decrypted payload");
+
+    return 0;
 }
 
 /* ======================================================================

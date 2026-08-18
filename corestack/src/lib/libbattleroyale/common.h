@@ -41,7 +41,7 @@ typedef struct {
     uint32_t id; // Own ID
     EndpointState state;
     Sockets* socks; // track sockets
-    // MessageQueue messages;
+    unsigned char* sesskey;
 } Endpoint;
 
 // functions for sockets

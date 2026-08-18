@@ -6,6 +6,7 @@
 #include <time.h>
 #include "lib/libbattleroyale/server.h"
 #include "lib/libtetrisprotocol/protocol.h"
+#include "lib/libhtttp.h"
 #include "lib/libtetrisbrain/garbage.h"
 #include "lib/libtetrislog/logclient.h"
 #include "game.h"
@@ -41,9 +42,13 @@ static void broadcast_feed(BRServer* server, uint32_t source, uint32_t target, u
         .lines = lines
     };
 
-    unsigned char feed_buffer[512] = {0};
-    pack_attack(feed_buffer, &feed);
-    brserver_send_to_all(server, feed_buffer);
+    ParsedMsgHT msg = {0};
+    req_create_attack(source, &feed, &msg);
+
+    HyperText ht;
+    convert_to_hypertext(&msg, ht);
+
+    brserver_send_to_all(server, (unsigned char*)ht);
 }
 
 // Garbage forwarded by the master from another room lands here
@@ -188,14 +193,23 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
     }
 
     // Tell every client who they share this room with
-    RosterPayload roster = {0};
+    // RosterPayload's ids[] is a flexible array member, so build it on a fixed-size
+    // wrapper struct and cast, same trick tetrisu uses to decode it
+    struct {
+        uint32_t count;
+        uint32_t ids[MAX_LOBBY_SIZE];
+    } roster = {0};
     roster.count = lobby_size;
     for (uint32_t i = 0; i < lobby_size && i < MAX_LOBBY_SIZE; i++) {
         roster.ids[i] = client_ids[i];
     }
-    unsigned char roster_buffer[512] = {0};
-    pack_roster(roster_buffer, &roster);
-    if (brserver_send_to_all(server, roster_buffer) < 0) {
+
+    ParsedMsgHT roster_msg = {0};
+    req_create_roster(0, (RosterPayload*)&roster, &roster_msg);
+
+    HyperText roster_ht;
+    convert_to_hypertext(&roster_msg, roster_ht);
+    if (brserver_send_to_all(server, (unsigned char*)roster_ht) < 0) {
         room_log_msg(LOG_LEVEL_WARN, "[room %d] Warning: failed to broadcast player roster.", room_index);
     }
 
@@ -207,7 +221,7 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
 
     #pragma region Authoritative Tick Loop
     // Non-blocking, runs while anyone in this room is alive
-    unsigned char buffer[1024] = {0};
+    HyperText buffer = {0};
     bool match_over = false;
     uint32_t winner_id = 0;
 
@@ -216,21 +230,29 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
         // Bounded to max_msgs so a flood of packets can never starve the simulation below!
         // => prevent frozen/malicious clients from spamming
         for (int drained = 0; drained < MAX_MSGS_PER_TICK; drained++) {
-            if (brserver_get_app_msg(buffer) != 1) {
+            if (brserver_get_app_msg((unsigned char*)buffer) != 1) {
                 break; // Queue is empty
             }
 
-            // Read the tag so the receiver knows what to do with the packet
-            uint32_t tag = read_packet_tag(buffer);
-            if (tag == PACKET_INPUT) {
+            ParsedMsgHT parsed = {0};
+            if (parse_hypertext(buffer, &parsed) < 0) {
+                continue; // Malformed message, drop it
+            }
+
+            MethodHTTTP method;
+            uint32_t sender_id;
+            char* body;
+            req_extract_info(&parsed, &method, &sender_id, &body);
+
+            if (method == REQ_ACTION) {
                 InputPayload input;
-                unpack_input(buffer, &input);
+                payload_decode_input(body, &input);
 
                 // Perform the requested action on that player's real board
-                PlayerSlot* slot = find_player(&session, input.player_id);
+                PlayerSlot* slot = find_player(&session, sender_id);
                 apply_action(&session, slot, (PlayerAction)input.action);
             }
-            // Any other tag is ignored
+            // Any other method is ignored
         }
 
         // (2) Drain the hub: incoming garbage, roster refreshes, global win/lose state
@@ -342,15 +364,18 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
                 continue; // Skip sending!
             }
 
-            // Reduces overall Gamestate into a smaller snapshot of relevant info 
+            // Reduces overall Gamestate into a smaller snapshot of relevant info
             // (eg: only preview pieces shown, etc.)
             StatePayload snapshot;
             build_state_payload(&slot->state, &snapshot);
 
             // Serialise payload and transmit those bytes to all clients
-            unsigned char state_buffer[512] = {0};
-            pack_state(state_buffer, &snapshot);
-            brserver_send_to_all(server, state_buffer);
+            ParsedMsgHT state_msg = {0};
+            req_create_state(slot->player_id, &snapshot, &state_msg);
+
+            HyperText state_ht;
+            convert_to_hypertext(&state_msg, state_ht);
+            brserver_send_to_all(server, (unsigned char*)state_ht);
 
             // Reset flag and idle timer
             slot->dirty = false;
@@ -377,9 +402,12 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
         StatePayload snapshot;
         build_state_payload(&slot->state, &snapshot);
 
-        unsigned char state_buffer[512] = {0};
-        pack_state(state_buffer, &snapshot);
-        brserver_send_to_all(server, state_buffer);
+        ParsedMsgHT state_msg = {0};
+        req_create_state(slot->player_id, &snapshot, &state_msg);
+
+        HyperText state_ht;
+        convert_to_hypertext(&state_msg, state_ht);
+        brserver_send_to_all(server, (unsigned char*)state_ht);
     }
 
     // Show relevant winning message

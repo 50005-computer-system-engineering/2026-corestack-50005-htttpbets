@@ -3,6 +3,7 @@
 #include "lib/libbattleroyale/server.h"
 #include "common.h"
 #include "clientll.h"
+#include "crypto.h"
 
 typedef struct {
     Endpoint* self; // the room's own endpoint
@@ -11,6 +12,9 @@ typedef struct {
     uint16_t udp_port; // unicast UDP port, also per-room so rooms never collide
     uint32_t next_id; // next player id to hand out, master sets the base per room
 } Server;
+
+static X509* cert;
+static EVP_PKEY* pkey;
 
 static MessageQueue server_messages;
 static pthread_mutex_t server_messages_lock;
@@ -175,7 +179,7 @@ During this state, TCP connections from client are accepted (and server assigns 
 */
 void server_lobby_state(Server* server_ptr) // loop where server accepts clients
 {
-    LOG_I("[serverLobbyState()] SERVER entering LOBBY state, accepting clients...");
+    LOG_I("SERVER entering LOBBY state, accepting clients...");
 
     // preparing TCP socket for polling
     struct pollfd accept_port;
@@ -192,10 +196,10 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
         }
 
         // accept a client if the socket has any POLLIN activity
-        LOG_D("[serverLobbyState()] polled activity, accpeting a client");
+        LOG_D("polled activity, accpeting a client");
         int client_fd = accept_on_tcp(server_ptr);
         if (client_fd < 0) {
-            LOG_E("[serverLobbyState()] accept failed to find client, skipping loop iteration...");
+            LOG_E("accept failed to find client, skipping loop iteration...");
             continue;
         }
         // ids come from a per-room base so they stay unique across every room
@@ -208,27 +212,88 @@ void server_lobby_state(Server* server_ptr) // loop where server accepts clients
             .socks = malloc(sizeof(Sockets))};
         new_client.socks->tcp = client_fd;
 
-        LOG_D("[serverLobbyState()] sending client %u their ID", new_client.id);
+        LOG_D("sending client %u their ID", new_client.id);
 
         unsigned char* buffer = NULL;
 
         buffer = malloc(sizeof(uint32_t));
         if (buffer == NULL) {
-            perror("[serverLobbyState()] malloc");
-            goto cleanup;
-        }
-        uint32_t id_bytes = htonl(new_client.id);
-        if (send_bytes(new_client.socks->tcp, (unsigned char*)&id_bytes, sizeof(uint32_t)) < 0) {
-            LOG_E("[serverLobbyState()] failed to send source ID");
+            perror("malloc");
             goto cleanup;
         }
 
-        // add completed new client to the clients list
-        if (add_to_list(server_ptr->clients, &new_client)) {
-            LOG_E("[serverLobbyState()] failed to add client to new list");
+        // new client id
+        uint32_t id_bytes = htonl(new_client.id);
+        if (send_bytes(new_client.socks->tcp, (unsigned char*)&id_bytes, sizeof(uint32_t)) < 0) {
+            LOG_E("failed to send source ID");
             goto cleanup;
         }
-        LOG_D("[serverLobbyState()] finished sending the new client their ID");
+
+        // security - authentication
+        // send certificate top new client
+        Message msg;
+        msg.source_id = server_ptr->self->id;
+        msg.msg_type = MSG_CERT;
+        /* Send certificate */
+        BIO* cert_bio = BIO_new(BIO_s_mem());
+        PEM_write_bio_X509(cert_bio, cert);
+        unsigned char* cert_buf_ptr;
+        uint32_t cert_len = BIO_get_mem_data(cert_bio, &cert_buf_ptr);
+        msg.msg_len = cert_len;
+        memcpy(msg.msg_content, cert_buf_ptr, cert_len);
+        send_message_tcp(new_client.socks->tcp, msg);
+        BIO_free(cert_bio);
+
+        // wait for nonce before signing and returning
+        do {
+            if (receive_message_tcp(new_client.socks->tcp, &msg) < 0) {
+                LOG_E("client disconnected while awaiting auth nonce");
+                goto cleanup;
+            }
+        } while (msg.msg_type != MSG_AUTH);
+        size_t sig_len;
+        unsigned char* sig = sign_message_pss(pkey, msg.msg_content, NONCE_LEN, &sig_len);
+
+        // format and send back signature
+        msg.source_id = server_ptr->self->id;
+        msg.msg_type = MSG_AUTH;
+        msg.msg_len = sig_len;
+        memcpy(msg.msg_content, sig, sig_len);
+        send_message_tcp(new_client.socks->tcp, msg);
+        free(sig);
+
+        // get session key for this client
+        do {
+            if (receive_message_tcp(new_client.socks->tcp, &msg) < 0) {
+                LOG_E("client disconnected while awaiting session key");
+                goto cleanup;
+            }
+        } while (msg.msg_type != MSG_KEY);
+        size_t client_sesskey_len;
+        unsigned char* client_sesskey = rsa_decrypt_block(pkey, msg.msg_content, msg.msg_len, &client_sesskey_len, 0);
+        if (client_sesskey == NULL || client_sesskey_len != SESSION_KEY_LEN) {
+            LOG_E("invalid sesskey length received");
+            free(client_sesskey);
+            goto cleanup;
+        }
+
+        // save the session key, then register the fully-authenticated client
+        new_client.sesskey = malloc(SESSION_KEY_LEN);
+        if (new_client.sesskey == NULL) {
+            perror("malloc");
+            free(client_sesskey);
+            goto cleanup;
+        }
+        memcpy(new_client.sesskey, client_sesskey, SESSION_KEY_LEN);
+        free(client_sesskey);
+
+        // add completed new client to the clients list
+        if (add_to_list(server_ptr->clients, &new_client)) {
+            LOG_E("failed to add client to new list");
+            free(new_client.sesskey);
+            goto cleanup;
+        }
+        LOG_D("finished sending the new client their ID");
 
         continue;
 
@@ -296,58 +361,52 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
         // every ~50-100ms can drain, so this loop needs to cycle quickly
         int socket_activity = poll(listen_fd_tcp, server_ptr->clients->count, 5);
         Message msg;
+        for (uint32_t i = 0; i < server_ptr->clients->count && socket_activity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
+        {
+            if (listen_fd_tcp[i].revents == POLLIN) {
+                int fd = listen_fd_tcp[i].fd;
+                socket_activity--;
+                if (receive_message_tcp(fd, &msg) < 0) {
+                    LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
+                    listen_fd_tcp[i].fd = -1; // Set disconnected socket to -1 to prevent triggering infinite EOF loop
+                    continue;
+                }
+                LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 
-        // listen to each message and handle. Deliberately NOT an early
-        // "continue" when socket_activity <= 0: that used to skip the UDP
-        // poll below entirely on every tick with no TCP traffic, which
-        // starves UDP unicast (eg: Bomberman's movement packets) whenever
-        // nothing happens to be arriving over TCP in the same 50ms window
-        if (socket_activity > 0) {
-            for (uint32_t i = 0; i < server_ptr->clients->count && socket_activity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
-            {
-                if (listen_fd_tcp[i].revents == POLLIN) {
-                    int fd = listen_fd_tcp[i].fd;
-                    socket_activity--;
-                    if (receive_message_tcp(fd, &msg) < 0) {
-                        LOG_E("[serverGameState()] could not read message from TCP socket fd %d", fd);
-                        listen_fd_tcp[i].fd = -1; // Set disconnected socket to -1 to prevent triggering infinite EOF loop
-
-                        // Record the forced disconnect so the app layer can
-                        // react (eg: bombd killing that player's character)
-                        pthread_mutex_lock(&disconnected_lock);
-                        if (disconnected_count < MAX_TRACKED_DISCONNECTS) {
-                            disconnected_ids[disconnected_count++] = client_ids_by_pfd[i];
+                // enqueue a message if its an application layer message
+                if (msg.msg_type == MSG_APP || msg.msg_type == MSG_APP_ENC) {
+                    if (msg.msg_type == MSG_APP_ENC) {
+                        Endpoint sender;
+                        if (get_from_list(server_ptr->clients, &sender, msg.source_id) < 0) {
+                            LOG_E("invalid source id");
+                            continue; // drop message
                         }
-                        pthread_mutex_unlock(&disconnected_lock);
-
-                        continue;
-                    }
-                    LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
-
-                    // enqueue a message if its an application layer message
-                    if (msg.msg_type == MSG_APP) // Shifted this inside the successful TCP read block to prevent queuing stale / uninitialized messages
-                    {
-                        LOG_D("[serverGameState()] Message received for application");
-                        if (pc_flags[0]) {
-                            pc_flags[1] = 1;
-                            LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
-                            sched_yield();
+                        unsigned char decrypted[MSG_CONTENT_LENGTH];
+                        size_t decrypted_len = 0;
+                        if (decrypt_message(&msg, sender.sesskey, decrypted, &decrypted_len) < 0) {
+                            LOG_E("[serverGameState()] failed to decrypt message from source %u, dropping", msg.source_id);
+                            continue; // drop message
                         }
-                        pthread_mutex_lock(&server_messages_lock);
-                        Message_enqueue(&server_messages, msg);
-                        pthread_mutex_unlock(&server_messages_lock);
-                        pc_flags[1] = 0;
+                        msg.msg_len = (uint32_t)decrypted_len;
+                        memcpy(msg.msg_content, decrypted, decrypted_len);
+                        msg.msg_type = MSG_APP;
                     }
+                    LOG_D("[serverGameState()] Message received for application");
+                    if (pc_flags[0]) {
+                        pc_flags[1] = 1;
+                        LOG_D("[serverGameState()] listener yielding CPU control for user polling queue");
+                        sched_yield();
+                    }
+                    pthread_mutex_lock(&server_messages_lock);
+                    Message_enqueue(&server_messages, msg);
+                    pthread_mutex_unlock(&server_messages_lock);
+                    pc_flags[1] = 0;
                 }
             }
         }
 
-        // Drain every UDP datagram currently waiting, not just one per loop
-        // iteration: a single message per pass can't keep up with a 60Hz
-        // unicast stream, so the backlog would just grow and every message
-        // actually processed would be increasingly stale. poll() with a 0
-        // timeout here is a non-blocking "is there more?" check
-        while (poll(&listen_fd_udp, 1, 0) > 0 && (listen_fd_udp.revents & POLLIN)) {
+        if ((poll(&listen_fd_udp, 1, 50) > 0) && (listen_fd_udp.revents & POLLIN)) // also poll for a UDP message
+        {
             int fd = listen_fd_udp.fd;
             if (receive_message_udp(fd, &msg) < 0) {
                 LOG_E("[serverGameState()] could not read message from UDP unicast socket fd %d", fd);
@@ -508,6 +567,18 @@ int brserver_open(BRServer* server_ptr)
         return 0; // allow to continue as though no issue (intended effect already in place)
     }
 
+    // security - authentication, load certificate
+    cert = load_cert_file("auth/server_signed.crt"); // TODO replace with proper location
+    if (!cert) {
+        LOG_E("failed to load cert");
+        return -1;
+    }
+    pkey = load_private_key("auth/private_key.pem"); // TODO replace with proper location
+    if (!pkey) {
+        LOG_E("failed to private key");
+        return -1;
+    }
+
     this_server->self->state = LOBBY;
 
     LOG_I("[brserver_open()] SERVER is set to LOBBY state");
@@ -605,20 +676,12 @@ int brserver_client_info(BRServer* server_ptr, uint32_t* n_clients, uint32_t* cl
     return 0;
 }
 
-int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[1024]) // use defined value instead of explicit number
+int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned char content[MAX_APP_PAYLOAD_LEN]) // use defined value instead of explicit number
 {
     LOG_I("[brserver_send_to_target()] sending broadcast to cliets...");
 
     // cast to private server struct
     Server* this_server = server_ptr;
-
-    // prepare the complete message
-    Message complete_msg = {
-        .source_id = this_server->self->id,
-        .msg_type = MSG_APP,
-    };
-    // snprintf(completeMsg.msgContent, MSG_CONTENT_LENGTH, content);
-    memcpy(complete_msg.msg_content, content, MSG_CONTENT_LENGTH); // Prevent null-byte truncation of binary data
 
     // get client
     Endpoint target_client;
@@ -626,6 +689,14 @@ int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned c
         LOG_E("[brserver_send_to_target()] failed to get target client %u from the list", target_id);
         return -1;
     }
+
+    // prepare the complete message
+    Message complete_msg = {
+        .source_id = this_server->self->id,
+        .msg_type = MSG_APP_ENC,
+    };
+
+    encrypt_message(&complete_msg, target_client.sesskey, content, MAX_APP_PAYLOAD_LEN);
 
     LOG_D("[brserver_send_to_target()] sending message to client %u:\n\tcontent: %s", target_id, complete_msg.msg_content);
 
@@ -640,7 +711,7 @@ int brserver_send_to_target(BRServer* server_ptr, uint32_t target_id, unsigned c
     return 0;
 }
 
-int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024])
+int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[2048])
 {
     Server* this_server = server_ptr;
 
@@ -660,7 +731,7 @@ int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024])
     LOG_I("[brserver_send_broadcast()] message has been sent");
 }
 
-int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024])
+int brserver_send_to_all(BRServer* server_ptr, unsigned char content[2048])
 {
     Server* this_server = server_ptr;
 
@@ -684,7 +755,7 @@ int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024])
 function allows developers to get a message from the message queue
 returns 0 if no message, returns 1 if there is
 */
-int brserver_get_app_msg(unsigned char return_msg[1024])
+int brserver_get_app_msg(unsigned char return_msg[2048])
 {
     if (!Message_empty(&server_messages)) {
         if (pc_flags[1]) {
@@ -700,7 +771,6 @@ int brserver_get_app_msg(unsigned char return_msg[1024])
         LOG_D("[brserver_get_app_msg()] client message has been returned to unsigned char array");
         return 1;
     } else {
-        LOG_D("[brserver_get_app_msg()] queue is empty");
         return 0;
     }
 }

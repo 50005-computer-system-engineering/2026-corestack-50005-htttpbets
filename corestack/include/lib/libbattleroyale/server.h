@@ -14,11 +14,11 @@ int brserver_end(BRServer* server_ptr);
 
 int brserver_client_info(BRServer* server_ptr, uint32_t* n_clients, uint32_t* client_ids);
 
-int brserver_send_to_target(BRServer* server_ptr, uint32_t client_id, unsigned char content[1024]); // use defined value instead of explicit number
-int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[1024]);
-int brserver_send_to_all(BRServer* server_ptr, unsigned char content[1024]);
+int brserver_send_to_target(BRServer* server_ptr, uint32_t client_id, unsigned char content[2048]); // use defined value instead of explicit number
+int brserver_send_broadcast(BRServer* server_ptr, unsigned char content[2048]);
+int brserver_send_to_all(BRServer* server_ptr, unsigned char content[2048]);
 
-int brserver_get_app_msg(unsigned char return_msg[1024]);
+int brserver_get_app_msg(unsigned char return_msg[2048]);
 
 // Drains one forced-disconnect (dropped TCP connection: closed window,
 // killed process, network drop) at a time. Returns 1 and writes the client's

@@ -217,7 +217,7 @@ $(foreach bin,$(FLAT_BIN_NAMES),$(eval $(call FLAT_BIN_template,$(bin))))
 # ----------------------------------------------------------------------
 # Top-Level Targets
 # ----------------------------------------------------------------------
-.PHONY: all init clean lint
+.PHONY: all init clean lint kill-server
 .DEFAULT_GOAL := all
 
 # All project .c/.h under src/, include/, tests/
@@ -253,3 +253,16 @@ clean:
 lint: init # Generate compile_commands.json first
 	run-clang-tidy -p . -fix $(SOURCES)
 	clang-format -i $(SOURCES)
+
+
+# --------------------------
+# Server Launching
+# --------------------------
+SERVER_BIN ?=
+CLIENT_BIN ?=
+SERVER_PORT := 6700
+
+kill-server:
+	@pkill -9 -x "${SERVER_BIN}" 2>/dev/null; \
+	fuser -k ${SERVER_PORT}/tcp 2>/dev/null; \
+	echo "Killed any ${SERVER_BIN} process and freed port ${SERVER_PORT}."

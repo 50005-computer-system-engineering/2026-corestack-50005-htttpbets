@@ -39,6 +39,10 @@ int send_bytes(int sockfd, const unsigned char* buf, uint64_t length)
     while (total_sent < length) {
         uint64_t remaining = length - total_sent;
         ssize_t m = send(sockfd, buf + total_sent, (size_t)remaining, 0);
+        if (m <= 0) {
+            perror("[sendBytes()] send");
+            return -1;
+        }
         total_sent += (uint64_t)m;
     }
     return 0;
@@ -69,6 +73,16 @@ int receive_message_tcp(int sockfd, Message* return_ptr)
     buffer = NULL;
 
     if (read_bytes(sockfd, &buffer, sizeof(uint32_t)) < 0) {
+        LOG_E("[receiveMessageTCP()] failed to read message length");
+        goto fail;
+    }
+    uint32_t length_bytes;
+    memcpy(&length_bytes, buffer, sizeof(length_bytes));
+    return_ptr->msg_len = ntohl(length_bytes);
+    free(buffer);
+    buffer = NULL;
+
+    if (read_bytes(sockfd, &buffer, sizeof(uint32_t)) < 0) {
         LOG_E("[receiveMessageTCP()] failed to read message type");
         goto fail;
     }
@@ -87,7 +101,7 @@ int receive_message_tcp(int sockfd, Message* return_ptr)
     free(buffer);
     buffer = NULL;
 
-    LOG_D("[receiveMessageTCP()] received message:\n\tsource: %u\n\ttype: %d", return_ptr->source_id, return_ptr->msg_type);
+    LOG_D("[receiveMessageTCP()] received message:\n\tsource: %u\n\ttype: %d\ncontent: %s", return_ptr->source_id, return_ptr->msg_type, return_ptr->msg_content);
     LOG_I("[receiveMessageTCP()] finished receiving message");
 
     return 0;
@@ -136,10 +150,24 @@ int send_message_tcp(int sockfd, const Message COMPLETE_MSG)
 {
     LOG_I("[sendMessageTCP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
     uint32_t source_id = htonl(COMPLETE_MSG.source_id);
-    send_bytes(sockfd, (const unsigned char*)&source_id, sizeof(uint32_t));
+    if (send_bytes(sockfd, (const unsigned char*)&source_id, sizeof(uint32_t)) < 0) {
+        LOG_E("[sendMessageTCP()] failed to send source id");
+        return -1;
+    }
+    uint32_t msg_len = htonl(COMPLETE_MSG.msg_len);
+    if (send_bytes(sockfd, (const unsigned char*)&msg_len, sizeof(uint32_t)) < 0) {
+        LOG_E("[sendMessageTCP()] failed to send message length");
+        return -1;
+    }
     MessageType type = htonl(COMPLETE_MSG.msg_type);
-    send_bytes(sockfd, (const unsigned char*)&type, sizeof(uint32_t));
-    send_bytes(sockfd, COMPLETE_MSG.msg_content, MSG_CONTENT_LENGTH);
+    if (send_bytes(sockfd, (const unsigned char*)&type, sizeof(uint32_t)) < 0) {
+        LOG_E("[sendMessageTCP()] failed to send message type");
+        return -1;
+    }
+    if (send_bytes(sockfd, COMPLETE_MSG.msg_content, MSG_CONTENT_LENGTH) < 0) {
+        LOG_E("[sendMessageTCP()] failed to send message content");
+        return -1;
+    }
     LOG_I("[sendMessageTCP()] pushed all bytes though socket");
     return 0;
 }
@@ -169,18 +197,27 @@ int send_broadcast_udp(int sockfd, const Message COMPLETE_MSG)
     return 0;
 }
 
-// Unicast UDP send: the caller's socket must already be connect()'d to its
-// single target (see connect_udp_uni in client.c), so this is just one send()
-// of the whole struct, same shape as send_broadcast_udp's single sendto()
-int send_message_udp_unicast(int sockfd, const Message COMPLETE_MSG)
+int send_unicast_udp(int sockfd, const char* dest_ip, const Message COMPLETE_MSG)
 {
-    LOG_I("[sendMessageUDPUnicast()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
+    LOG_I("[sendUnicastUDP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
 
-    if (send(sockfd, (const unsigned char*)&COMPLETE_MSG, sizeof(Message), 0) < 0) {
-        perror("[sendMessageUDPUnicast()] send");
+    // preparing parameters 
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_UNI)};
+    if (inet_pton(AF_INET, dest_ip, &addr.sin_addr) <= 0) {
+        perror("[sendUnicastUDP()] inet_pton");
+        return -1;
+    }
+    int flags_set = 0;
+    socklen_t addr_len = sizeof(addr);
+
+    // send to the unicast UDP port
+    if (sendto(sockfd, (unsigned char*)&COMPLETE_MSG, sizeof(Message), flags_set, (struct sockaddr*)&addr, addr_len) < 0) {
+        perror("[sendUnicastUDP()] sendto");
         return -1;
     }
 
-    LOG_I("[sendMessageUDPUnicast()] unicast message has been sent");
+    LOG_I("[sendUnicastUDP()] unicast message has been sent");
     return 0;
 }
