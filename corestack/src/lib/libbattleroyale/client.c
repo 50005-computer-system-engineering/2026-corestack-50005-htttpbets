@@ -480,7 +480,7 @@ int brclient_send_msg_udp(BRClient* client_ptr, unsigned char content[2048])
     // build message
     Message msg = {
         .source_id = this_client->id,
-        .msg_type = MSG_APP,
+        .msg_type = MSG_APP_ENC,
     };
 
     encrypt_message(&msg, this_client->sesskey, content, MAX_APP_PAYLOAD_LEN);

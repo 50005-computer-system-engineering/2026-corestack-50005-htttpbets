@@ -98,7 +98,7 @@ static void send_redirect(int client_fd)
 static void broadcast_tile_update(BRServer* server, int x, int y, TileType tile)
 {
     TileUpdatePayload payload = {.x = (uint32_t)x, .y = (uint32_t)y, .tile = (uint32_t)tile};
-    unsigned char buffer[512] = {0};
+    unsigned char buffer[2048] = {0};
     pack_tile_update(buffer, &payload);
     brserver_send_to_all(server, buffer);
 }
@@ -145,7 +145,7 @@ static void broadcast_state(BRServer* server, const BombSession* session)
         entry->timer = bomb->timer;
     }
 
-    unsigned char buffer[512] = {0};
+    unsigned char buffer[2048] = {0};
     pack_state(buffer, &payload);
     brserver_send_to_all(server, buffer);
 }
@@ -162,7 +162,7 @@ static void on_explosion_triggered(const ExplosionInfo* explosion, void* user_da
         payload.spread_amt[i] = (uint32_t)explosion->spread_amt[i];
     }
 
-    unsigned char buffer[512] = {0};
+    unsigned char buffer[2048] = {0};
     pack_explosion(buffer, &payload);
     brserver_send_broadcast(server, buffer);
 }
@@ -285,7 +285,7 @@ int main(void)
     for (uint32_t i = 0; i < lobby_size && i < BOMBD_MAX_PLAYERS; i++) {
         roster.ids[i] = client_ids[i];
     }
-    unsigned char roster_buffer[512] = {0};
+    unsigned char roster_buffer[2048] = {0};
     pack_roster(roster_buffer, &roster);
     brserver_send_to_all(server, roster_buffer);
 
@@ -298,12 +298,12 @@ int main(void)
             prev_map[i][j] = (uint8_t)map[i][j];
         }
     }
-    unsigned char map_buffer[512] = {0};
+    unsigned char map_buffer[2048] = {0};
     pack_map_init(map_buffer, &map_init);
     brserver_send_to_all(server, map_buffer);
 
     /* ----- AUTHORITATIVE TICK LOOP ----- */
-    unsigned char msg_buffer[1024] = {0};
+    unsigned char msg_buffer[2048] = {0};
     bool match_over = false;
     uint32_t winner_id = 0;
     float delta_time = (float)TICK_MICROSECONDS / 1000000.0f;
@@ -377,7 +377,7 @@ int main(void)
 
     /* ----- MATCH OVER ----- */
     GameOverPayload over = {.winner_id = winner_id};
-    unsigned char over_buffer[512] = {0};
+    unsigned char over_buffer[2048] = {0};
     pack_game_over(over_buffer, &over);
     brserver_send_to_all(server, over_buffer);
 

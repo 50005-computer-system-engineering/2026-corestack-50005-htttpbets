@@ -415,8 +415,24 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
             LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 
             // enqueue a message if its an application layer message
-            if (msg.msg_type == MSG_APP) // Shifted this inside the successful UDP read block to prevent queuing stale / uninitialized messages
+            if (msg.msg_type == MSG_APP || msg.msg_type == MSG_APP_ENC) // Shifted this inside the successful UDP read block to prevent queuing stale / uninitialized messages
             {
+                if (msg.msg_type == MSG_APP_ENC) {
+                    Endpoint sender;
+                    if (get_from_list(server_ptr->clients, &sender, msg.source_id) < 0) {
+                        LOG_E("invalid source id");
+                        continue; // drop message
+                    }
+                    unsigned char decrypted[MSG_CONTENT_LENGTH];
+                    size_t decrypted_len = 0;
+                    if (decrypt_message(&msg, sender.sesskey, decrypted, &decrypted_len) < 0) {
+                        LOG_E("[serverGameState()] failed to decrypt UDP message from source %u, dropping", msg.source_id);
+                        continue; // drop message
+                    }
+                    msg.msg_len = (uint32_t)decrypted_len;
+                    memcpy(msg.msg_content, decrypted, decrypted_len);
+                    msg.msg_type = MSG_APP;
+                }
                 LOG_D("[serverGameState()] Message received for application");
                 if (pc_flags[0]) {
                     pc_flags[1] = 1;

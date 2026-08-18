@@ -228,7 +228,7 @@ static void apply_game_over(const GameOverPayload* payload)
 /* ----- POLLING ----- */
 void network_poll(void)
 {
-    unsigned char buffer[1024] = {0};
+    unsigned char buffer[2048] = {0};
     while (brclient_get_app_msg(buffer) == 1) {
         uint32_t tag = read_bomb_packet_tag(buffer);
         switch (tag) {
@@ -321,13 +321,13 @@ void network_send_input(void)
         .dx = dx,
         .dy = dy,
         .sprinting = sprinting ? 1u : 0u};
-    unsigned char buffer[512] = {0};
+    unsigned char buffer[2048] = {0};
     pack_move(buffer, &move);
     brclient_send_msg_udp(client, buffer);
 
     if (IsKeyPressed(CONFIG.KEYS.BOMB)) {
         BombPlacePayload bomb_place = {.player_id = local_id};
-        unsigned char bomb_buffer[512] = {0};
+        unsigned char bomb_buffer[2048] = {0};
         pack_bomb_place(bomb_buffer, &bomb_place);
         brclient_send_msg(client, bomb_buffer);
     }
