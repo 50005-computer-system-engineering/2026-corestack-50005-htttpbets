@@ -20,6 +20,7 @@ typedef enum {
 extern int map_size;   // Width and height of map
 extern TileType** map; // 2D Array of tiles
 
+int calc_map_size(int num_players);
 void map_generate(int num_players);
 void map_free();
 void map_debugprint();

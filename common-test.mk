@@ -1,4 +1,4 @@
-# Shared Unity-based test scaffold for tetris and bomberman.
+# Shared cmocka-based test scaffold for tetris and bomberman.
 # Include AFTER ../common.mk (needs CFLAGS, LDFLAGS, LDLIBS, LIB_OUT, etc. from it)
 # Set PROJECT_NAME before including this file so we can label test output
 
@@ -9,15 +9,16 @@ UNIT_BIN := $(UNIT_DIR)/bin
 UNIT_SRCS := $(wildcard $(UNIT_DIR)/test_*.c)
 UNIT_BINS := $(UNIT_SRCS:$(UNIT_DIR)/%.c=$(UNIT_BIN)/%)
 
-TEST_CFLAGS  := $(CFLAGS) -I$(UNITY_DIR)
+# Tests never link raylib — test game logic through the libs directly.
+TEST_CFLAGS  := $(CFLAGS)
 TEST_LDFLAGS := -L$(LIB_OUT) $(if $(CS_LIB),-L$(CS_LIB))
-TEST_LDLIBS  := $(LDLIBS)
+TEST_LDLIBS  := $(LDLIBS) -lcmocka
 
 .PHONY: unit integration test
 
-$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c $(UNITY_DIR)/unity.c | $(ALL_LIB_ARCHIVES)
+$(UNIT_BIN)/test_%: $(UNIT_DIR)/test_%.c | $(ALL_LIB_ARCHIVES)
 	@mkdir -p $(UNIT_BIN)
-	$(CC) $(TEST_CFLAGS) $< $(UNITY_DIR)/unity.c -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
+	$(CC) $(TEST_CFLAGS) $< -o $@ $(TEST_LDFLAGS) $(TEST_LDLIBS)
 
 unit: $(UNIT_BINS)
 	@echo "==> Running $(PROJECT_NAME) unit tests"
