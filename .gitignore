@@ -63,3 +63,9 @@ tetris/var/
 
 # Ignore compile_commands, as this is unique to each user
 compile_commands.json
+
+# CA-issued server key/cert (secret, per-deployer - see auth/README.md)
+/auth/*.pem
+/auth/*.crt
+!/auth/.gitkeep
+var/log/tetris.log

@@ -106,10 +106,17 @@ $(eval $(call FETCH_TARBALL_template,RAYLIB))
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
 	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
 
-.PHONY: run deps distclean kill-server
+.PHONY: run-server run-client deps distclean
 
-run: $(TARGET)
-	./$(TARGET)
+# Dynamically find available terminal emulator
+TERM_CMD := $(shell which kitty || which gnome-terminal || which xfce4-terminal || which xterm)
+
+# Launch dir up as our certificates are read from CWD
+run-server: $(BIN_OUT)/$(SERVER_BIN)
+	${TERM_CMD} -- bash -c "cd $(CURDIR)/.. && ./bomberman/$(BIN_OUT)/$(SERVER_BIN); exec bash" &
+
+run-client: $(BIN_OUT)/$(CLIENT_BIN)
+	${TERM_CMD} -- bash -c "$(CURDIR)/$(BIN_OUT)/$(CLIENT_BIN); exec bash" &
 
 # Fetch and build dependencies without building the project
 deps: $(RAYLIB_DEP)

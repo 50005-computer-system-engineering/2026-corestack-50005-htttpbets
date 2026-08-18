@@ -44,15 +44,13 @@ include ../common-test.mk
 # Dynamically find available terminal emulator
 TERM_CMD := $(shell which kitty || which gnome-terminal || which xfce4-terminal || which xterm)
 
-.PHONY: run run-server run-client
+.PHONY: run-server run-client
 
-run-server:
-	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
 
-run-client:
-	${TERM_CMD} -- bash -c "${BIN_OUT}/${CLIENT_BIN}; exec bash" &
+# Launch dir up as our certificates are read from CWD
+run-server: $(BIN_OUT)/$(SERVER_BIN) $(BIN_OUT)/tetrislogd
+	${TERM_CMD} -- bash -c "cd $(CURDIR)/.. && ./tetris/${BIN_OUT}/tetrislogd; exec bash" &
+	${TERM_CMD} -- bash -c "cd $(CURDIR)/.. && ./tetris/${BIN_OUT}/${SERVER_BIN}; exec bash" &
 
-run:
-	${TERM_CMD} -- bash -c "${BIN_OUT}/${SERVER_BIN}; exec bash" &
-	sleep 1;
-	${TERM_CMD} -- bash -c "${BIN_OUT}/${CLIENT_BIN}; exec bash" &
+run-client: $(BIN_OUT)/$(CLIENT_BIN)
+	${TERM_CMD} -- bash -c "cd $(CURDIR)/.. && ./tetris/${BIN_OUT}/${CLIENT_BIN}; exec bash" &

@@ -6,10 +6,18 @@
 
 **CoreStack** is a comprehensive distributed multi-component architecture powering a Bomberman Battle Royale-styled Tetris game, modeled after Jackbox's host-player system. This project is developed as part of the **50.005 Computer System Engineering** course.
 
-## How 2 Run (temp):
-`make bomberman` or `make tetris`
+## How to Run:
+First, generate your own keys using `make gen-auth` in the root project.
+Then, run `make` to build the whole project.
 
-Then run `./bomberman/launcher` or `./tetris/launcher`
+* Ensure that all players are playing on the same network.
+* `make run-server [tetris/bomberman]` to launch the server. 
+It will print your current IP address, tell this to your other players.
+* `make run-client [tetris/bomberman]` to launch the client. 
+Enter the IP address given by your host! Or you can just press [ENTER] to use your own IP (join locally).
+* Once all clients have joined, server can press [ENTER] to start the game.
+
+For viewing the project's source code, run `make init` to generate the `compile_commands.json` file. This allows Intellisense to automatically recognise our project's dynamically generated binaries and libraries.
 
 ## 👥 Team HTTTPBets (C1C7)
 
