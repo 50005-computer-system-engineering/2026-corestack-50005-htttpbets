@@ -122,9 +122,7 @@ static void apply_map_init(const MapInitPayload* payload)
     for (int i = 0; i < map_size; i++) {
         map[i] = (TileType*)malloc((size_t)map_size * sizeof(TileType));
         for (int j = 0; j < map_size; j++) {
-            map[i][j] = (i < BOMBD_MAX_MAP_DIM && j < BOMBD_MAX_MAP_DIM)
-                ? (TileType)payload->tiles[i][j]
-                : EMPTY;
+            map[i][j] = (i < BOMBD_MAX_MAP_DIM && j < BOMBD_MAX_MAP_DIM) ? (TileType)payload->tiles[i][j] : EMPTY;
         }
     }
 
@@ -310,10 +308,10 @@ void network_send_input(void)
         return;
     }
 
-    int dx = IsKeyDown(CONFIG.KEYS.MOVE_RIGHT) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_LEFT) ? -1
-                                                                                       : 0;
-    int dy = IsKeyDown(CONFIG.KEYS.MOVE_UP) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_DOWN) ? -1
-                                                                                    : 0;
+    int dx = IsKeyDown(CONFIG.KEYS.MOVE_RIGHT) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_LEFT) ? -1 :
+                                                                                        0;
+    int dy = IsKeyDown(CONFIG.KEYS.MOVE_UP) ? 1 : IsKeyDown(CONFIG.KEYS.MOVE_DOWN) ? -1 :
+                                                                                     0;
     bool sprinting = IsKeyDown(CONFIG.KEYS.SPRINT);
 
     MovePayload move = {
@@ -334,7 +332,10 @@ void network_send_input(void)
 }
 
 /* ----- ACCESSORS ----- */
-uint32_t network_local_player_id(void) { return local_id; }
+uint32_t network_local_player_id(void)
+{
+    return local_id;
+}
 
 int network_local_slot(void)
 {
@@ -357,9 +358,27 @@ Vector2 network_get_camera_target(void)
     return spectator_cam_pos;
 }
 
-int network_player_count(void) { return player_count; }
-Bomberman* network_get_player(int index) { return &players[index]; }
-uint32_t network_get_player_id(int index) { return player_ids[index]; }
-bool network_is_player_alive(int index) { return player_alive[index]; }
-bool network_game_over(void) { return game_over; }
-uint32_t network_winner_id(void) { return winner_id; }
+int network_player_count(void)
+{
+    return player_count;
+}
+Bomberman* network_get_player(int index)
+{
+    return &players[index];
+}
+uint32_t network_get_player_id(int index)
+{
+    return player_ids[index];
+}
+bool network_is_player_alive(int index)
+{
+    return player_alive[index];
+}
+bool network_game_over(void)
+{
+    return game_over;
+}
+uint32_t network_winner_id(void)
+{
+    return winner_id;
+}

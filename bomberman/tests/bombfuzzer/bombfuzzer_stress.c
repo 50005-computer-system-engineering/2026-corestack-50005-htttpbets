@@ -19,16 +19,22 @@ static __thread volatile sig_atomic_t crashArmed = 0;
 static void crashHandler(int sig)
 {
     (void)sig;
-    if (crashArmed)
-    {
+    if (crashArmed) {
         siglongjmp(crashJmpBuf, 1);
     }
 }
 
 // Deliberately NOT #include "lib/libhtttp.h" - see bombfuzzer_htttp.c's top comment for why
 // (multiple-definition linker bug). Declaring only what we call routes around it.
-typedef enum { UNKNOWN = 0, REQ_MOVE, REQ_DROP, REQ_ROTATE, REQ_STATE, REQ_ATTACK } MethodHTTTP;
-void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, ParsedMsgHT *formatted_msg);
+typedef enum {
+    UNKNOWN = 0,
+    REQ_MOVE,
+    REQ_DROP,
+    REQ_ROTATE,
+    REQ_STATE,
+    REQ_ATTACK
+} MethodHTTTP;
+void req_create_action(uint32_t id, MethodHTTTP method, InputPayload* payload, ParsedMsgHT* formatted_msg);
 
 // concurrency/volume stress: hammers the pure parsing/encoding functions from many threads at
 // once. Each thread checks its own round trips stay correct despite everyone else running at the
@@ -41,13 +47,13 @@ void req_create_action(uint32_t id, MethodHTTTP method, InputPayload *payload, P
 
 static int threadsCount(void)
 {
-    const char *env = getenv("BOMBFUZZER_STRESS_THREADS");
+    const char* env = getenv("BOMBFUZZER_STRESS_THREADS");
     return env != NULL ? atoi(env) : THREADS_DEFAULT;
 }
 
 static int itersPerThread(void)
 {
-    const char *env = getenv("BOMBFUZZER_STRESS_ITERS");
+    const char* env = getenv("BOMBFUZZER_STRESS_ITERS");
     return env != NULL ? atoi(env) : ITERS_PER_THREAD_DEFAULT;
 }
 
@@ -62,10 +68,9 @@ typedef struct {
 // round trip matched, 0 otherwise.
 static int roundTripOnce(int threadIdx, int iter)
 {
-    if (sigsetjmp(crashJmpBuf, 1) != 0)
-    {
+    if (sigsetjmp(crashJmpBuf, 1) != 0) {
         crashArmed = 0;
-        return 0;   // landed here via crashHandler - treat the crash itself as a failed round trip
+        return 0; // landed here via crashHandler - treat the crash itself as a failed round trip
     }
     crashArmed = 1;
 
@@ -78,8 +83,7 @@ static int roundTripOnce(int threadIdx, int iter)
     req_create_action(id, REQ_MOVE, &input, &msg);
 
     HyperText ht;
-    if (convert_to_hypertext(&msg, ht) < 0)
-    {
+    if (convert_to_hypertext(&msg, ht) < 0) {
         return 0;
     }
     ParsedMsgHT parsed;
@@ -90,8 +94,7 @@ static int roundTripOnce(int threadIdx, int iter)
     char expectedPath[64];
     snprintf(expectedPath, sizeof(expectedPath), "/room/0/player/%u", id);
     if (parsed.token1 == NULL || strcmp(parsed.token1, "MOVE") != 0 || parsed.token2 == NULL ||
-        strcmp(parsed.token2, expectedPath) != 0)
-    {
+        strcmp(parsed.token2, expectedPath) != 0) {
         return 0;
     }
 
@@ -103,25 +106,23 @@ static int roundTripOnce(int threadIdx, int iter)
     memset(&attackOut, 0, sizeof(attackOut));
     payload_decode_attack(attackBuf, &attackOut);
     if (attackOut.source_player != attack.source_player || attackOut.target_player != attack.target_player ||
-        attackOut.lines != attack.lines)
-    {
+        attackOut.lines != attack.lines) {
         return 0;
     }
 
     // roster payload round trip
     unsigned char rosterBuf[sizeof(RosterPayload) + 2 * sizeof(uint32_t)];
-    RosterPayload *roster = (RosterPayload *)rosterBuf;
+    RosterPayload* roster = (RosterPayload*)rosterBuf;
     roster->count = 2;
     roster->ids[0] = id;
     roster->ids[1] = id + 1;
     char rosterEncoded[MAX_BUF];
     payload_encode_roster(rosterEncoded, roster);
     unsigned char rosterOutBuf[sizeof(RosterPayload) + 2 * sizeof(uint32_t)];
-    RosterPayload *rosterOut = (RosterPayload *)rosterOutBuf;
+    RosterPayload* rosterOut = (RosterPayload*)rosterOutBuf;
     memset(rosterOut, 0, sizeof(rosterOutBuf));
     payload_decode_roster(rosterEncoded, rosterOut);
-    if (rosterOut->count != roster->count || rosterOut->ids[0] != roster->ids[0] || rosterOut->ids[1] != roster->ids[1])
-    {
+    if (rosterOut->count != roster->count || rosterOut->ids[0] != roster->ids[0] || rosterOut->ids[1] != roster->ids[1]) {
         return 0;
     }
 
@@ -135,23 +136,20 @@ static int roundTripOnce(int threadIdx, int iter)
     StatePayload stateOut;
     memset(&stateOut, 0, sizeof(stateOut));
     payload_decode_state(stateEncoded, &stateOut);
-    if (stateOut.player_id != state.player_id || stateOut.score != state.score)
-    {
+    if (stateOut.player_id != state.player_id || stateOut.score != state.score) {
         return 0;
     }
 
     return 1;
 }
 
-static void *threadMain(void *arg)
+static void* threadMain(void* arg)
 {
-    ThreadArg *t = (ThreadArg *)arg;
-    for (int i = 0; i < t->iters; i++)
-    {
+    ThreadArg* t = (ThreadArg*)arg;
+    for (int i = 0; i < t->iters; i++) {
         int ok = roundTripOnce(t->threadIdx, i);
-        crashArmed = 0;   // disarm here - covers both normal return and the longjmp-recovery path
-        if (!ok)
-        {
+        crashArmed = 0; // disarm here - covers both normal return and the longjmp-recovery path
+        if (!ok) {
             t->mismatches++;
         }
     }
@@ -174,21 +172,19 @@ int main(void)
     int iters = itersPerThread();
     printf("bombfuzzer_stress: %d threads x %d iterations each\n", nThreads, iters);
 
-    pthread_t *tids = malloc(sizeof(pthread_t) * (size_t)nThreads);
-    ThreadArg *args = malloc(sizeof(ThreadArg) * (size_t)nThreads);
+    pthread_t* tids = malloc(sizeof(pthread_t) * (size_t)nThreads);
+    ThreadArg* args = malloc(sizeof(ThreadArg) * (size_t)nThreads);
 
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    for (int i = 0; i < nThreads; i++)
-    {
+    for (int i = 0; i < nThreads; i++) {
         args[i] = (ThreadArg){.threadIdx = i, .iters = iters, .mismatches = 0};
         pthread_create(&tids[i], NULL, threadMain, &args[i]);
     }
 
     int totalMismatches = 0;
-    for (int i = 0; i < nThreads; i++)
-    {
+    for (int i = 0; i < nThreads; i++) {
         pthread_join(tids[i], NULL);
         totalMismatches += args[i].mismatches;
     }
@@ -204,8 +200,8 @@ int main(void)
     snprintf(actual, sizeof(actual), "%d of %ld round trips came back mismatched under concurrent execution",
              totalMismatches, totalOps);
     bombfuzzer_report(totalMismatches == 0, "bombfuzzer_stress", "concurrent round-trip consistency", seed, NULL, 0,
-                       "every thread's own request/payload round trips stay correct under concurrent execution",
-                       actual);
+                      "every thread's own request/payload round trips stay correct under concurrent execution",
+                      actual);
 
     free(tids);
     free(args);

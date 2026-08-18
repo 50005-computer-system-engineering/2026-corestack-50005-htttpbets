@@ -110,9 +110,8 @@ void draw_loop()
         }
         if (network_game_over()) {
             uint32_t winner = network_winner_id();
-            const char* message = (winner == 0) ? "NO SURVIVORS"
-                : (winner == network_local_player_id())     ? "YOU WIN!"
-                                                              : TextFormat("P%u WINS!", winner);
+            const char* message = (winner == 0) ? "NO SURVIVORS" : (winner == network_local_player_id()) ? "YOU WIN!" :
+                                                                                                           TextFormat("P%u WINS!", winner);
             int width = MeasureText(message, 80);
             DrawText(message, GetScreenWidth() / 2 - width / 2, GetScreenHeight() / 2 - 40, 80, RED);
         } else if (slot >= 0 && !network_is_player_alive(slot)) {

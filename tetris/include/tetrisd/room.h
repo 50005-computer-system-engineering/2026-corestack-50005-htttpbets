@@ -4,7 +4,7 @@
 #include <stdint.h>
 /**
  * @brief Runs one room's entire life inside a forked worker process
- * Binds its own TCP port, runs the lobby and the authoritative tick loop, 
+ * Binds its own TCP port, runs the lobby and the authoritative tick loop,
  * and reports to the master over hub_fd
  *
  * Never returns, exits the process when the room ends.

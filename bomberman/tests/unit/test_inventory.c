@@ -8,7 +8,8 @@
 // Pure function, no setup/teardown needed
 
 // [Correctness] Consuming a bomb should decrement remaining_bombs by 1
-static void test_consume_bomb_decrements_remaining(void **state) {
+static void test_consume_bomb_decrements_remaining(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 3, .num_bombs = 3, .num_fires = 1, .bomb_replenish_timer = 0.0f};
     consume_bomb(&stock);
@@ -16,7 +17,8 @@ static void test_consume_bomb_decrements_remaining(void **state) {
 }
 
 // [Correctness] Consuming a bomb should (re)start the replenish timer
-static void test_consume_bomb_resets_replenish_timer(void **state) {
+static void test_consume_bomb_resets_replenish_timer(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 2, .num_bombs = 3, .num_fires = 1, .bomb_replenish_timer = 0.2f};
     consume_bomb(&stock);
@@ -28,7 +30,8 @@ static void test_consume_bomb_resets_replenish_timer(void **state) {
 // Pure function, no setup/teardown needed
 
 // [Boundary] Stock already full should not tick the replenish timer down
-static void test_inventory_update_noop_when_full(void **state) {
+static void test_inventory_update_noop_when_full(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 3, .num_bombs = 3, .num_fires = 1, .bomb_replenish_timer = 0.5f};
     inventory_update(&stock, 0.5f);
@@ -37,7 +40,8 @@ static void test_inventory_update_noop_when_full(void **state) {
 }
 
 // [Scaling] Timer should tick down while under capacity, without replenishing yet
-static void test_inventory_update_ticks_timer_down(void **state) {
+static void test_inventory_update_ticks_timer_down(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 1, .num_bombs = 3, .num_fires = 1, .bomb_replenish_timer = 1.0f};
     inventory_update(&stock, 0.4f);
@@ -46,7 +50,8 @@ static void test_inventory_update_ticks_timer_down(void **state) {
 }
 
 // [Correctness] Once the timer expires, a bomb should be replenished and the timer reset
-static void test_inventory_update_replenishes_on_expiry(void **state) {
+static void test_inventory_update_replenishes_on_expiry(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 1, .num_bombs = 3, .num_fires = 1, .bomb_replenish_timer = 0.1f};
     inventory_update(&stock, 0.2f);
@@ -55,7 +60,8 @@ static void test_inventory_update_replenishes_on_expiry(void **state) {
 }
 #pragma endregion Test Group 2
 
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest consume_bomb_tests[] = {
         cmocka_unit_test(test_consume_bomb_decrements_remaining),
         cmocka_unit_test(test_consume_bomb_resets_replenish_timer),

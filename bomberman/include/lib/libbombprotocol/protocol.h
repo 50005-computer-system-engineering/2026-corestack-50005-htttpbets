@@ -8,8 +8,8 @@
 // Bomberman is played on one shared arena, unlike tetris's per-player boards,
 // so these bound the single shared world rather than a per-room lobby size
 #define BOMBD_MAX_PLAYERS 25
-#define BOMBD_MAX_BOMBS 100      // Ticking bombs visible on the shared map at once
-#define BOMBD_MAX_MAP_DIM 20    // Covers calc_map_size(BOMBD_MAX_PLAYERS) + border (20x20 at 100 players)
+#define BOMBD_MAX_BOMBS 100  // Ticking bombs visible on the shared map at once
+#define BOMBD_MAX_MAP_DIM 20 // Covers calc_map_size(BOMBD_MAX_PLAYERS) + border (20x20 at 100 players)
 
 // Every packet is capped at 512 bytes (MSG_CONTENT_LENGTH is 1024, but this
 // protocol only ever uses the first 512). At 36 bytes/player and 12
@@ -72,7 +72,7 @@ typedef struct
 // Sent once at game start: the randomly generated arena every client renders
 typedef struct
 {
-    uint32_t map_size; // Width and height (square)
+    uint32_t map_size;                                   // Width and height (square)
     uint8_t tiles[BOMBD_MAX_MAP_DIM][BOMBD_MAX_MAP_DIM]; // TileType, row-major
 } MapInitPayload;
 

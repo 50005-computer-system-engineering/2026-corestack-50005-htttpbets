@@ -6,7 +6,7 @@
  * 1 SOCK_SEQPACKET socketpair per room, carrying fixed-size HubMsg structs.
  * Everything that crosses a room boundary (joins, eliminations, cross-room garbage, etc.)
  * travels through here. See README!
-*/
+ */
 #include <stdint.h>
 #include "lib/libtetrisprotocol/protocol.h"
 

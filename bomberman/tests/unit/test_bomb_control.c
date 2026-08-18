@@ -23,11 +23,12 @@
 #define TEST_MAP_SIZE 5
 
 // [SETUP]
-static int setup_map(void **state) {
+static int setup_map(void** state)
+{
     (void)state;
     // Allocate map
     map_size = TEST_MAP_SIZE;
-    map = malloc(TEST_MAP_SIZE * sizeof(TileType *));
+    map = malloc(TEST_MAP_SIZE * sizeof(TileType*));
     for (int i = 0; i < TEST_MAP_SIZE; i++) {
         map[i] = malloc(TEST_MAP_SIZE * sizeof(TileType));
         for (int j = 0; j < TEST_MAP_SIZE; j++)
@@ -50,14 +51,16 @@ static int setup_map(void **state) {
 }
 
 // [TEARDOWN]
-static int teardown_map(void **state) {
+static int teardown_map(void** state)
+{
     (void)state;
     map_free();
     return 0;
 }
 
 // Placing a bomb on an empty tile with stock available should succeed
-static void test_place_bomb_succeeds_on_empty_tile(void **state) {
+static void test_place_bomb_succeeds_on_empty_tile(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 1, .num_bombs = 1, .num_fires = 1, .bomb_replenish_timer = 0.0f};
     bool placed = place_bomb((Vector2){1, 1}, &stock);
@@ -66,7 +69,8 @@ static void test_place_bomb_succeeds_on_empty_tile(void **state) {
 }
 
 // Placing a bomb should consume one from the inventory's remaining stock
-static void test_place_bomb_consumes_inventory(void **state) {
+static void test_place_bomb_consumes_inventory(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 2, .num_bombs = 2, .num_fires = 1, .bomb_replenish_timer = 0.0f};
     place_bomb((Vector2){1, 1}, &stock);
@@ -74,7 +78,8 @@ static void test_place_bomb_consumes_inventory(void **state) {
 }
 
 // Placing a bomb on a wall tile should fail and leave the tile untouched
-static void test_place_bomb_fails_on_wall(void **state) {
+static void test_place_bomb_fails_on_wall(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 1, .num_bombs = 1, .num_fires = 1, .bomb_replenish_timer = 0.0f};
     bool placed = place_bomb((Vector2){3, 2}, &stock);
@@ -83,7 +88,8 @@ static void test_place_bomb_fails_on_wall(void **state) {
 }
 
 // Placing a bomb with no remaining stock should fail even on an empty tile
-static void test_place_bomb_fails_when_out_of_stock(void **state) {
+static void test_place_bomb_fails_when_out_of_stock(void** state)
+{
     (void)state;
     InventoryStock stock = {.remaining_bombs = 0, .num_bombs = 1, .num_fires = 1, .bomb_replenish_timer = 0.0f};
     bool placed = place_bomb((Vector2){1, 1}, &stock);
@@ -92,11 +98,12 @@ static void test_place_bomb_fails_when_out_of_stock(void **state) {
 }
 #pragma endregion Test Group 1
 
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest place_bomb_tests[] = {
         cmocka_unit_test_setup_teardown(test_place_bomb_succeeds_on_empty_tile, setup_map, teardown_map),
-        cmocka_unit_test_setup_teardown(test_place_bomb_consumes_inventory,     setup_map, teardown_map),
-        cmocka_unit_test_setup_teardown(test_place_bomb_fails_on_wall,          setup_map, teardown_map),
+        cmocka_unit_test_setup_teardown(test_place_bomb_consumes_inventory, setup_map, teardown_map),
+        cmocka_unit_test_setup_teardown(test_place_bomb_fails_on_wall, setup_map, teardown_map),
         cmocka_unit_test_setup_teardown(test_place_bomb_fails_when_out_of_stock, setup_map, teardown_map),
     };
 

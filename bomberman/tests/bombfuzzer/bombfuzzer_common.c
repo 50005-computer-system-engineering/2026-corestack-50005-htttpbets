@@ -26,37 +26,32 @@ static int trackedClassCount = 0;
 static void alarmHandler(int sig)
 {
     (void)sig;
-    if (timeoutArmed)
-    {
+    if (timeoutArmed) {
         siglongjmp(bombfuzzer_jmpbuf, 1);
     }
 }
 
 static void ensureFindingsDir(void)
 {
-    if (mkdir(BOMBFUZZER_FINDINGS_DIR, 0755) < 0 && errno != EEXIST)
-    {
+    if (mkdir(BOMBFUZZER_FINDINGS_DIR, 0755) < 0 && errno != EEXIST) {
         perror("bombfuzzer: mkdir findings dir");
     }
 }
 
 // returns the running occurrence count for this (harness, description) pair, registering it as a
 // newly-seen class the first time it's asked about
-static int noteOccurrence(const char *harness, const char *description)
+static int noteOccurrence(const char* harness, const char* description)
 {
     char key[160];
     snprintf(key, sizeof(key), "%s | %s", harness, description);
 
-    for (int i = 0; i < trackedClassCount; i++)
-    {
-        if (strcmp(trackedClasses[i].key, key) == 0)
-        {
+    for (int i = 0; i < trackedClassCount; i++) {
+        if (strcmp(trackedClasses[i].key, key) == 0) {
             trackedClasses[i].count++;
             return trackedClasses[i].count;
         }
     }
-    if (trackedClassCount < MAX_TRACKED_CLASSES)
-    {
+    if (trackedClassCount < MAX_TRACKED_CLASSES) {
         snprintf(trackedClasses[trackedClassCount].key, sizeof(trackedClasses[trackedClassCount].key), "%s", key);
         trackedClasses[trackedClassCount].count = 1;
         trackedClassCount++;
@@ -66,13 +61,11 @@ static int noteOccurrence(const char *harness, const char *description)
 
 static void printSummaryOnExit(void)
 {
-    if (trackedClassCount == 0)
-    {
+    if (trackedClassCount == 0) {
         return;
     }
     printf("bombfuzzer: %d distinct finding class(es) this run:\n", trackedClassCount);
-    for (int i = 0; i < trackedClassCount; i++)
-    {
+    for (int i = 0; i < trackedClassCount; i++) {
         printf("  - %s (x%d)\n", trackedClasses[i].key, trackedClasses[i].count);
     }
 }
@@ -85,8 +78,7 @@ static void printSummaryOnExit(void)
 static void capMemoryUsage(void)
 {
     struct rlimit lim = {.rlim_cur = BOMBFUZZER_MEM_LIMIT_BYTES, .rlim_max = BOMBFUZZER_MEM_LIMIT_BYTES};
-    if (setrlimit(RLIMIT_AS, &lim) < 0)
-    {
+    if (setrlimit(RLIMIT_AS, &lim) < 0) {
         perror("bombfuzzer: setrlimit(RLIMIT_AS)");
     }
 }
@@ -98,13 +90,10 @@ unsigned int bombfuzzer_init_seed(void)
     ensureFindingsDir();
 
     unsigned int seed;
-    const char *envSeed = getenv("BOMBFUZZER_SEED");
-    if (envSeed != NULL)
-    {
+    const char* envSeed = getenv("BOMBFUZZER_SEED");
+    if (envSeed != NULL) {
         seed = (unsigned int)strtoul(envSeed, NULL, 10);
-    }
-    else
-    {
+    } else {
         seed = (unsigned int)time(NULL) ^ (unsigned int)getpid();
     }
     srand(seed);
@@ -121,8 +110,7 @@ uint8_t bombfuzzer_rand_byte(void)
 uint32_t bombfuzzer_rand_u32(void)
 {
     uint32_t v = 0;
-    for (int i = 0; i < 4; i++)
-    {
+    for (int i = 0; i < 4; i++) {
         v = (v << 8) | bombfuzzer_rand_byte();
     }
     return v;
@@ -131,17 +119,15 @@ uint32_t bombfuzzer_rand_u32(void)
 uint64_t bombfuzzer_rand_u64(void)
 {
     uint64_t v = 0;
-    for (int i = 0; i < 8; i++)
-    {
+    for (int i = 0; i < 8; i++) {
         v = (v << 8) | bombfuzzer_rand_byte();
     }
     return v;
 }
 
-void bombfuzzer_flip_random_bit(unsigned char *buf, uint64_t len)
+void bombfuzzer_flip_random_bit(unsigned char* buf, uint64_t len)
 {
-    if (len == 0)
-    {
+    if (len == 0) {
         return;
     }
     uint64_t byteIdx = bombfuzzer_rand_u64() % len;
@@ -172,10 +158,9 @@ void bombfuzzer_disarm_timeout(void)
     timeoutArmed = 0;
 }
 
-void bombfuzzer_log_finding(const BombfuzzerFinding *finding)
+void bombfuzzer_log_finding(const BombfuzzerFinding* finding)
 {
-    if (noteOccurrence(finding->harness, finding->description) > 1)
-    {
+    if (noteOccurrence(finding->harness, finding->description) > 1) {
         return; // already logged this class once this run - see noteOccurrence's comment above
     }
 
@@ -185,9 +170,8 @@ void bombfuzzer_log_finding(const BombfuzzerFinding *finding)
     snprintf(path, sizeof(path), "%s/%s_%d_%03d.log", BOMBFUZZER_FINDINGS_DIR, finding->harness,
              (int)getpid(), findingCount);
 
-    FILE *f = fopen(path, "w");
-    if (f == NULL)
-    {
+    FILE* f = fopen(path, "w");
+    if (f == NULL) {
         perror("bombfuzzer_log_finding fopen");
         return;
     }
@@ -200,11 +184,9 @@ void bombfuzzer_log_finding(const BombfuzzerFinding *finding)
     fprintf(f, "expected: %s\n", finding->expected);
     fprintf(f, "actual: %s\n", finding->actual);
 
-    if (finding->input != NULL)
-    {
+    if (finding->input != NULL) {
         fprintf(f, "input (%lu bytes, hex): ", (unsigned long)finding->input_len);
-        for (uint64_t i = 0; i < finding->input_len; i++)
-        {
+        for (uint64_t i = 0; i < finding->input_len; i++) {
             fprintf(f, "%02x", finding->input[i]);
         }
         fprintf(f, "\n");
@@ -214,12 +196,11 @@ void bombfuzzer_log_finding(const BombfuzzerFinding *finding)
     printf("bombfuzzer: FINDING logged -> %s (%s)\n", path, finding->description);
 }
 
-void bombfuzzer_report(int ok, const char *harness, const char *description, unsigned int seed,
-                       const unsigned char *input, uint64_t input_len,
-                       const char *expected, const char *actual)
+void bombfuzzer_report(int ok, const char* harness, const char* description, unsigned int seed,
+                       const unsigned char* input, uint64_t input_len,
+                       const char* expected, const char* actual)
 {
-    if (ok)
-    {
+    if (ok) {
         return;
     }
     BombfuzzerFinding finding = {
@@ -234,31 +215,26 @@ void bombfuzzer_report(int ok, const char *harness, const char *description, uns
     bombfuzzer_log_finding(&finding);
 }
 
-int bombfuzzer_run_isolated(BombfuzzerCaseFn fn, void *arg, unsigned int timeoutSecs)
+int bombfuzzer_run_isolated(BombfuzzerCaseFn fn, void* arg, unsigned int timeoutSecs)
 {
     pid_t pid = fork();
-    if (pid < 0)
-    {
+    if (pid < 0) {
         perror("bombfuzzer_run_isolated fork");
         return -1;
     }
-    if (pid == 0)
-    {
+    if (pid == 0) {
         fn(arg);
         _exit(0);
     }
 
     time_t deadline = time(NULL) + (time_t)timeoutSecs;
     int status = 0;
-    for (;;)
-    {
+    for (;;) {
         pid_t r = waitpid(pid, &status, WNOHANG);
-        if (r == pid)
-        {
+        if (r == pid) {
             break;
         }
-        if (time(NULL) >= deadline)
-        {
+        if (time(NULL) >= deadline) {
             kill(pid, SIGKILL);
             waitpid(pid, &status, 0);
             return -1;

@@ -19,13 +19,13 @@
 
 static int iterations(void)
 {
-    const char *env = getenv("BOMBFUZZER_ITERS");
+    const char* env = getenv("BOMBFUZZER_ITERS");
     return env != NULL ? atoi(env) : ITER_DEFAULT;
 }
 
 static int mutateIterations(void)
 {
-    const char *env = getenv("BOMBFUZZER_MUTATE_ITERS");
+    const char* env = getenv("BOMBFUZZER_MUTATE_ITERS");
     return env != NULL ? atoi(env) : MUTATE_ITER_DEFAULT;
 }
 
@@ -49,40 +49,37 @@ static void case_wellformed_roundtrip(unsigned int seed)
                    result.token3 != NULL && strcmp(result.token3, "HTTTP/1.0") == 0 &&
                    result.n_headers == 2 && result.body != NULL && strcmp(result.body, "test") == 0;
     bombfuzzer_report(fieldsOk, "bombfuzzer_hypertext", "well-formed roundtrip fields", seed,
-                       (const unsigned char *)raw, strlen(raw),
-                       "parse_hypertext correctly splits method/path/version/headers/body",
-                       "parse_hypertext produced mismatched fields on well-formed input");
+                      (const unsigned char*)raw, strlen(raw),
+                      "parse_hypertext correctly splits method/path/version/headers/body",
+                      "parse_hypertext produced mismatched fields on well-formed input");
 
     // parse_hypertext has no reachable 'return 0' - every path falls through to 'return -1'
     bombfuzzer_report(rc == 0, "bombfuzzer_hypertext", "parse_hypertext return code", seed, NULL, 0,
-                       "parse_hypertext returns 0 once it has successfully parsed the input",
-                       "parse_hypertext returned -1 despite parsing successfully (dead success path)");
+                      "parse_hypertext returns 0 once it has successfully parsed the input",
+                      "parse_hypertext returned -1 despite parsing successfully (dead success path)");
 }
 
 typedef struct {
     HyperText ht;
 } ParseArg;
 
-static void runParse(void *arg)
+static void runParse(void* arg)
 {
     ParsedMsgHT result;
     memset(&result, 0, sizeof(result));
-    parse_hypertext(((ParseArg *)arg)->ht, &result);
+    parse_hypertext(((ParseArg*)arg)->ht, &result);
 }
 
-static void reportCrashProbe(const char *description, unsigned int seed, const char *ht, int sig)
+static void reportCrashProbe(const char* description, unsigned int seed, const char* ht, int sig)
 {
     char actual[128];
-    if (sig > 0)
-    {
+    if (sig > 0) {
         snprintf(actual, sizeof(actual), "crashed with signal %d", sig);
-    }
-    else
-    {
+    } else {
         snprintf(actual, sizeof(actual), "hung past the timeout");
     }
-    bombfuzzer_report(sig == 0, "bombfuzzer_hypertext", description, seed, (const unsigned char *)ht, strlen(ht),
-                       "rejects malformed input gracefully instead of crashing or hanging", actual);
+    bombfuzzer_report(sig == 0, "bombfuzzer_hypertext", description, seed, (const unsigned char*)ht, strlen(ht),
+                      "rejects malformed input gracefully instead of crashing or hanging", actual);
 }
 
 // class 2: request line has no separators - next_token() returns NULL, then gets passed straight
@@ -122,7 +119,7 @@ static void case_missing_body_separator(unsigned int seed)
 
 // class 5: msg_add_header() never checks n_headers against MAX_HEADERS - the 17th call writes
 // past the fixed-size headers[] array
-static void doOverflowHeaders(void *arg)
+static void doOverflowHeaders(void* arg)
 {
     (void)arg;
     ParsedMsgHT msg;
@@ -131,8 +128,7 @@ static void doOverflowHeaders(void *arg)
 
     char fields[24][16];
     char values[24][16];
-    for (int i = 0; i < 24; i++)
-    {
+    for (int i = 0; i < 24; i++) {
         snprintf(fields[i], sizeof(fields[i]), "X-Field-%d", i);
         snprintf(values[i], sizeof(values[i]), "value-%d", i);
         msg_add_header(&msg, fields[i], values[i]);
@@ -143,17 +139,16 @@ static void case_too_many_headers(unsigned int seed)
 {
     int sig = bombfuzzer_run_isolated(doOverflowHeaders, NULL, BOMBFUZZER_TIMEOUT_SEC);
     char actual[128];
-    snprintf(actual, sizeof(actual), sig > 0 ? "crashed with signal %d writing past headers[MAX_HEADERS]"
-                                              : "completed without crashing (Valgrind may still show an invalid write)",
+    snprintf(actual, sizeof(actual), sig > 0 ? "crashed with signal %d writing past headers[MAX_HEADERS]" : "completed without crashing (Valgrind may still show an invalid write)",
              sig);
     bombfuzzer_report(sig == 0, "bombfuzzer_hypertext", "more than MAX_HEADERS headers", seed, NULL, 0,
-                       "msg_add_header rejects a header once n_headers reaches MAX_HEADERS", actual);
+                      "msg_add_header rejects a header once n_headers reaches MAX_HEADERS", actual);
 }
 
 // class 6: convert_to_hypertext's header loop is `for (i = 0; i < n_headers || offset < MAX_BUF; i++)`
 // - that `||` should be `&&`. With few headers and a short body it keeps indexing headers[] past
 // what was populated, eventually reading out of bounds and dereferencing garbage as field/value
-static void doConvertFewHeaders(void *arg)
+static void doConvertFewHeaders(void* arg)
 {
     (void)arg;
     ParsedMsgHT msg;
@@ -171,17 +166,16 @@ static void case_convert_few_headers(unsigned int seed)
     int sig = bombfuzzer_run_isolated(doConvertFewHeaders, NULL, BOMBFUZZER_TIMEOUT_SEC);
     char actual[160];
     snprintf(actual, sizeof(actual),
-             sig > 0 ? "crashed with signal %d - convert_to_hypertext read headers[] out of bounds"
-                     : "completed without crashing",
+             sig > 0 ? "crashed with signal %d - convert_to_hypertext read headers[] out of bounds" : "completed without crashing",
              sig);
     bombfuzzer_report(sig == 0, "bombfuzzer_hypertext", "convert_to_hypertext with few headers", seed, NULL, 0,
-                       "convert_to_hypertext stops its header loop once i reaches n_headers", actual);
+                      "convert_to_hypertext stops its header loop once i reaches n_headers", actual);
 }
 
 // class 7: msg_add_body rejects bodies at/over MAX_BUF
 static void case_oversized_body(unsigned int seed)
 {
-    char *body = malloc(MAX_BUF + 16);
+    char* body = malloc(MAX_BUF + 16);
     memset(body, 'A', MAX_BUF + 15);
     body[MAX_BUF + 15] = '\0';
 
@@ -190,7 +184,7 @@ static void case_oversized_body(unsigned int seed)
     int rc = msg_add_body(&msg, body);
 
     bombfuzzer_report(rc == -1, "bombfuzzer_hypertext", "oversized body", seed, NULL, (uint64_t)strlen(body),
-                       "msg_add_body rejects a body at/over MAX_BUF", "msg_add_body accepted an oversized body");
+                      "msg_add_body rejects a body at/over MAX_BUF", "msg_add_body accepted an oversized body");
     free(body);
 }
 
@@ -198,47 +192,45 @@ static void case_oversized_body(unsigned int seed)
 // which values legitimately need - eg. a Date header's "12:30:00") in the value
 static void case_illegal_chars(unsigned int seed)
 {
-    const char *badFields[] = {"Bad\rField", "Bad\nField", "Bad:Field"};
-    for (size_t i = 0; i < sizeof(badFields) / sizeof(badFields[0]); i++)
-    {
+    const char* badFields[] = {"Bad\rField", "Bad\nField", "Bad:Field"};
+    for (size_t i = 0; i < sizeof(badFields) / sizeof(badFields[0]); i++) {
         ParsedMsgHT msg;
         memset(&msg, 0, sizeof(msg));
         int rc = msg_add_header(&msg, badFields[i], "clean-value");
         bombfuzzer_report(rc == -1, "bombfuzzer_hypertext", "illegal header field", seed,
-                           (const unsigned char *)badFields[i], strlen(badFields[i]),
-                           "msg_add_header rejects fields containing CR/LF/colon",
-                           "msg_add_header accepted a field with an illegal character");
+                          (const unsigned char*)badFields[i], strlen(badFields[i]),
+                          "msg_add_header rejects fields containing CR/LF/colon",
+                          "msg_add_header accepted a field with an illegal character");
     }
 
-    const char *badValues[] = {"has\rcr", "has\nlf"};
-    for (size_t i = 0; i < sizeof(badValues) / sizeof(badValues[0]); i++)
-    {
+    const char* badValues[] = {"has\rcr", "has\nlf"};
+    for (size_t i = 0; i < sizeof(badValues) / sizeof(badValues[0]); i++) {
         ParsedMsgHT msg;
         memset(&msg, 0, sizeof(msg));
         int rc = msg_add_header(&msg, "Content-Type", badValues[i]);
         bombfuzzer_report(rc == -1, "bombfuzzer_hypertext", "illegal header value", seed,
-                           (const unsigned char *)badValues[i], strlen(badValues[i]),
-                           "msg_add_header rejects values containing CR/LF",
-                           "msg_add_header accepted a value with an illegal character");
+                          (const unsigned char*)badValues[i], strlen(badValues[i]),
+                          "msg_add_header rejects values containing CR/LF",
+                          "msg_add_header accepted a value with an illegal character");
     }
 
     ParsedMsgHT msg;
     memset(&msg, 0, sizeof(msg));
     int rc = msg_add_header(&msg, "Date", "12:30:00");
     bombfuzzer_report(rc == 0, "bombfuzzer_hypertext", "colon legal in header value", seed,
-                       (const unsigned char *)"12:30:00", 8,
-                       "msg_add_header accepts ':' in a value (colons are only illegal in field names)",
-                       "msg_add_header rejected a value containing ':'");
+                      (const unsigned char*)"12:30:00", 8,
+                      "msg_add_header accepts ':' in a value (colons are only illegal in field names)",
+                      "msg_add_header rejected a value containing ':'");
 }
 
 // class 9: mutation-based - bit-flip a well-formed request and confirm parse_hypertext never
 // crashes/hangs on it, whatever the mutation lands on (a broader, less-targeted complement to the
 // hand-picked classes above)
-static void doParseMutated(void *arg)
+static void doParseMutated(void* arg)
 {
     ParsedMsgHT result;
     memset(&result, 0, sizeof(result));
-    parse_hypertext(((ParseArg *)arg)->ht, &result);
+    parse_hypertext(((ParseArg*)arg)->ht, &result);
 }
 
 static void case_mutated_request(unsigned int seed)
@@ -251,9 +243,8 @@ static void case_mutated_request(unsigned int seed)
     memcpy(arg.ht, raw, strlen(raw) + 1);
 
     int mutations = 1 + (int)(bombfuzzer_rand_byte() % 8);
-    for (int i = 0; i < mutations; i++)
-    {
-        bombfuzzer_flip_random_bit((unsigned char *)arg.ht, strlen(raw));
+    for (int i = 0; i < mutations; i++) {
+        bombfuzzer_flip_random_bit((unsigned char*)arg.ht, strlen(raw));
     }
 
     int sig = bombfuzzer_run_isolated(doParseMutated, &arg, BOMBFUZZER_TIMEOUT_SEC);
@@ -268,8 +259,7 @@ int main(void)
     int n = iterations();
     printf("bombfuzzer_hypertext: running %d cases per equivalence class\n", n);
 
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         unsigned int caseSeed = seed + (unsigned int)i;
         case_wellformed_roundtrip(caseSeed);
         case_missing_token_separator(caseSeed);
@@ -283,8 +273,7 @@ int main(void)
 
     int m = mutateIterations();
     printf("bombfuzzer_hypertext: running %d mutation-based cases\n", m);
-    for (int i = 0; i < m; i++)
-    {
+    for (int i = 0; i < m; i++) {
         case_mutated_request(seed + (unsigned int)i);
     }
 

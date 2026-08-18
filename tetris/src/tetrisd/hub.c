@@ -8,8 +8,7 @@ int hub_send(int fd, const HubMsg* msg)
     // NOSIGNAL so a dead peer surfaces as an error instead of killing the process
     ssize_t sent = send(fd, msg, sizeof(*msg), MSG_NOSIGNAL);
 
-
-    // Did it send the whole struct (by compare memory size)? 
+    // Did it send the whole struct (by compare memory size)?
     // If not, it failed! As SEQPACKET is all-or-nothing
     return sent == (ssize_t)sizeof(*msg) ? 0 : -1;
 }

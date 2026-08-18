@@ -29,8 +29,8 @@ typedef struct
     pid_t pid;
     int hub_fd;
     uint16_t port;
-    int redirected; // Clients pointed at this room (but might have be joined yet)
-    int joined; // Arrivals the worker has confirmed
+    int redirected;                  // Clients pointed at this room (but might have be joined yet)
+    int joined;                      // Arrivals the worker has confirmed
     int pending_fds[MAX_LOBBY_SIZE]; // "Waiting Room", parked sockets until worker has initialised
     int pending_count;
 } Room;
@@ -535,7 +535,7 @@ int main(void)
     }
 
     /* --- SHUTDOWN --- */
-    // Closing the hubs is the shutdown signal, 
+    // Closing the hubs is the shutdown signal,
     // workers treat EOF as game over
     for (int i = 0; i < MAX_ROOMS; i++) {
         if (rooms[i].used) {

@@ -201,7 +201,7 @@ int send_unicast_udp(int sockfd, const char* dest_ip, const Message COMPLETE_MSG
 {
     LOG_I("[sendUnicastUDP()] sending message:\n\tsourceId: %u\n\ttype (integerified): %d\n\tcontent: %s", COMPLETE_MSG.source_id, COMPLETE_MSG.msg_type, COMPLETE_MSG.msg_content);
 
-    // preparing parameters 
+    // preparing parameters
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
         .sin_port = htons(PORT_UDP_UNI)};

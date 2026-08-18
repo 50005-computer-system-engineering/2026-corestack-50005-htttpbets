@@ -39,8 +39,7 @@ static void broadcast_feed(BRServer* server, uint32_t source, uint32_t target, u
     AttackPayload feed = {
         .source_player = source,
         .target_player = target,
-        .lines = lines
-    };
+        .lines = lines};
 
     ParsedMsgHT msg = {0};
     req_create_attack(source, &feed, &msg);
@@ -115,7 +114,6 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
     // XOR'd with the PID so the same time will always get different seeds across all workers!
     srand((unsigned)(time(NULL) ^ (unsigned)getpid()));
 
-
     // Initialize the room's log client
     char log_name[32];
     snprintf(log_name, sizeof(log_name), "tetrisd-r%d", room_index);
@@ -146,16 +144,16 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
     hub_send(hub_fd, &ready);
     room_log_msg(LOG_LEVEL_INFO, "[room %d] Lobby open on port %u.", room_index, tcp_port);
 
-    // TODO: Separate into multiple functions
-    #pragma region Lobby
+// TODO: Separate into multiple functions
+#pragma region Lobby
     // Report every arrival, wait for the master's start order */
     uint32_t lobby_size = 0;
     uint32_t client_ids[MAX_LOBBY_SIZE] = {0};
-    uint32_t reported = 0; // How many clients have reported in
-    uint32_t expected = 0; // How many clients are expected to join (while the master is waiting)
+    uint32_t reported = 0;      // How many clients have reported in
+    uint32_t expected = 0;      // How many clients are expected to join (while the master is waiting)
     bool start_ordered = false; // Whether the master has ordered the start of the match
-    time_t order_time = 0; // When the master ordered the start of the match, used for grace window
-    HubRoster global = {0}; // The global roster of all players in the lobby
+    time_t order_time = 0;      // When the master ordered the start of the match, used for grace window
+    HubRoster global = {0};     // The global roster of all players in the lobby
 
     while (1) {
         brserver_client_info(server, &lobby_size, client_ids);
@@ -217,9 +215,9 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
     GameSession session;
     init_session(&session, client_ids, lobby_size);
     room_log_msg(LOG_LEVEL_INFO, "[room %d] Match started with %d player(s).", room_index, session.count);
-    #pragma endregion Lobby
+#pragma endregion Lobby
 
-    #pragma region Authoritative Tick Loop
+#pragma region Authoritative Tick Loop
     // Non-blocking, runs while anyone in this room is alive
     HyperText buffer = {0};
     bool match_over = false;
@@ -267,7 +265,7 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
                 // Purely visual: the damage already landed wherever the real
                 // victim is, this just shows the event in this room's kill feed
                 room_log_msg(LOG_LEVEL_INFO, " <!> [room %d] feed: P%u attacked P%u with %u lines (elsewhere)",
-                            room_index, msg.attack.attacker_id, msg.attack.victim_id, msg.attack.lines);
+                             room_index, msg.attack.attacker_id, msg.attack.victim_id, msg.attack.lines);
                 broadcast_feed(server, msg.attack.attacker_id, msg.attack.victim_id, msg.attack.lines);
                 break;
             case HUB_ROSTER:
@@ -312,7 +310,7 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
 
             // Not sending any garbage, skip
             if (attacker->state.outgoing_garbage == 0)
-                continue; 
+                continue;
 
             uint32_t lines = attacker->state.outgoing_garbage;
             attacker->state.outgoing_garbage = 0; // Consume garbage
@@ -352,7 +350,7 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
         }
 
         // Push state to anyone whose board changed
-        // Dirty flag keeps traffic low by only sending on changed state, 
+        // Dirty flag keeps traffic low by only sending on changed state,
         // keepalive repairs missed updates from UDP
         for (int i = 0; i < session.count; i++) {
             PlayerSlot* slot = &session.players[i];
@@ -381,12 +379,12 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
             slot->dirty = false;
             slot->idle_ticks = 0;
         }
-        
+
         usleep(TICK_MICROSECONDS); // Advance at a fixed rate
     }
-    #pragma endregion Authoritative Tick Loop
+#pragma endregion Authoritative Tick Loop
 
-    #pragma region Room Over
+#pragma region Room Over
     // Mark everyone finished and push one final state each so clients exit cleanly
     for (int i = 0; i < session.count; i++) {
         PlayerSlot* slot = &session.players[i];
@@ -424,5 +422,5 @@ void room_worker_run(int hub_fd, uint16_t tcp_port, uint32_t id_base, int room_i
 
     brserver_end(server);
     exit(0); // Hub fd closes here, which is how the master learns the room ended
-    #pragma endregion Room Over
+#pragma endregion Room Over
 }

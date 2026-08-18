@@ -16,15 +16,14 @@
 
 static int iterations(void)
 {
-    const char *env = getenv("BOMBFUZZER_ITERS");
+    const char* env = getenv("BOMBFUZZER_ITERS");
     return env != NULL ? atoi(env) : ITER_DEFAULT;
 }
 
-static unsigned char *randomPayload(uint64_t length)
+static unsigned char* randomPayload(uint64_t length)
 {
-    unsigned char *buf = malloc(length);
-    for (uint64_t i = 0; i < length; i++)
-    {
+    unsigned char* buf = malloc(length);
+    for (uint64_t i = 0; i < length; i++) {
         buf[i] = bombfuzzer_rand_byte();
     }
     return buf;
@@ -34,33 +33,29 @@ static unsigned char *randomPayload(uint64_t length)
 static void case_wellformed(unsigned int seed)
 {
     int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0)
-    {
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
         perror("bombfuzzer_bytes socketpair");
         return;
     }
 
     uint64_t length = 1 + (bombfuzzer_rand_u32() % MAX_PAYLOAD);
-    unsigned char *payload = randomPayload(length);
+    unsigned char* payload = randomPayload(length);
     send_bytes(fds[1], payload, length);
 
-    unsigned char *out = NULL;
+    unsigned char* out = NULL;
     int rc = -1;
-    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0)
-    {
+    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0) {
         bombfuzzer_arm_timeout();
         rc = read_bytes(fds[0], &out, length);
         bombfuzzer_disarm_timeout();
 
         int matched = (rc == 0) && (out != NULL) && (memcmp(out, payload, length) == 0);
         bombfuzzer_report(matched, "bombfuzzer_bytes", "well-formed transfer", seed, payload, length,
-                           "read_bytes returns 0 with the exact bytes sent",
-                           "read_bytes returned an error or mismatched content on a well-formed transfer");
-    }
-    else
-    {
+                          "read_bytes returns 0 with the exact bytes sent",
+                          "read_bytes returned an error or mismatched content on a well-formed transfer");
+    } else {
         bombfuzzer_report(0, "bombfuzzer_bytes", "well-formed transfer", seed, payload, length,
-                           "read_bytes returns promptly", "read_bytes hung past the timeout");
+                          "read_bytes returns promptly", "read_bytes hung past the timeout");
     }
 
     free(out);
@@ -73,28 +68,24 @@ static void case_wellformed(unsigned int seed)
 static void case_zero_length(unsigned int seed)
 {
     int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0)
-    {
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
         perror("bombfuzzer_bytes socketpair");
         return;
     }
 
-    unsigned char *out = NULL;
+    unsigned char* out = NULL;
     int rc = -1;
-    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0)
-    {
+    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0) {
         bombfuzzer_arm_timeout();
         rc = read_bytes(fds[0], &out, 0);
         bombfuzzer_disarm_timeout();
 
         bombfuzzer_report(rc == 0, "bombfuzzer_bytes", "zero-length read", seed, NULL, 0,
-                           "read_bytes returns 0 for a zero-length request",
-                           "read_bytes returned an error for length == 0");
-    }
-    else
-    {
+                          "read_bytes returns 0 for a zero-length request",
+                          "read_bytes returned an error for length == 0");
+    } else {
         bombfuzzer_report(0, "bombfuzzer_bytes", "zero-length read", seed, NULL, 0,
-                           "read_bytes returns promptly", "read_bytes hung past the timeout on length == 0");
+                          "read_bytes returns promptly", "read_bytes hung past the timeout on length == 0");
     }
 
     free(out);
@@ -106,36 +97,32 @@ static void case_zero_length(unsigned int seed)
 static void case_truncated(unsigned int seed)
 {
     int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0)
-    {
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
         perror("bombfuzzer_bytes socketpair");
         return;
     }
 
     uint64_t claimedLength = 256 + (bombfuzzer_rand_u32() % MAX_PAYLOAD);
-    uint64_t actualLength = bombfuzzer_rand_u32() % claimedLength;  // strictly less than claimed
-    unsigned char *payload = randomPayload(actualLength);
+    uint64_t actualLength = bombfuzzer_rand_u32() % claimedLength; // strictly less than claimed
+    unsigned char* payload = randomPayload(actualLength);
     send_bytes(fds[1], payload, actualLength);
-    close(fds[1]);   // disconnect before the claimed length is satisfied
+    close(fds[1]); // disconnect before the claimed length is satisfied
 
-    unsigned char *out = NULL;
-    int rc = -2;   // sentinel distinct from read_bytes' own -1/0
-    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0)
-    {
+    unsigned char* out = NULL;
+    int rc = -2; // sentinel distinct from read_bytes' own -1/0
+    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0) {
         bombfuzzer_arm_timeout();
         rc = read_bytes(fds[0], &out, claimedLength);
         bombfuzzer_disarm_timeout();
 
         bombfuzzer_report(rc == -1 && out == NULL, "bombfuzzer_bytes", "truncated transfer", seed, payload,
-                           actualLength,
-                           "read_bytes returns -1 and frees its buffer once the peer closes early",
-                           "read_bytes did not cleanly report the truncated/closed connection");
-    }
-    else
-    {
+                          actualLength,
+                          "read_bytes returns -1 and frees its buffer once the peer closes early",
+                          "read_bytes did not cleanly report the truncated/closed connection");
+    } else {
         bombfuzzer_report(0, "bombfuzzer_bytes", "truncated transfer", seed, payload, actualLength,
-                           "read_bytes returns promptly once the peer closes",
-                           "read_bytes hung past the timeout instead of observing EOF");
+                          "read_bytes returns promptly once the peer closes",
+                          "read_bytes hung past the timeout instead of observing EOF");
     }
 
     free(out);
@@ -147,31 +134,27 @@ static void case_truncated(unsigned int seed)
 static void case_send_after_peer_close(unsigned int seed)
 {
     int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0)
-    {
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
         perror("bombfuzzer_bytes socketpair");
         return;
     }
-    close(fds[0]);   // "peer" hangs up its read end first
+    close(fds[0]); // "peer" hangs up its read end first
 
     uint64_t length = 1 + (bombfuzzer_rand_u32() % MAX_PAYLOAD);
-    unsigned char *payload = randomPayload(length);
+    unsigned char* payload = randomPayload(length);
 
     int rc = -2;
-    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0)
-    {
+    if (sigsetjmp(bombfuzzer_jmpbuf, 1) == 0) {
         bombfuzzer_arm_timeout();
         rc = send_bytes(fds[1], payload, length);
         bombfuzzer_disarm_timeout();
 
         bombfuzzer_report(rc < 0, "bombfuzzer_bytes", "send after peer close", seed, payload, length,
-                           "send_bytes returns a negative code once send() fails on a closed peer",
-                           "send_bytes reported success (returned 0) despite send() failing");
-    }
-    else
-    {
+                          "send_bytes returns a negative code once send() fails on a closed peer",
+                          "send_bytes reported success (returned 0) despite send() failing");
+    } else {
         bombfuzzer_report(0, "bombfuzzer_bytes", "send after peer close", seed, payload, length,
-                           "send_bytes returns promptly", "send_bytes hung past the timeout");
+                          "send_bytes returns promptly", "send_bytes hung past the timeout");
     }
 
     free(payload);
@@ -180,14 +163,13 @@ static void case_send_after_peer_close(unsigned int seed)
 
 int main(void)
 {
-    signal(SIGPIPE, SIG_IGN);   // a broken pipe should surface as send()'s return value, not kill us
+    signal(SIGPIPE, SIG_IGN); // a broken pipe should surface as send()'s return value, not kill us
     unsigned int seed = bombfuzzer_init_seed();
 
     int n = iterations();
     printf("bombfuzzer_bytes: running %d cases per equivalence class\n", n);
 
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         case_wellformed(seed + (unsigned int)i);
         case_zero_length(seed + (unsigned int)i);
         case_truncated(seed + (unsigned int)i);
