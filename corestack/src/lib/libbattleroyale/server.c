@@ -20,6 +20,17 @@ static MessageQueue server_messages;
 static pthread_mutex_t server_messages_lock;
 static int pc_flags[2] = {0, 0};
 
+// Client IDs whose TCP connection dropped mid-GAME (forced disconnect: closed
+// window, killed process, network drop). server_game_state() only ever
+// marked the pollfd unusable and moved on; nothing told the app layer a
+// player vanished, so a caller like bombd had no way to react (eg: kill
+// their character) - this is that missing signal, drained via
+// brserver_get_disconnected()
+#define MAX_TRACKED_DISCONNECTS 64
+static uint32_t disconnected_ids[MAX_TRACKED_DISCONNECTS];
+static int disconnected_count = 0;
+static pthread_mutex_t disconnected_lock = PTHREAD_MUTEX_INITIALIZER;
+
 // private functions
 int free_server(Server** server_ptr)
 {
@@ -325,12 +336,17 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
     // setup pollfd array for clients being listened to
     struct pollfd* listen_fd_tcp = malloc(sizeof(struct pollfd) * server_ptr->clients->count);
     struct pollfd* current_fd = listen_fd_tcp;
+    // Parallel array so a failed read on listen_fd_tcp[i] can be reported
+    // against the right player id (see brserver_get_disconnected)
+    uint32_t* client_ids_by_pfd = malloc(sizeof(uint32_t) * server_ptr->clients->count);
+    uint32_t* current_id_slot = client_ids_by_pfd;
     // loop through server's clients
     for (ClientNode* current_client = server_ptr->clients->head; current_client != NULL; current_client = current_client->next) {
         current_fd->fd = current_client->client.socks->tcp;
         current_fd->events = POLLIN;
         current_fd->revents = 0;
         current_fd++;
+        *current_id_slot++ = current_client->client.id;
     }
     struct pollfd listen_fd_udp;
     listen_fd_udp.fd = server_ptr->self->socks->udp_uni;
@@ -339,14 +355,11 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
 
     // while the GAME state is active, monitor for messages to each port
     while (server_ptr->self->state == GAME) {
-        // poll for any tcp activity
-        int socket_activity = poll(listen_fd_tcp, server_ptr->clients->count, 50);
-        if (socket_activity <= 0) // timeout configured to prevent perma-blocking
-        {
-            continue; // skip if nothing
-        }
-
-        // listen to each message and handle
+        // poll for any tcp activity. Timeout dropped from 50ms to 5ms: a
+        // 60Hz stream of unicast UDP (eg: Bomberman's movement input) queues
+        // up in the kernel receive buffer far faster than one loop iteration
+        // every ~50-100ms can drain, so this loop needs to cycle quickly
+        int socket_activity = poll(listen_fd_tcp, server_ptr->clients->count, 5);
         Message msg;
         for (uint32_t i = 0; i < server_ptr->clients->count && socket_activity > 0; i++) // Changed condition from || to && to prevent array out-of-bounds access
         {
@@ -397,7 +410,7 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
             int fd = listen_fd_udp.fd;
             if (receive_message_udp(fd, &msg) < 0) {
                 LOG_E("[serverGameState()] could not read message from UDP unicast socket fd %d", fd);
-                continue;
+                break;
             }
             LOG_D("[serverGameState()] received message:\n\tsource: %u\n\ttype (integerified): %d\n\tcontent: %s", msg.source_id, msg.msg_type, msg.msg_content);
 
@@ -419,6 +432,7 @@ void server_game_state(Server* server_ptr) // loop where listens for unicast fro
         // TODO other type message handling
     }
     free(listen_fd_tcp); // free to prevent memory leaks
+    free(client_ids_by_pfd);
 }
 
 void server_end_state(Server* server_ptr)
@@ -759,4 +773,20 @@ int brserver_get_app_msg(unsigned char return_msg[2048])
     } else {
         return 0;
     }
+}
+
+int brserver_get_disconnected(uint32_t* return_id)
+{
+    int got = 0;
+    pthread_mutex_lock(&disconnected_lock);
+    if (disconnected_count > 0) {
+        *return_id = disconnected_ids[0];
+        for (int i = 1; i < disconnected_count; i++) {
+            disconnected_ids[i - 1] = disconnected_ids[i];
+        }
+        disconnected_count--;
+        got = 1;
+    }
+    pthread_mutex_unlock(&disconnected_lock);
+    return got;
 }

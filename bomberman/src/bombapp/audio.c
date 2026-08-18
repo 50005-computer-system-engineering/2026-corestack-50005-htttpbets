@@ -11,6 +11,14 @@ Music bgm_tracks[BGM_COUNT] = {0};
 Sound sfx_tracks[SFX_COUNT] = {0};
 
 Music* curr_bgm = NULL;
+static BGM curr_bgm_id = BGM_COUNT; // BGM_COUNT doubles as "none playing yet"
+
+// How long the battle theme takes to fade back up to full volume once a
+// one-shot win/lose track finishes
+#define BGM_FADE_IN_SECONDS 1.5f
+static float fade_in_elapsed = -1.0f; // < 0 means "not fading"
+
+static void play_bgm_faded_in(BGM bgm);
 
 static void set_sound_position(Camera2D listener, Sound sound, Vector2 sound_pos, float max_dist)
 {
@@ -47,6 +55,18 @@ void on_bomb_exploded(void* args)
     play_sound(SFX_BOMB);
 }
 
+void on_player_died(void* args)
+{
+    (void)args;
+    play_bgm(BGM_LOSE);
+}
+
+void on_match_won(void* args)
+{
+    (void)args;
+    play_bgm(BGM_WIN);
+}
+
 void audio_init()
 {
     InitAudioDevice();
@@ -63,6 +83,10 @@ void audio_init()
     bgm_tracks[BGM_BATTLE] = LoadMusicStream("../../assets/audio/bgm/03_Battle.mp3");
     bgm_tracks[BGM_WIN] = LoadMusicStream("../../assets/audio/bgm/04_BattleWin.mp3");
     bgm_tracks[BGM_LOSE] = LoadMusicStream("../../assets/audio/bgm/04_BattleLose.mp3");
+    // Play once, not on a loop: audio_update() notices when these end and
+    // fades the battle theme back in
+    bgm_tracks[BGM_WIN].looping = false;
+    bgm_tracks[BGM_LOSE].looping = false;
 
     // Initialise SFX tracks
     sfx_tracks[SFX_PLACEBOMB] = LoadSound("../../assets/audio/sfx/bomb_place.wav");
@@ -78,12 +102,32 @@ void audio_init()
 
     // Listen for events
     event_bus_listen(EVENT_BOMB_EXPLODED, on_bomb_exploded);
+    event_bus_listen(EVENT_PLAYER_DIED, on_player_died);
+    event_bus_listen(EVENT_MATCH_WON, on_match_won);
 }
 
 void audio_update()
 {
-    if (curr_bgm != NULL)
-        UpdateMusicStream(*curr_bgm);
+    if (curr_bgm == NULL)
+        return;
+
+    UpdateMusicStream(*curr_bgm);
+
+    if (fade_in_elapsed >= 0.0f) {
+        fade_in_elapsed += GetFrameTime();
+        float t = fade_in_elapsed / BGM_FADE_IN_SECONDS;
+        if (t >= 1.0f) {
+            t = 1.0f;
+            fade_in_elapsed = -1.0f; // Fade complete
+        }
+        SetMusicVolume(*curr_bgm, t * CONFIG.SETTINGS.MUSIC_VOLUME);
+    }
+
+    // A one-shot track (win/lose) reached its end: return to the battle
+    // theme, fading it back in rather than snapping straight to full volume
+    if (!bgm_tracks[curr_bgm_id].looping && !IsMusicStreamPlaying(*curr_bgm)) {
+        play_bgm_faded_in(BGM_BATTLE);
+    }
 }
 
 void play_sound(SFX sfx)
@@ -95,7 +139,23 @@ void play_bgm(BGM bgm)
 {
     if (curr_bgm != NULL)
         StopMusicStream(*curr_bgm);
+    curr_bgm_id = bgm;
     curr_bgm = &bgm_tracks[bgm];
+    fade_in_elapsed = -1.0f; // Direct plays start at full volume, no fade
+    SetMusicVolume(*curr_bgm, CONFIG.SETTINGS.MUSIC_VOLUME);
+    PlayMusicStream(*curr_bgm);
+}
+
+// Same as play_bgm(), but starts silent and ramps up to full volume over
+// BGM_FADE_IN_SECONDS instead of starting at full volume immediately
+static void play_bgm_faded_in(BGM bgm)
+{
+    if (curr_bgm != NULL)
+        StopMusicStream(*curr_bgm);
+    curr_bgm_id = bgm;
+    curr_bgm = &bgm_tracks[bgm];
+    fade_in_elapsed = 0.0f;
+    SetMusicVolume(*curr_bgm, 0.0f);
     PlayMusicStream(*curr_bgm);
 }
 
@@ -110,6 +170,8 @@ void audio_cleanup()
         UnloadSound(sfx_tracks[i]);
 
     event_bus_stop_listening(EVENT_BOMB_EXPLODED, on_bomb_exploded);
+    event_bus_stop_listening(EVENT_PLAYER_DIED, on_player_died);
+    event_bus_stop_listening(EVENT_MATCH_WON, on_match_won);
 
     CloseAudioDevice();
 }

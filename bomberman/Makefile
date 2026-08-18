@@ -106,7 +106,7 @@ $(eval $(call FETCH_TARBALL_template,RAYLIB))
 $(TARGET): $(BIN_OUT)/$(LAUNCHER_BIN)
 	ln -sf $(BIN_OUT)/$(LAUNCHER_BIN) $(TARGET)
 
-.PHONY: run deps distclean
+.PHONY: run deps distclean kill-server
 
 run: $(TARGET)
 	./$(TARGET)
@@ -218,3 +218,12 @@ clean:
 # Remove /deps and build artifacts
 distclean: clean
 	rm -rf $(DEPS_DIR)
+
+SERVER_BIN := bombd
+CLIENT_BIN := bombu
+SERVER_PORT := 6700
+
+kill-server:
+	@pkill -9 -x "${SERVER_BIN}" 2>/dev/null; \
+	fuser -k ${SERVER_PORT}/tcp 2>/dev/null; \
+	echo "Killed any ${SERVER_BIN} process and freed port ${SERVER_PORT}."

@@ -57,6 +57,28 @@ int prepare_udp(Sockets* socks, char* server_ip)
     return 0;
 }
 
+// connect()'s the unicast UDP socket to the server, so brclient_send_msg_udp
+// can just send() without re-specifying the destination each call
+int connect_udp_uni(Sockets* socks, char* server_ip)
+{
+    LOG_I("[connectUDPUni()] connecting unicast UDP socket to server at %s:%u...", server_ip, PORT_UDP_UNI);
+
+    struct sockaddr_in server_addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT_UDP_UNI)};
+    if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) < 0) {
+        perror("[connectUDPUni()] inet_pton");
+        return -1;
+    }
+    if (connect(socks->udp_uni, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("[connectUDPUni()] connect");
+        return -1;
+    }
+
+    LOG_I("[connectUDPUni()] unicast UDP socket connected");
+    return 0;
+}
+
 // private state functions
 typedef void (*StateLoops)(Endpoint* client);
 
@@ -397,6 +419,11 @@ int brclient_join(BRClient* client_ptr, char* ip_address)
     // prepare UDP ports for future use upon connection
     if (prepare_udp(this_client->socks, ip_address) < 0) {
         LOG_E("[brclient_join()] could not prepare UDP port to receive broadcasts");
+        return -1;
+    }
+    // Point the unicast UDP socket at the server so brclient_send_msg_udp can just send()
+    if (connect_udp_uni(this_client->socks, ip_address) < 0) {
+        LOG_E("[brclient_join()] could not connect unicast UDP socket to server");
         return -1;
     }
 

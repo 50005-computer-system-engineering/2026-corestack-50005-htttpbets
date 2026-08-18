@@ -13,6 +13,8 @@ typedef enum {
 
     // Events
     EVENT_BOMB_EXPLODED,
+    EVENT_PLAYER_DIED, // Local player only, fired once on the alive->dead transition
+    EVENT_MATCH_WON,   // Local player was still alive when the match ended
 
     // Final Count
     EVENT_COUNT
